@@ -18,7 +18,6 @@ export default class Spawner {
       const s = this.group.get(x, y, 'gameplay', frame) as Enemy
       s.setActive(true).setVisible(true).setScale(0.5)
       s.body.enable = true
-      // @ts-expect-error custom tag
       s.setData('etype', type)
       const healthBar = this.scene.add.graphics()
       s.setData('healthBar', healthBar)
@@ -26,7 +25,7 @@ export default class Spawner {
       try {
         const balance = this.scene.registry.get('balance') as any
         const hp = balance?.enemies?.[type]?.hp ?? (type === 'brute' ? 6 : type === 'dasher' ? 3 : 1)
-        // @ts-expect-error custom
+ 
         s.setData('hp', hp)
       } catch {}
       s.body.setCircle(Math.max(s.width, s.height) / 2)

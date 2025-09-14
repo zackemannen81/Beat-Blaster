@@ -30,12 +30,12 @@ export default class Powerups extends Phaser.Events.EventEmitter {
         this.slowmoUntil = Math.max(this.slowmoUntil, end)
         this.scene.time.timeScale = 0.8
         // physics
-        // @ts-expect-error world exists
+        
         if (this.scene.physics?.world) this.scene.physics.world.timeScale = 0.8
         this.scene.time.delayedCall(durationSec * 1000, () => {
           if (!this.hasSlowmo) {
             this.scene.time.timeScale = 1
-            // @ts-expect-error world exists
+        
             if (this.scene.physics?.world) this.scene.physics.world.timeScale = 1
           }
         })

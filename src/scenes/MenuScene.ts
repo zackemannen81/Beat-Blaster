@@ -20,15 +20,22 @@ export default class MenuScene extends Phaser.Scene {
     this.starfield = new Starfield(this)
     this.starfield.create()
 
-    this.add.text(width / 2, height * 0.35, 'Beat Blaster', {
+    
+   /* 
+      this.add.text(width / 2, height * 0.35, 'Beat Blaster', {
       fontFamily: 'HudFont, UiFont, sans-serif',
       fontSize: '48px',
       color: '#ffffff'
     }).setOrigin(0.5)
+    */
+    const logo = this.add.image(width / 2, height * 0.35, 'menulogo')
+    logo.setOrigin(0.5)
+    // Adjust scale if needed:
+    logo.setScale(0.5)
 
     this.hint = this.add.text(width / 2, height * 0.85, 'SPACE: Play   ↑/↓: Select   O: Options', {
       fontFamily: 'UiFont, sans-serif',
-      fontSize: '20px',
+      fontSize: '16px',
       color: '#a0e9ff'
     }).setOrigin(0.5)
 
@@ -45,7 +52,7 @@ export default class MenuScene extends Phaser.Scene {
     this.index = Math.max(0, this.tracks.findIndex((t: any) => t.id === initialId))
     this.list = this.add.text(width / 2, height * 0.6, '', {
       fontFamily: 'UiFont, sans-serif',
-      fontSize: '18px',
+      fontSize: '14px',
       color: '#ffffff',
       align: 'center'
     }).setOrigin(0.5)

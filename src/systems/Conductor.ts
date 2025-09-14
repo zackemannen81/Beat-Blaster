@@ -13,6 +13,7 @@ export default class Conductor extends Phaser.Events.EventEmitter {
   }
 
   onBeat() {
+   //console.log('Beat detected, calculating BPM...')
     this.beatCount++
     if (this.beatCount % this.barBeats === 1) {
       this.lastBarTime = this.scene.time.now

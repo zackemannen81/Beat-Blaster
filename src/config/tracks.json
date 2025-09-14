@@ -26,7 +26,7 @@
     "name": "Neon Reverie",
     "artist": "Alex Harmony",
     "inputOffsetMs": 0,
-    "lengthSec": 120,
+    "lengthSec": 77,
     "fileOgg": "",
     "fileMp3": "src/assets/audio/tracks/track_03.mp3",
     "difficultyProfileId": "normal",
@@ -37,10 +37,33 @@
     "name": "Electric heartbeat",
     "artist": "Alex Harmony",
     "inputOffsetMs": 0,
-    "lengthSec": 120,
+    "lengthSec": 77,
     "fileOgg": "",
     "fileMp3": "src/assets/audio/tracks/track_04.mp3",
     "difficultyProfileId": "normal",
     "hash": "91913fcb63140356966ac881688e6ae6170bc333"
+  },
+  {
+    "id": "track_05",
+    "name": "Electric Pulse",
+    "artist": "Alex Harmony",
+    "inputOffsetMs": 0,
+    "lengthSec": 120,
+    "fileOgg": "",
+    "fileMp3": "src/assets/audio/tracks/track_05.mp3",
+    "difficultyProfileId": "hard",
+    "hash": "91913fcb63140356966ac881688e6ae6170bc333"
+  },
+  {
+    "id": "track_06",
+    "name": "Dark dancer",
+    "artist": "Alex Harmony",
+    "inputOffsetMs": 0,
+    "lengthSec": 138,
+    "fileOgg": "",
+    "fileMp3": "src/assets/audio/tracks/track_06.mp3",
+    "difficultyProfileId": "easy",
+    "hash": "91913fcb63140356966ac881688e6ae6170bc333"
   }
+  
 ]

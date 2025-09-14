@@ -8,21 +8,25 @@ export default class Effects {
   }
 
   hitSpark(x: number, y: number) {
+    // Create and position the emitter at the target coordinates
     const emitter = this.scene.add.particles(x, y, 'particles', {
-      frame: ['particle_circle_small', 'star_small'],
-      speed: { min: 60, max: 160 },
-      lifespan: 300,
-      scale: { start: 0.6, end: 0 },
+      frame: ['particle_glow_small', 'particle_circle_small', 'star_small'],
+      speed: { min: 80, max: 200 },
+      lifespan: 400,
+      scale: { start: 0.8, end: 0 },
       alpha: { start: 1, end: 0 },
-      blendMode: 'ADD'
+      blendMode: 'ADD',
+      quantity: 2,
+      frequency: 100
     })
-    emitter.explode(10, x, y)
-    this.scene.time.delayedCall(200, () => emitter.destroy())
+    // Emit particles at the emitter's position
+    emitter.explode(12, 0, 0)
+    this.scene.time.delayedCall(400, () => emitter.destroy())
   }
 
   explosion(x: number, y: number) {
     const emitter = this.scene.add.particles(x, y, 'particles', {
-      frame: ['particle_glow_small', 'particle_circle_small'],
+      frame: ['particle_glow_small', 'particle_circle_small','star_small'],
       speed: { min: 120, max: 300 },
       lifespan: 600,
       scale: { start: 1.0, end: 0 },
@@ -39,11 +43,16 @@ export default class Effects {
       frame: 'particle_glow_small',
       speed: 0,
       lifespan: 120,
-      scale: { start: 0.6, end: 0 },
+      scale: { start: 0.8, end: 0 },
       alpha: { start: 1, end: 0 },
-      blendMode: 'ADD'
+      blendMode: 'ADD',
+      emitZone: {
+        type: 'random',
+        source: new Phaser.Geom.Circle(0, 0, 5),
+        quantity: 1
+      }
     })
-    emitter.explode(1, 0, 0)
+    emitter.explode(1)
     this.scene.time.delayedCall(120, () => {
       // The emitter is a manager; destroying it cleans up all child emitters.
       emitter.destroy()
@@ -52,11 +61,16 @@ export default class Effects {
 
   beatPulse() {
     const cam = this.scene.cameras.main
+    const originalZoom = cam.zoom
     this.scene.tweens.add({
       targets: cam,
-      zoom: cam.zoom + 0.02,
+      zoom: originalZoom * 1.12,  // Scale by percentage to maintain relative zoom
       duration: 60,
-      yoyo: true
+      yoyo: true,
+      onComplete: () => {
+        cam.zoom = originalZoom  // Ensure we return to the exact original zoom
+        cam.setZoom(1)
+      }
     })
   }
 

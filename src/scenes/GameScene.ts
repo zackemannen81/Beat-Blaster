@@ -23,7 +23,7 @@ export default class GameScene extends Phaser.Scene {
   private lastShotAt = 0
   private bulletSpeed = 900
   private bulletTtlMs = 1000
-  private fireCooldownMs = 120
+  private fireCooldownMs = 50
   private effects!: Effects
   private powerups!: Powerups
   private playerHp = 3
@@ -34,16 +34,18 @@ export default class GameScene extends Phaser.Scene {
   private lastDashToggle = 0
   private lastBeatAt = 0
   private nextQuantizedShotAt = 0
-  private beatPeriodMs = 500 // fallback
+  private beatPeriodMs = 2000 // fallback
   private crosshair!: Phaser.GameObjects.Graphics
   private starfield!: Starfield
-  private enemyCap = 15
+  private enemyCap = 25
   private fallbackCycle = 0
   private comboCount = 0
   private comboTimeoutMs = 2000
   private lastHitAt = 0
   private opts = loadOptions()
+  private beatIndicator!: Phaser.GameObjects.Graphics;
 
+  //private keys:Phaser.Types.Input.Keyboard;
   constructor() {
     super('GameScene')
   }
@@ -58,8 +60,32 @@ export default class GameScene extends Phaser.Scene {
 
     // Player sprite from atlas
     this.player = this.physics.add.sprite(width / 2, height / 2, 'gameplay', 'player_idle')
+    this.player.setScale(0.5);
     this.player.setCollideWorldBounds(true)
+    this.player.setRotation(Math.PI/2) // Rotate 90 degrees to face right
 
+    this.beatIndicator = this.add.graphics();
+    this.beatIndicator.fillStyle(0xff0000, 1);
+    this.beatIndicator.fillCircle(this.player.x, this.player.y, 20); // Placera den där det passar i ditt UI
+
+  /*
+    // aktivera WASD
+    this.keys = this.input.keyboard!.addKeys({
+      up: Phaser.Input.Keyboard.KeyCodes.W,
+      down: Phaser.Input.Keyboard.KeyCodes.S,
+      left: Phaser.Input.Keyboard.KeyCodes.A,
+      right: Phaser.Input.Keyboard.KeyCodes.D,
+      space: Phaser.Input.Keyboard.KeyCodes.SPACE,
+      shift: Phaser.Input.Keyboard.KeyCodes.SHIFT
+    }) as {
+      up: Phaser.Input.Keyboard.Key;
+      down: Phaser.Input.Keyboard.Key;
+      left: Phaser.Input.Keyboard.Key;
+      right: Phaser.Input.Keyboard.Key;
+      space: Phaser.Input.Keyboard.Key;
+      shift: Phaser.Input.Keyboard.Key;
+    };
+*/
     this.cursors = this.input.keyboard!.createCursorKeys()
 
     // Read balance
@@ -99,22 +125,61 @@ export default class GameScene extends Phaser.Scene {
     const tracks = this.registry.get('tracks') as any[]
     const selId = this.registry.get('selectedTrackId') as string | null
     const track = tracks?.find((t) => t.id === selId)
-    if (track) {
-      this.load.audio('music', [track.fileOgg || '', track.fileMp3 || ''].filter(Boolean))
-      this.load.once(Phaser.Loader.Events.COMPLETE, () => {
-        this.music = this.sound.add('music', { loop: false, volume: this.opts.musicVolume })
-        this.music.play()
-      })
-      this.load.start()
-    }
-
-    // Analyzer + Conductor
+    
+    // Initialize analyzer first
     this.analyzer = new AudioAnalyzer(this)
-    this.analyzer.attachToAudio()
     this.conductor = new Conductor(this)
+    
+    // Set up beat listeners
     this.analyzer.on('beat:low', () => { this.conductor.onBeat(); this.lastBeatAt = this.time.now })
     this.analyzer.on('beat:mid', () => { this.conductor.onBeat(); this.lastBeatAt = this.time.now })
     this.analyzer.on('beat:high', () => { this.conductor.onBeat(); this.lastBeatAt = this.time.now })
+    
+    if (track) {
+      // First, ensure the audio context is running
+      const soundManager = this.sound as Phaser.Sound.WebAudioSoundManager;
+      if (soundManager.context.state === 'suspended') {
+        soundManager.context.resume().catch(console.error);
+      }
+
+      this.load.audio('music', [track.fileOgg || '', track.fileMp3 || ''].filter(Boolean));
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+        try {
+          // Create and configure the music
+          this.music = this.sound.add('music', { 
+            loop: false, 
+            volume: this.opts.musicVolume
+          });
+          
+          // Start playing the music
+          this.music.on('play', () => {
+            console.log('Music started playing');
+            
+            // Attach analyzer after a short delay
+            setTimeout(() => {
+              if (this.music) {
+                if (this.analyzer.attachToAudio(this.music)) {
+                  console.log('Analyzer attached successfully');
+                } else {
+                  console.warn('Failed to attach analyzer');
+                }
+              }
+            }, 500);
+          });
+          
+          // Start playback
+          this.music.play();
+          
+        } catch (error) {
+          console.error('Error initializing audio:', error);
+        }
+      });
+      
+      this.load.start();
+    } else {
+      console.warn('No track selected or track not found');
+    }
+
     // Read metronome from options
     this.metronome = this.opts.metronome
     this.analyzer.on('beat:low', () => {
@@ -141,7 +206,7 @@ export default class GameScene extends Phaser.Scene {
     // Fallback BPM-driven spawns if analyzer events are not firing
     const bpm = (track && track.bpm) ? track.bpm : 120
     const interval = 60000 / bpm
-    this.time.addEvent({ delay: interval, loop: true, callback: () => {
+/*    this.time.addEvent({ delay: interval, loop: true, callback: () => {
       if (!canSpawn()) return
       // If no analyzer beat in the last 1.5 intervals, synthesize spawns (one type at a time)
       if (this.time.now - this.lastBeatAt > interval * 1.5) {
@@ -152,7 +217,7 @@ export default class GameScene extends Phaser.Scene {
         this.fallbackCycle++
       }
     }})
-
+*/
     // HUD
     this.hud = new HUD(this)
     this.hud.create()
@@ -169,6 +234,7 @@ export default class GameScene extends Phaser.Scene {
       const bullet = _b as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
       const enemy = _e as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
       const etype = (enemy.getData('etype') as 'brute' | 'dasher' | 'swarm') || 'swarm'
+      
       const hp = (enemy.getData('hp') as number) ?? 1
       const dmg = 1
       const newHp = hp - dmg
@@ -201,6 +267,8 @@ export default class GameScene extends Phaser.Scene {
       if (this.powerups.hasShield) {
         // shield blocks one hit
         this.effects.hitSpark(this.player.x, this.player.y)
+        //this.effects.hitSpark(20, 20)
+      
       } else {
         enemy.disableBody(true, true)
         this.playerHp = Math.max(0, this.playerHp - 1)
@@ -237,6 +305,11 @@ export default class GameScene extends Phaser.Scene {
     // Starfield update
     if (this.starfield) this.starfield.update(delta)
 
+      if (this.time.now - this.lastBeatAt < 100) { // Visa cirkeln i 100ms efter varje beat
+        this.beatIndicator.setAlpha(1);
+    } else {
+        this.beatIndicator.setAlpha(0.3); // Gör den genomskinlig när inget beat
+    }
     // Combo timeout
     if (this.comboCount > 0 && time - this.lastHitAt > this.comboTimeoutMs) {
       this.comboCount = 0
@@ -253,7 +326,7 @@ export default class GameScene extends Phaser.Scene {
     const speed = 250
     const body = this.player.body
     body.setVelocity(0, 0)
-
+//if (this.keys.)
     if (this.cursors.left?.isDown) body.velocity.x = -speed
     else if (this.cursors.right?.isDown) body.velocity.x = speed
     if (this.cursors.up?.isDown) body.velocity.y = -speed
@@ -291,7 +364,7 @@ export default class GameScene extends Phaser.Scene {
     const pointer = this.input.activePointer
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
     const ang = Phaser.Math.Angle.Between(this.player.x, this.player.y, world.x, world.y)
-    this.player.setRotation(ang)
+    this.player.setRotation(ang+Math.PI/2) 
     // Draw reticle
     this.crosshair.clear()
     this.crosshair.lineStyle(2, 0x00e5ff, 0.9)
@@ -320,13 +393,24 @@ export default class GameScene extends Phaser.Scene {
     b.body.enable = true
     b.body.setVelocity(dir.x * this.bulletSpeed, dir.y * this.bulletSpeed)
     b.setRotation(Math.atan2(dir.y, dir.x) + Math.PI / 2)
-    // TTL
-    const dieAt = this.time.now + this.bulletTtlMs
-    b.setData('dieAt', dieAt)
-    this.time.addEvent({ delay: this.bulletTtlMs, callback: () => b.disableBody(true, true) })
+    // Set bullet lifetime
+    b.setData('spawnTime', this.time.now)
+    
+    // Disable bullet when it goes off-screen or hits something
+    b.body.onWorldBounds = true
+    b.body.world.on('worldbounds', (body: Phaser.Physics.Arcade.Body) => {
+      if (body.gameObject === b) {
+        b.disableBody(true, true)
+      }
+    })
     this.sound.play('shot', { volume: this.opts.sfxVolume })
-    this.effects.muzzleFlash(this.player.x + dir.x * 12, this.player.y + dir.y * 12)
-    // Split-shot
+   // Position the muzzle flash slightly in front of the player in the direction of fire
+   this.effects.muzzleFlash(
+     this.player.x + dir.x * 8,
+     this.player.y + dir.y * 8
+   )
+     
+   // Split-shot
     if (this.powerups.hasSplit) {
       const ang = 12 * (Math.PI / 180)
       const dirL = dir.clone().rotate(-ang)
@@ -360,12 +444,12 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private maybeDropPickup(x: number, y: number) {
-    const chance = 0.15
+    const chance = 0.2
     if (Math.random() > chance) return
     const types: PowerupType[] = ['shield', 'rapid', 'split', 'slowmo']
     const type = types[Math.floor(Math.random() * types.length)]
     const frame =
-      type === 'shield' ? 'pickup_shield' : type === 'rapid' ? 'pickup_rapid' : type === 'split' ? 'pickup_split' : 'pickup_slowmo'
+    type === 'shield' ? 'pickup_shield' : type === 'rapid' ? 'pickup_rapid' : type === 'split' ? 'pickup_split' : 'pickup_slowmo'
     const s = this.physics.add.sprite(x, y, 'gameplay', frame)
     s.setData('ptype', type)
     s.setDepth(1)
@@ -423,7 +507,7 @@ export default class GameScene extends Phaser.Scene {
     healthBar.fillRect(x, y, barWidth, barHeight)
 
     if (healthPercentage > 0) {
-      healthBar.fillStyle(0x00ff00)
+      healthBar.fillStyle(0x0066ff)
       healthBar.fillRect(x, y, barWidth * healthPercentage, barHeight)
     }
   }
@@ -432,5 +516,8 @@ export default class GameScene extends Phaser.Scene {
     // Stop music
     this.music?.stop()
     this.scene.start('ResultScene', { score: this.scoring.score })
+  }
+  public getMusic(): Phaser.Sound.BaseSound | undefined {
+    return this.music;
   }
 }

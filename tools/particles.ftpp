@@ -1,0 +1,42 @@
+{
+  "images": [
+    {
+      "name": "particle_circle_small.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/particles/particle_circle_small.png"
+    },
+    {
+      "name": "particle_glow_small.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/particles/particle_glow_small.png"
+    },
+    {
+      "name": "star_small.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/particles/star_small.png"
+    },
+    {
+      "name": "trail_streak.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/particles/trail_streak.png"
+    }
+  ],
+  "folders": [],
+  "savePath": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/src/assets/sprites",
+  "packOptions": {
+    "textureName": "particles.atlas",
+    "width": 2048,
+    "height": 2048,
+    "fixedSize": false,
+    "powerOfTwo": true,
+    "padding": 4,
+    "extrude": 2,
+    "allowRotation": false,
+    "detectIdentical": true,
+    "allowTrim": true,
+    "trimMode": "trim",
+    "alphaThreshold": 0,
+    "removeFileExtension": true,
+    "prependFolderName": false,
+    "textureFormat": "png",
+    "base64Export": false,
+    "scale": 1,
+    "exporter": "JsonHash"
+  }
+}

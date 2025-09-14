@@ -1,0 +1,106 @@
+{
+  "images": [
+    {
+      "name": "accuracy_ring_0.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/accuracy_ring_0.png"
+    },
+    {
+      "name": "accuracy_ring_1.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/accuracy_ring_1.png"
+    },
+    {
+      "name": "accuracy_ring_2.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/accuracy_ring_2.png"
+    },
+    {
+      "name": "accuracy_ring_3.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/accuracy_ring_3.png"
+    },
+    {
+      "name": "bomb_meter_bg.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/bomb_meter_bg.png"
+    },
+    {
+      "name": "bomb_meter_fill.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/bomb_meter_fill.png"
+    },
+    {
+      "name": "btn_primary.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/btn_primary.png"
+    },
+    {
+      "name": "btn_secondary.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/btn_secondary.png"
+    },
+    {
+      "name": "cursor_crosshair.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/cursor_crosshair.png"
+    },
+    {
+      "name": "heart_empty.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/heart_empty.png"
+    },
+    {
+      "name": "heart_full.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/heart_full.png"
+    },
+    {
+      "name": "icon_contrast.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/icon_contrast.png"
+    },
+    {
+      "name": "icon_gamepad.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/icon_gamepad.png"
+    },
+    {
+      "name": "icon_metronome.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/icon_metronome.png"
+    },
+    {
+      "name": "icon_music.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/icon_music.png"
+    },
+    {
+      "name": "icon_offset.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/icon_offset.png"
+    },
+    {
+      "name": "icon_sfx.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/icon_sfx.png"
+    },
+    {
+      "name": "icon_shader.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/icon_shader.png"
+    },
+    {
+      "name": "multiplier_icon.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/multiplier_icon.png"
+    },
+    {
+      "name": "panel_9slice.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/ui/panel_9slice.png"
+    }
+  ],
+  "folders": [],
+  "savePath": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/src/assets/sprites",
+  "packOptions": {
+    "textureName": "ui.atlas",
+    "width": 2048,
+    "height": 2048,
+    "fixedSize": false,
+    "powerOfTwo": true,
+    "padding": 4,
+    "extrude": 2,
+    "allowRotation": false,
+    "detectIdentical": true,
+    "allowTrim": true,
+    "trimMode": "trim",
+    "alphaThreshold": 0,
+    "removeFileExtension": true,
+    "prependFolderName": false,
+    "textureFormat": "png",
+    "base64Export": false,
+    "scale": 1,
+    "exporter": "JsonHash"
+  }
+}

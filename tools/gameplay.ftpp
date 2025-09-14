@@ -1,0 +1,170 @@
+{
+  "images": [
+    {
+      "name": "bullet_basic.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/bullet_basic.png"
+    },
+    {
+      "name": "bullet_split.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/bullet_split.png"
+    },
+    {
+      "name": "elite_body.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/elite_body.png"
+    },
+    {
+      "name": "elite_telegraph.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/elite_telegraph.png"
+    },
+    {
+      "name": "enemy_brute_0.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/enemy_brute_0.png"
+    },
+    {
+      "name": "enemy_brute_1.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/enemy_brute_1.png"
+    },
+    {
+      "name": "enemy_brute_2.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/enemy_brute_2.png"
+    },
+    {
+      "name": "enemy_brute_3.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/enemy_brute_3.png"
+    },
+    {
+      "name": "enemy_dasher_0.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/enemy_dasher_0.png"
+    },
+    {
+      "name": "enemy_dasher_1.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/enemy_dasher_1.png"
+    },
+    {
+      "name": "enemy_dasher_2.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/enemy_dasher_2.png"
+    },
+    {
+      "name": "enemy_dasher_3.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/enemy_dasher_3.png"
+    },
+    {
+      "name": "enemy_swarm_0.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/enemy_swarm_0.png"
+    },
+    {
+      "name": "enemy_swarm_1.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/enemy_swarm_1.png"
+    },
+    {
+      "name": "explosion_0.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/explosion_0.png"
+    },
+    {
+      "name": "explosion_1.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/explosion_1.png"
+    },
+    {
+      "name": "explosion_2.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/explosion_2.png"
+    },
+    {
+      "name": "explosion_3.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/explosion_3.png"
+    },
+    {
+      "name": "explosion_4.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/explosion_4.png"
+    },
+    {
+      "name": "explosion_5.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/explosion_5.png"
+    },
+    {
+      "name": "explosion_6.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/explosion_6.png"
+    },
+    {
+      "name": "explosion_7.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/explosion_7.png"
+    },
+    {
+      "name": "hit_spark_0.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/hit_spark_0.png"
+    },
+    {
+      "name": "hit_spark_1.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/hit_spark_1.png"
+    },
+    {
+      "name": "hit_spark_2.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/hit_spark_2.png"
+    },
+    {
+      "name": "hit_spark_3.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/hit_spark_3.png"
+    },
+    {
+      "name": "pickup_magnet.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/pickup_magnet.png"
+    },
+    {
+      "name": "pickup_rapid.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/pickup_rapid.png"
+    },
+    {
+      "name": "pickup_shield.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/pickup_shield.png"
+    },
+    {
+      "name": "pickup_slowmo.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/pickup_slowmo.png"
+    },
+    {
+      "name": "pickup_split.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/pickup_split.png"
+    },
+    {
+      "name": "player_idle.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/player_idle.png"
+    },
+    {
+      "name": "player_thruster_0.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/player_thruster_0.png"
+    },
+    {
+      "name": "player_thruster_1.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/player_thruster_1.png"
+    },
+    {
+      "name": "player_thruster_2.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/player_thruster_2.png"
+    },
+    {
+      "name": "player_thruster_3.png",
+      "path": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/tools/atlas_src/gameplay/player_thruster_3.png"
+    }
+  ],
+  "folders": [],
+  "savePath": "/Users/rickardzakrisson/Desktop/code/Beat-Blaster/src/assets/sprites",
+  "packOptions": {
+    "textureName": "gameplay.atlas",
+    "width": 2048,
+    "height": 2048,
+    "fixedSize": false,
+    "powerOfTwo": true,
+    "padding": 4,
+    "extrude": 2,
+    "allowRotation": false,
+    "detectIdentical": true,
+    "allowTrim": true,
+    "trimMode": "trim",
+    "alphaThreshold": 0,
+    "removeFileExtension": true,
+    "prependFolderName": false,
+    "textureFormat": "png",
+    "base64Export": false,
+    "scale": 1,
+    "exporter": "JsonHash"
+  }
+}

@@ -1,0 +1,21 @@
+0 verbose cli /usr/local/bin/node /usr/local/lib/node_modules/npm/bin/npm-cli.js
+1 info using npm@10.9.3
+2 info using node@v22.19.0
+3 silly config load:file:/usr/local/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/rickardzakrisson/.npmrc
+5 silly config load:file:/usr/local/etc/npmrc
+6 verbose title npm exec free-tex-packer-cli --project tools/ui.ftpp --output src/assets/sprites
+7 verbose argv "exec" "--yes" "--" "free-tex-packer-cli" "--project" "tools/ui.ftpp" "--output" "src/assets/sprites"
+8 verbose logfile logs-max:10 dir:/Users/rickardzakrisson/Desktop/code/Beat-Blaster/vendor/.npm-cache/_logs/2025-09-13T09_58_18_210Z-
+9 verbose logfile /Users/rickardzakrisson/Desktop/code/Beat-Blaster/vendor/.npm-cache/_logs/2025-09-13T09_58_18_210Z-debug-0.log
+10 silly logfile done cleaning log files
+11 silly packumentCache heap:2197815296 maxSize:549453824 maxEntrySize:274726912
+12 http fetch GET 200 https://registry.npmjs.org/free-tex-packer-cli 837ms (cache revalidated)
+13 silly packumentCache heap:2197815296 maxSize:549453824 maxEntrySize:274726912
+14 silly packumentCache heap:2197815296 maxSize:549453824 maxEntrySize:274726912
+15 verbose cwd /Users/rickardzakrisson/Desktop/code/Beat-Blaster
+16 verbose os Darwin 20.6.0
+17 verbose node v22.19.0
+18 verbose npm  v10.9.3
+19 verbose exit 0
+20 info ok

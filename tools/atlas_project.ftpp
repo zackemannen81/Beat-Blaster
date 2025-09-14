@@ -1,0 +1,56 @@
+{
+  "meta": { "appInfo": { "url": "https://github.com/odrick/free-tex-packer-cli", "version": "0.3.0" } },
+  "textures": [
+    {
+      "name": "gameplay.atlas",
+      "path": "tools/atlas_src/gameplay",
+      "out": "src/assets/sprites",
+      "exporter": "JsonHash",
+      "allowRotation": false,
+      "allowTrim": true,
+      "trimMode": "trim",
+      "padding": 4,
+      "extrude": 2,
+      "powerOfTwo": true,
+      "width": 2048,
+      "height": 2048,
+      "textureFormat": "png",
+      "removeFileExtension": true,
+      "prependFolderName": false
+    },
+    {
+      "name": "ui.atlas",
+      "path": "tools/atlas_src/ui",
+      "out": "src/assets/sprites",
+      "exporter": "JsonHash",
+      "allowRotation": false,
+      "allowTrim": true,
+      "trimMode": "trim",
+      "padding": 4,
+      "extrude": 2,
+      "powerOfTwo": true,
+      "width": 2048,
+      "height": 2048,
+      "textureFormat": "png",
+      "removeFileExtension": true,
+      "prependFolderName": false
+    },
+    {
+      "name": "particles.atlas",
+      "path": "tools/atlas_src/particles",
+      "out": "src/assets/sprites",
+      "exporter": "JsonHash",
+      "allowRotation": false,
+      "allowTrim": true,
+      "trimMode": "trim",
+      "padding": 4,
+      "extrude": 2,
+      "powerOfTwo": true,
+      "width": 2048,
+      "height": 2048,
+      "textureFormat": "png",
+      "removeFileExtension": true,
+      "prependFolderName": false
+    }
+  ]
+}

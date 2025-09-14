@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "allowJs": false,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "types": ["node" ],
+    "baseUrl": ".",
+    "paths": {
+      "@scenes/*": ["src/scenes/*"]
+    }
+  },
+  "include": ["src"]
+}

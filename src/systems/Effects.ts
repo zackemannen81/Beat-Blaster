@@ -59,6 +59,28 @@ export default class Effects {
     })
   }
 
+  showComboText(x: number, y: number, count: number) {
+    console.log('Creating combo text:', count, 'at', x, y)
+    const text = this.scene.add.text(x, y - 30, `COMBO x${count}`, {
+      fontFamily: 'UiFont, sans-serif',
+      fontSize: '24px',
+      color: '#ffb300',
+      stroke: '#000',
+      strokeThickness: 2
+    }).setOrigin(0.5, 0.5)
+    console.log('Text created:', text.text, 'at', text.x, text.y)
+
+    // Animate the text floating up and fading out
+    this.scene.tweens.add({
+      targets: text,
+      y: y - 80,
+      alpha: 0,
+      duration: 1000,
+      ease: 'Power1',
+      onComplete: () => text.destroy()
+    })
+  }
+
   beatPulse() {
     const cam = this.scene.cameras.main
     const originalZoom = cam.zoom

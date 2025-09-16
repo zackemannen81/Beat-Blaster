@@ -52,15 +52,8 @@ export default class HUD {
   }
 
   setCombo(count: number) {
-    if (count > 1) {
-      this.comboText.setText(`Combo x${count}`)
-      this.scene.tweens.add({
-        targets: this.comboText,
-        scale: { from: 1.1, to: 1 },
-        duration: 100,
-      })
-    } else {
-      this.comboText.setText('')
-    }
+    // This method is kept for backward compatibility but is no longer used
+    // as we now show combo numbers above enemies
+    this.comboText.setVisible(false)
   }
 }

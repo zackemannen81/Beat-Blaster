@@ -8,6 +8,10 @@ import Effects from '../systems/Effects'
 import Powerups, { PowerupType } from '../systems/Powerups'
 import Starfield from '../systems/Starfield'
 import { loadOptions } from '../systems/Options'
+import PlayerSkin from '../systems/PlayerSkin'
+import NeonGrid from '../systems/NeonGrid'
+
+type Enemy = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
 
 export default class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
@@ -44,13 +48,30 @@ export default class GameScene extends Phaser.Scene {
   private lastHitAt = 0
   private opts = loadOptions()
   private beatIndicator!: Phaser.GameObjects.Graphics;
+  private lastHitEnemyId: string | null = null
+  private neon!: NeonGrid
+  // inne i klassen GameScene, efter private-fälten
+private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
+  // städa skin
+  const skin = enemy.getData('skin') as any
+  if (doDeathFx) skin?.onDeath?.()
+  skin?.destroy?.()
 
+  // städa healthbar
+  const hb = enemy.getData('healthBar') as Phaser.GameObjects.Graphics
+  hb?.destroy()
+
+  // disable + hide själva fienden
+  enemy.disableBody(true, true)
+}
   //private keys:Phaser.Types.Input.Keyboard;
   constructor() {
     super('GameScene')
   }
 
   create() {
+    this.neon = new NeonGrid(this)
+    this.neon.create()
     const { width, height } = this.scale
     this.cameras.main.setBackgroundColor('#0a0a0f')
 
@@ -59,14 +80,33 @@ export default class GameScene extends Phaser.Scene {
     this.starfield.create()
 
     // Player sprite from atlas
+/*
     this.player = this.physics.add.sprite(width / 2, height / 2, 'gameplay', 'player_idle')
     this.player.setScale(0.5);
     this.player.setCollideWorldBounds(true)
     this.player.setRotation(Math.PI/2) // Rotate 90 degrees to face right
+*/
+// Player sprite (behåll som fysik-host)
+    this.player = this.physics.add.sprite(width/2, height/2, 'gameplay', 'player_idle')
+    this.player.setCollideWorldBounds(true)
+
+  // vi ritar spelaren via PlayerSkin → göm atlas-grafiken
+    this.player.setVisible(false)
+
+// sätt en rimlig hitbox (matcha din PlayerSkin-storlek, t.ex. triangel ~18px)
+    const r = 14
+    this.player.body.setCircle(r, -r + this.player.width/2, -r + this.player.height/2)
+
+// rotationen behövs fortfarande – PlayerSkin följer host.rotation
+    this.player.setRotation(Math.PI/2)
+
+// koppla på skinet
+    const pskin = new PlayerSkin(this, this.player)
+    this.player.setData('skin', pskin)
 
     this.beatIndicator = this.add.graphics();
     this.beatIndicator.fillStyle(0xff0000, 1);
-    this.beatIndicator.fillCircle(this.player.x, this.player.y, 20); // Placera den där det passar i ditt UI
+    this.beatIndicator.fillCircle(50, 50, 20); // Placera den där det passar i ditt UI
 
   /*
     // aktivera WASD
@@ -133,8 +173,9 @@ export default class GameScene extends Phaser.Scene {
     // Set up beat listeners
     this.analyzer.on('beat:low', () => { this.conductor.onBeat(); this.lastBeatAt = this.time.now })
     this.analyzer.on('beat:mid', () => { this.conductor.onBeat(); this.lastBeatAt = this.time.now })
-    this.analyzer.on('beat:high', () => { this.conductor.onBeat(); this.lastBeatAt = this.time.now })
+    this.analyzer.on('beat:high', () => {  this.conductor.onBeat(); this.lastBeatAt = this.time.now })
     
+
     if (track) {
       // First, ensure the audio context is running
       const soundManager = this.sound as Phaser.Sound.WebAudioSoundManager;
@@ -243,9 +284,45 @@ export default class GameScene extends Phaser.Scene {
       bullet.disableBody(true, true)
       this.effects.hitSpark(enemy.x, enemy.y)
       this.effects.hitFlash(enemy)
-      this.comboCount++
-      this.lastHitAt = this.time.now
-      this.hud.setCombo(this.comboCount)
+      const skin = enemy.getData('skin') as any
+      skin?.onHit?.()
+      // Get a unique ID for the enemy (use the Phaser object's ID)
+      const enemyId = enemy.getData('eid') as string
+      // enemyId bör vara unikt per fiende
+if (this.time.now - this.lastHitAt > this.comboTimeoutMs) {
+  // För sent -> reset combo
+  this.comboCount = 0
+  this.lastHitEnemyId = null
+}
+
+// Är det en ny fiende inom tidsfönstret?
+if (this.lastHitEnemyId !== enemyId) {
+  if (this.comboCount > 0) {
+    // Bara från andra fienden och uppåt
+    this.comboCount++
+    console.log('New combo count:', this.comboCount)
+
+    // Visa text när multiplikatorn ökar
+    this.effects.showComboText(enemy.x, enemy.y, this.comboCount)
+    this.hud.setCombo(this.comboCount)
+  } else {
+    // Första träffen bara armerar combon
+    this.comboCount = 1
+  }
+  this.lastHitEnemyId = enemyId
+}
+
+// Reset timer
+this.lastHitAt = this.time.now
+if (newHp <= 0) {
+  this.sound.play('hit_enemy', { volume: this.opts.sfxVolume })
+  this.scoring.addKill(etype)
+  this.bumpBomb(10)
+  this.maybeDropPickup(enemy.x, enemy.y)
+
+  this.cleanupEnemy(enemy, true) // ← allt städas här
+}
+/*
       if (newHp <= 0) {
         const healthBar = enemy.getData('healthBar') as Phaser.GameObjects.Graphics
         if (healthBar) {
@@ -256,7 +333,12 @@ export default class GameScene extends Phaser.Scene {
         this.scoring.addKill(etype)
         this.bumpBomb(10)
         this.maybeDropPickup(enemy.x, enemy.y)
+        const skin = enemy.getData('skin') as any
+    skin?.onDeath?.()
+    skin?.destroy?.()
       }
+      */
+    
     })
 
     // Collisions: player <- enemies
@@ -270,7 +352,8 @@ export default class GameScene extends Phaser.Scene {
         //this.effects.hitSpark(20, 20)
       
       } else {
-        enemy.disableBody(true, true)
+        //enemy.disableBody(true, true)
+        this.cleanupEnemy(enemy, false) // inga extra death-FX om du inte vill
         this.playerHp = Math.max(0, this.playerHp - 1)
         this.comboCount = 0
         this.hud.setCombo(this.comboCount)
@@ -310,11 +393,14 @@ export default class GameScene extends Phaser.Scene {
     } else {
         this.beatIndicator.setAlpha(0.3); // Gör den genomskinlig när inget beat
     }
-    // Combo timeout
-    if (this.comboCount > 0 && time - this.lastHitAt > this.comboTimeoutMs) {
+    this.neon.update(delta)
+    
+    if (time - this.lastHitAt > this.comboTimeoutMs && this.comboCount > 0) {
       this.comboCount = 0
-      this.hud.setCombo(this.comboCount)
+      this.hud.setCombo(0)
+      this.lastHitEnemyId = null
     }
+    
 
     // Shooting
     const cooldown = this.powerups.hasRapid ? this.fireCooldownMs * 0.8 : this.fireCooldownMs
@@ -347,7 +433,7 @@ export default class GameScene extends Phaser.Scene {
       const s = obj as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
       const healthBar = s.getData('healthBar') as Phaser.GameObjects.Graphics
       if (!s.active) {
-        if (healthBar) healthBar.clear()
+        healthBar?.destroy()
         return false
       }
       const etype = (s.getData('etype') as 'brute' | 'dasher' | 'swarm') || 'swarm'
@@ -469,11 +555,19 @@ export default class GameScene extends Phaser.Scene {
   private triggerBomb() {
     // Clear enemies in radius by disabling all
     const group = this.spawner.getGroup()
-    group.children.each((e: Phaser.GameObjects.GameObject) => {
+   /* group.children.each((e: Phaser.GameObjects.GameObject) => {
       const s = e as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
       if (!s.active) return false
       this.effects.explosion(s.x, s.y)
       s.disableBody(true, true)
+      return true
+    })
+    */
+    group.children.each((e: Phaser.GameObjects.GameObject) => {
+      const s = e as Enemy
+      if (!s.active) return true
+      this.effects.explosion(s.x, s.y)
+      this.cleanupEnemy(s, true)   // ← viktigt, städar skin + bar
       return true
     })
     this.sound.play('explode_big', { volume: this.opts.sfxVolume })
@@ -511,6 +605,7 @@ export default class GameScene extends Phaser.Scene {
       healthBar.fillRect(x, y, barWidth * healthPercentage, barHeight)
     }
   }
+  
 
   private endRun() {
     // Stop music

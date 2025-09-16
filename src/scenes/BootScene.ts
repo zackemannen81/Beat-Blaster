@@ -4,6 +4,36 @@ export default class BootScene extends Phaser.Scene {
   constructor() {
     super('BootScene')
   }
+  private makeSynthParticles() {
+    const makeGlow = (key: string, color: number, size = 20) => {
+      // Skapa grafik i scenen, men göm den så den inte syns när vi ritar texturen
+      const g = this.add.graphics({ x: 0, y: 0 });
+      g.setVisible(false);
+  
+      const cx = size / 2, cy = size / 2;
+      const layers = 6;
+      const r = size * 0.48;
+  
+      // “Fejk-gradient” med flera cirklar → mjuk neon-glow
+      for (let i = 0; i < layers; i++) {
+        const t = 1 - i / layers;          // 1..0
+        const a = 0.10 + 0.12 * t;         // fallande alpha
+        g.fillStyle(color, a);
+        g.fillCircle(cx, cy, r * t);
+      }
+  
+      // Liten highlight-ring för crisp kant
+      g.lineStyle(1, 0xffffff, 0.12);
+      g.strokeCircle(cx, cy, r * 0.85);
+  
+      g.generateTexture(key, size, size);
+      g.destroy();
+    };
+  
+    makeGlow('p_glow_cyan', 0x00e5ff, 20);
+    makeGlow('p_glow_pink', 0xff5db1, 20);
+  }
+  
 
   preload() {
     // Atlases (TexturePacker JSON Hash)
@@ -78,6 +108,7 @@ export default class BootScene extends Phaser.Scene {
       repeat: -1
   });
   */
+  this.makeSynthParticles();
     const tracks = this.cache.json.get('tracks') as any[]
     this.registry.set('tracks', tracks)
     this.registry.set('selectedTrackId', tracks?.[0]?.id || null)

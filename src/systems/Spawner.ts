@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import CubeSkin, { CubeVariant } from '../systems/CubeSkin' // <- importera
 
 export type Enemy = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
 
@@ -19,6 +20,7 @@ export default class Spawner {
       s.setActive(true).setVisible(true).setScale(0.5)
       s.body.enable = true
       s.setData('etype', type)
+
       const healthBar = this.scene.add.graphics()
       s.setData('healthBar', healthBar)
       // Initialize HP from balance registry if present
@@ -34,6 +36,14 @@ export default class Spawner {
       const ang = Phaser.Math.Angle.Between(x, y, width / 2, height / 2)
       const speed = (type === 'swarm' ? 110 : type === 'dasher' ? 160 : 80) * 0.5
       s.body.setVelocity(Math.cos(ang) * speed, Math.sin(ang) * speed)
+      const uid = Phaser.Utils.String.UUID()
+s.setData('eid', uid)
+    // === NYTT: koppla på kub-skin ===
+    const variant: CubeVariant =
+      Math.random() < 0.34 ? 'solid' : (Math.random() < 0.5 ? 'wire' : 'plasma')
+    const size = type === 'brute' ? 36 : (type === 'dasher' ? 28 : 22)
+    const skin = new CubeSkin(this.scene, s, variant, size)
+    s.setData('skin', skin)
     }
   }
 

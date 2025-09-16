@@ -20,7 +20,7 @@ export function loadOptions(): Options {
     sfxVolume: 0.8,
     metronome: false,
     highContrast: false,
-    shaderEnabled: false,
+    shaderEnabled: true,
     inputOffsetMs: {},
     fireMode: 'click'
   }

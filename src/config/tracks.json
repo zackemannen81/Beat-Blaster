@@ -64,6 +64,17 @@
     "fileMp3": "src/assets/audio/tracks/track_06.mp3",
     "difficultyProfileId": "easy",
     "hash": "91913fcb63140356966ac881688e6ae6170bc333"
+  },
+  {
+    "id": "track_07",
+    "name": "White noice",
+    "artist": "Alex Harmony",
+    "inputOffsetMs": 0,
+    "lengthSec": 138,
+    "fileOgg": "",
+    "fileMp3": "src/assets/audio/tracks/track_07.mp3",
+    "difficultyProfileId": "easy",
+    "hash": "91913fcb63140356966ac881688e6ae6170bc333"
   }
   
 ]

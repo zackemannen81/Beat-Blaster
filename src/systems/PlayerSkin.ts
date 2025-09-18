@@ -1,167 +1,108 @@
 // systems/PlayerSkin.ts
 import Phaser from 'phaser'
 
+type SpriteBody = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+type ParticleManager = ReturnType<Phaser.GameObjects.GameObjectFactory['particles']>
+
 export default class PlayerSkin {
   private scene: Phaser.Scene
-  private host: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+  private host: SpriteBody
   private gfx: Phaser.GameObjects.Graphics
-  private trailCyan?: Phaser.GameObjects.Particles.ParticleEmitter
-  private trailPink?: Phaser.GameObjects.Particles.ParticleEmitter
-  private pulseTween?: Phaser.Tweens.Tween
 
-  constructor(scene: Phaser.Scene, host: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody) {
+  private pm?: ParticleManager
+  private emitter?: Phaser.GameObjects.Particles.ParticleEmitter
+
+  private size = 18
+  private tailOffset = this.size * 1.86   // Distance to the middle of the base from center
+  private speedOn = 0                     // 0 = always on (change to 5 to enable only when moving)
+
+  constructor(scene: Phaser.Scene, host: SpriteBody) {
     this.scene = scene
     this.host = host
-
-    // vi ritar själva; host = fysik/kollision
     this.host.setVisible(false)
 
-    // spelargrafik
     this.gfx = scene.add.graphics({ x: host.x, y: host.y }).setDepth(900)
-    this.drawTriangle(18)
+    this.drawTriangle(this.size)
 
-    // följ host varje frame
+    this.createThruster()
+
     scene.events.on(Phaser.Scenes.Events.UPDATE, this.follow, this)
-
-    // --- säkerställ att glow-texturer finns (om BootScene inte hann) ---
-    const ensureGlow = (key: string, color: number, size = 24) => {
-      if (this.scene.textures.exists(key)) return
-      const g = this.scene.add.graphics({ x: 0, y: 0 }).setVisible(false)
-      const cx = size / 2, cy = size / 2, layers = 6, r = size * 0.48
-      for (let i = 0; i < layers; i++) {
-        const t = 1 - i / layers
-        g.fillStyle(color, 0.10 + 0.12 * t)
-        g.fillCircle(cx, cy, r * t)
-      }
-      g.lineStyle(1, 0xffffff, 0.12)
-      g.strokeCircle(cx, cy, r * 0.85)
-      g.generateTexture(key, size, size)
-      g.destroy()
-    }
-    ensureGlow('p_glow_cyan', 0x00e5ff, 24)
-    ensureGlow('p_glow_pink', 0xff5db1, 24)
-
-    const hasCyan = scene.textures.exists('p_glow_cyan')
-    const hasPink = scene.textures.exists('p_glow_pink')
-
-    // === CYAN TRAIL === (Phaser 3.90: 4-args utan config; sätt props via metoder)
-    this.trailCyan = scene.add.particles(0, 0, hasCyan ? 'p_glow_cyan' : 'particles')
-    if (!hasCyan) { (this.trailCyan as any).setFrame?.('particle_glow_small') }
-    ;(this.trailCyan as any).setLifespan?.(220, 320)
-    ;(this.trailCyan as any).setSpeed?.(10, 26)
-    ;(this.trailCyan as any).setScale?.({ start: 0.5, end: 0 })
-    ;(this.trailCyan as any).setAlpha?.({ start: 1, end: 0 })
-    ;(this.trailCyan as any).setAngle?.(170, 190)
-    ;(this.trailCyan as any).setQuantity?.(1)
-    ;(this.trailCyan as any).setFrequency?.(16)
-    ;(this.trailCyan as any).setBlendMode?.(Phaser.BlendModes.ADD)
-    this.trailCyan.startFollow(this.gfx, 0, 8)
-    ;(this.trailCyan as any).setDepth?.(this.gfx.depth + 1)
-    ;(this.trailCyan as any).emitting = true
-
-    // === PINK TRAIL (blink på high-beat) ===
-    if (hasPink) {
-      this.trailPink = scene.add.particles(0, 0, 'p_glow_pink')
-      ;(this.trailPink as any).setLifespan?.(220, 320)
-      ;(this.trailPink as any).setSpeed?.(10, 26)
-      ;(this.trailPink as any).setScale?.({ start: 0.5, end: 0 })
-      ;(this.trailPink as any).setAlpha?.({ start: 1, end: 0 })
-      ;(this.trailPink as any).setAngle?.(170, 190)
-      ;(this.trailPink as any).setQuantity?.(1)
-      ;(this.trailPink as any).setFrequency?.(16)
-      ;(this.trailPink as any).setBlendMode?.(Phaser.BlendModes.ADD)
-      this.trailPink.startFollow(this.gfx, 0, 8)
-      ;(this.trailPink as any).setDepth?.(this.gfx.depth + 1)
-      ;(this.trailPink as any).emitting = false
-    }
-
-    // beat-pulse
-    scene.events.on('beat:low', this.onBeatLow, this)
-    scene.events.on('beat:mid', this.onBeatMid, this)
-    scene.events.on('beat:high', this.onBeatHigh, this)
-  }
-
-  private follow = () => {
-    this.gfx.x = this.host.x
-    this.gfx.y = this.host.y
-    this.gfx.rotation = this.host.rotation
   }
 
   private drawTriangle(size: number) {
     const g = this.gfx
     g.clear()
-    g.fillStyle(0x00e5ff, 0.12)
-    g.fillCircle(0, 0, size + 6)
-    const s = size
-    g.fillStyle(0x00e5ff, 0.95)
+
+    const tip = size * 0.92
+    const halfBase = size * 0.52
+    const baseY = size * 0.86
+
+    g.fillStyle(0x00e5ff, 0.20)
     g.beginPath()
-    g.moveTo(0, -s)
-    g.lineTo(s * 0.7, s * 0.8)
-    g.lineTo(-s * 0.7, s * 0.8)
+    g.moveTo(0, -tip)
+    g.lineTo(-halfBase, baseY)
+    g.lineTo( halfBase, baseY)
     g.closePath()
     g.fillPath()
-    g.lineStyle(2, 0xffffff, 0.35)
+
+    g.lineStyle(2, 0xffffff, 0.9)
     g.strokePath()
   }
 
-  private pulse(scaleTo = 1.12, dur = 120) {
-    this.pulseTween?.stop()
-    this.pulseTween = this.scene.tweens.add({
-      targets: this.gfx,
-      scale: { from: 1, to: scaleTo },
-      yoyo: true,
-      duration: dur,
-      ease: 'Sine.easeOut'
+  private createThruster() {
+    const hasPink = this.scene.textures.exists('thruster_pink')
+    const texKey = hasPink ? 'thruster_pink' : 'particles'
+    const frame = hasPink ? undefined : 'particle_glow_small'
+
+    // Skapa MANAGER + EMITTER via config (Phaser 3.90-way)
+    this.pm = this.scene.add.particles(0, 0, texKey, {
+      frame,
+      lifespan: { min: 220, max: 768  },
+      speed: { min: 40, max: 100 },
+      scale: { start: 0.35, end: 0 },
+      alpha: { start: 1, end: 0 },
+      quantity: 1,
+      frequency: 14,
+      angle: { min: -15, max: 30},     // riktas bakåt per frame i follow()
+      blendMode: Phaser.BlendModes.ADD,
+      follow: this.gfx,                // emitter följer grafiken (viktigt!)
+      followOffset: { x: 0, y: 0 }     // vi flyttar den till baken i follow()
     })
+
+    this.pm.setDepth(this.gfx.depth - 1)
+    this.pm.setRadial(true)
+
   }
 
-  // beat-hooks
-  private onBeatLow = () => this.pulse(1.14, 140)
-  private onBeatMid = () => this.pulse(1.10, 120)
-  private onBeatHigh = () => {
-    this.pulse(1.12, 140)
-    if (this.trailPink && this.trailCyan) {
-      ;(this.trailCyan as any).emitting = false
-      ;(this.trailPink as any).emitting = true
-      this.scene.time.delayedCall(160, () => {
-        if (!this.trailPink || !this.trailCyan) return
-        ;(this.trailPink as any).emitting = false
-        ;(this.trailCyan as any).emitting = true
-      })
-    }
+  private follow = () => {
+    // keep graphics in sync with host
+    this.gfx.x = this.host.x
+    this.gfx.y = this.host.y
+    this.gfx.rotation = this.host.rotation
+const rot = this.gfx.rotation
+// Calculate direction to the base (180 degrees from the triangle's forward)
+const backX = Math.cos(rot + Math.PI)  // 180 degrees from forward
+const backY = Math.sin(rot + Math.PI)  // 180 degrees from forward
+
+// Updating the emitter with new settings (emitting angle) 
+const backDeg = Phaser.Math.RadToDeg(rot) + 90 
+this.pm?.updateConfig({ angle: { min: backDeg - 15, max: backDeg + 15 } })
+const body = this.host.body as Phaser.Physics.Arcade.Body
+const speed = body?.velocity?.length() ?? 0
+const t = Phaser.Math.Clamp(speed / 300, 0, 1)
+this.pm?.updateConfig({ frequency: Phaser.Math.Linear(26, 8, t) +8})
+this.pm?.updateConfig({ scale: { start: 0.35 + (0.25 * t), end: 0 } })
+
   }
 
-  onHit() {
-    const old = this.gfx.blendMode
-    this.gfx.setBlendMode(Phaser.BlendModes.ADD)
-    this.scene.time.delayedCall(80, () => this.gfx.setBlendMode(old))
-    this.pulse(1.16, 90)
-  }
-
-  onDeath() {
-    // Death-burst: skapa utan frame, sätt props via metoder
-    const usesCustom = this.scene.textures.exists('p_glow_cyan')
-    const textureKey = usesCustom ? 'p_glow_cyan' : 'particles'
-    const burst = this.scene.add.particles(this.gfx.x, this.gfx.y, textureKey)
-    if (!usesCustom) { (burst as any).setFrame?.('star_small') }
-    ;(burst as any).setSpeed?.(60, 220)
-    ;(burst as any).setLifespan?.(300, 700)
-    ;(burst as any).setScale?.({ start: 0.9, end: 0 })
-    ;(burst as any).setAlpha?.({ start: 1, end: 0 })
-    ;(burst as any).setQuantity?.(12)
-    ;(burst as any).setAngle?.(0, 360)
-    ;(burst as any).setBlendMode?.(Phaser.BlendModes.ADD)
-    ;(burst as any).explode?.(12, this.gfx.x, this.gfx.y)
-    this.scene.time.delayedCall(220, () => { (burst as any).stop?.(); burst.destroy() })
-  }
+  // Hooks (no-op)
+  setThrust(_level01: number) {}
+  onHit() {}
+  onDeath() {}
 
   destroy() {
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.follow, this)
-    this.scene.events.off('beat:low', this.onBeatLow, this)
-    this.scene.events.off('beat:mid', this.onBeatMid, this)
-    this.scene.events.off('beat:high', this.onBeatHigh, this)
-    this.trailCyan?.stop(); this.trailCyan?.destroy()
-    this.trailPink?.stop(); this.trailPink?.destroy()
+    this.pm?.destroy()
     this.gfx.destroy()
   }
 }

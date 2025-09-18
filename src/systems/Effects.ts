@@ -39,31 +39,40 @@ export default class Effects {
   }
 
   muzzleFlash(x: number, y: number) {
+    if (this.scene.textures.exists('plasma_glow_disc')) {
+      const sprite = this.scene.add.sprite(x, y, 'plasma_glow_disc')
+      sprite.setBlendMode(Phaser.BlendModes.ADD)
+      sprite.setScale(0.55)
+      sprite.setAlpha(0.9)
+      this.scene.tweens.add({
+        targets: sprite,
+        alpha: 0,
+        scale: 1.6,
+        duration: 140,
+        ease: 'Cubic.easeOut',
+        onComplete: () => sprite.destroy()
+      })
+    }
+
     const emitter = this.scene.add.particles(x, y, 'particles', {
       frame: 'particle_glow_small',
-      speed: 0,
-      lifespan: 120,
-      scale: { start: 0.8, end: 0 },
+      speed: { min: -20, max: 20 },
+      lifespan: 150,
+      scale: { start: 0.9, end: 0 },
       alpha: { start: 1, end: 0 },
       blendMode: 'ADD',
-      emitZone: {
-        type: 'random',
-        source: new Phaser.Geom.Circle(0, 0, 5),
-        quantity: 1
-      }
+      quantity: 4,
+      frequency: -1
     })
-    emitter.explode(1)
-    this.scene.time.delayedCall(120, () => {
-      // The emitter is a manager; destroying it cleans up all child emitters.
-      emitter.destroy()
-    })
+    emitter.explode(4)
+    this.scene.time.delayedCall(140, () => emitter.destroy())
   }
 
   showComboText(x: number, y: number, count: number) {
     console.log('Creating combo text:', count, 'at', x, y)
     const text = this.scene.add.text(x, y - 30, `COMBO x${count}`, {
-      fontFamily: 'UiFont, sans-serif',
-      fontSize: '24px',
+      fontFamily: 'AnnouncerFont, UiFont, sans-serif',
+      fontSize: '26px',
       color: '#ffb300',
       stroke: '#000',
       strokeThickness: 2
@@ -102,5 +111,200 @@ export default class Effects {
     this.scene.time.delayedCall(80, () => {
       target.clearTint()
     })
+  }
+
+  plasmaCharge(x: number, y: number, rotation: number) {
+    if (!this.scene.textures.exists('bullet_plasma_charge_0')) return
+    const sprite = this.scene.add.sprite(x, y, 'bullet_plasma_charge_0')
+    sprite.setRotation(rotation)
+    sprite.setBlendMode(Phaser.BlendModes.ADD)
+    sprite.play('bullet_plasma_charge')
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.destroy())
+  }
+
+  plasmaImpact(x: number, y: number) {
+    if (!this.scene.textures.exists('bullet_plasma_impact_0')) {
+      this.hitSpark(x, y)
+      return
+    }
+    const sprite = this.scene.add.sprite(x, y, 'bullet_plasma_impact_0')
+    sprite.setBlendMode(Phaser.BlendModes.ADD)
+    sprite.play('bullet_plasma_impact')
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.destroy())
+  }
+
+  attachPlasmaTrail(bullet: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody) {
+    if (!this.scene) return
+    this.clearPlasmaTrail(bullet)
+
+    const trailEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = []
+
+    if (this.scene.textures.exists('pink_beam_arc')) {
+      const emitter = this.scene.add.particles(0, 0, 'pink_beam_arc', {
+        lifespan: 200,
+        quantity: 1,
+        frequency: 45,
+        speed: 0,
+        scale: { start: 0.65, end: 0 },
+        alpha: { start: 0.8, end: 0 },
+        blendMode: 'ADD'
+      })
+      emitter.follow = bullet as Phaser.Types.Math.Vector2Like
+      emitter.emitCallback = (particle: Phaser.GameObjects.Particles.Particle) => {
+        particle.rotation = bullet.rotation
+      }
+      trailEmitters.push(emitter)
+    }
+
+    if (this.scene.textures.exists('particle_plasma_spark')) {
+      const emitter = this.scene.add.particles(0, 0, 'particle_plasma_spark', {
+        lifespan: 220,
+        speed: { min: -30, max: 30 },
+        scale: { start: 0.6, end: 0 },
+        alpha: { start: 1, end: 0 },
+        quantity: 1,
+        frequency: 55,
+        blendMode: 'ADD'
+      })
+      emitter.follow = bullet as Phaser.Types.Math.Vector2Like
+      trailEmitters.push(emitter)
+    }
+
+    if (this.scene.textures.exists('particle_plasma_dot')) {
+      const emitter = this.scene.add.particles(0, 0, 'particle_plasma_dot', {
+        lifespan: 180,
+        speed: { min: -20, max: 20 },
+        scale: { start: 0.45, end: 0 },
+        alpha: { start: 0.9, end: 0 },
+        quantity: 1,
+        frequency: 70,
+        blendMode: 'ADD'
+      })
+      emitter.follow = bullet as Phaser.Types.Math.Vector2Like
+      trailEmitters.push(emitter)
+    }
+
+    let trailTimer: Phaser.Time.TimerEvent | undefined
+    if (this.scene.textures.exists('plasma_trail_0')) {
+      trailTimer = this.scene.time.addEvent({
+        delay: 70,
+        loop: true,
+        callback: () => {
+          if (!bullet.active) return
+          const sprite = this.scene.add.sprite(bullet.x, bullet.y, 'plasma_trail_0')
+          sprite.setRotation(bullet.rotation)
+          sprite.setBlendMode(Phaser.BlendModes.ADD)
+          sprite.play('plasma_trail_cycle')
+          const currentAnim = sprite.anims.currentAnim
+          if (currentAnim) {
+            const total = currentAnim.getTotalFrames()
+            if (total > 0) {
+              const frame = currentAnim.getFrameAt(Phaser.Math.Between(0, total - 1))
+              if (frame) sprite.setFrame(frame.textureFrame)
+            }
+          }
+          this.scene.tweens.add({
+            targets: sprite,
+            alpha: 0,
+            scale: { from: 0.9, to: 0.4 },
+            duration: 200,
+            onComplete: () => sprite.destroy()
+          })
+        }
+      })
+    }
+
+    bullet.setData('plasmaTrailEmitters', trailEmitters)
+    bullet.setData('plasmaTrailTimer', trailTimer)
+  }
+
+  clearPlasmaTrail(bullet: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody) {
+    const emitters = bullet.getData('plasmaTrailEmitters') as Phaser.GameObjects.Particles.ParticleEmitter[] | undefined
+    emitters?.forEach((emitter) => emitter.destroy())
+    bullet.setData('plasmaTrailEmitters', undefined)
+
+    const timer = bullet.getData('plasmaTrailTimer') as Phaser.Time.TimerEvent | undefined
+    timer?.remove(false)
+    bullet.setData('plasmaTrailTimer', undefined)
+  }
+
+  enemyHitFx(x: number, y: number) {
+    if (this.scene.textures.exists('enemy_hit_plasma_0')) {
+      const sprite = this.scene.add.sprite(x, y, 'enemy_hit_plasma_0')
+      sprite.setBlendMode(Phaser.BlendModes.ADD)
+      sprite.play('enemy_hit_plasma')
+      sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.destroy())
+    } else {
+      this.plasmaImpact(x, y)
+    }
+
+    if (this.scene.textures.exists('particle_plasma_spark')) {
+      const emitter = this.scene.add.particles(0, 0, 'particle_plasma_spark', {
+        lifespan: 260,
+        speed: { min: 80, max: 220 },
+        angle: { min: 0, max: 360 },
+        scale: { start: 0.8, end: 0 },
+        alpha: { start: 1, end: 0 },
+        quantity: 12,
+        blendMode: 'ADD'
+      })
+      emitter.explode(12, x, y)
+      this.scene.time.delayedCall(260, () => emitter.destroy())
+    }
+  }
+
+  enemyExplodeFx(x: number, y: number) {
+    if (this.scene.textures.exists('enemy_explode_plasma_0')) {
+      const sprite = this.scene.add.sprite(x, y, 'enemy_explode_plasma_0')
+      sprite.setBlendMode(Phaser.BlendModes.ADD)
+      sprite.play('enemy_explode_plasma')
+      sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.destroy())
+    } else {
+      this.explosion(x, y)
+    }
+
+    const shardFrames: string[] = []
+    for (let i = 0; i < 4; i++) {
+      const key = `enemy_shard_${i}`
+      if (this.scene.textures.exists(key)) shardFrames.push(key)
+    }
+
+    if (shardFrames.length > 0) {
+      for (let i = 0; i < 10; i++) {
+        const frame = shardFrames[Phaser.Math.Between(0, shardFrames.length - 1)]
+        const shard = this.scene.add.sprite(x, y, frame)
+        shard.setBlendMode(Phaser.BlendModes.ADD)
+        shard.play({ key: 'enemy_shard_twinkle', startFrame: Phaser.Math.Between(0, 3) })
+        const angle = Phaser.Math.FloatBetween(0, Math.PI * 2)
+        const speed = Phaser.Math.FloatBetween(120, 260)
+        const vx = Math.cos(angle) * speed
+        const vy = Math.sin(angle) * speed
+        this.scene.tweens.add({
+          targets: shard,
+          x: x + vx * 0.3,
+          y: y + vy * 0.3,
+          alpha: 0,
+          rotation: Phaser.Math.FloatBetween(-Math.PI, Math.PI),
+          duration: Phaser.Math.Between(360, 520),
+          ease: 'Cubic.easeOut',
+          onComplete: () => shard.destroy()
+        })
+      }
+    }
+
+    if (this.scene.textures.exists('particle_plasma_dot')) {
+      const emitter = this.scene.add.particles(0, 0, 'particle_plasma_dot', {
+        lifespan: 400,
+        speed: { min: 60, max: 160 },
+        scale: { start: 0.7, end: 0 },
+        alpha: { start: 1, end: 0 },
+        quantity: 20,
+        blendMode: 'ADD'
+      })
+      emitter.explode(20, x, y)
+      this.scene.time.delayedCall(400, () => emitter.destroy())
+    }
+
+    this.scene.cameras.main.shake(150, 0.01)
   }
 }

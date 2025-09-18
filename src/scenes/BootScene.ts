@@ -4,7 +4,56 @@ export default class BootScene extends Phaser.Scene {
   constructor() {
     super('BootScene')
   }
-  private makeSynthParticles() {
+  private makeThrusterPinkCanvas(key = 'thruster_pink', w = 64, h = 64) {
+    // Ta bort gammal om den finns
+    if (this.textures.exists(key)) this.textures.remove(key)
+
+    const tex = this.textures.createCanvas(key, w, h)
+    if (!tex) {
+      console.warn('createCanvas gav null för', key)
+      return
+    }
+
+    const ctx = tex.getContext()
+    if (!ctx) {
+      console.warn('Ingen 2D context för', key)
+      tex.destroy()
+      return
+    }
+
+    // Rensa
+    ctx.clearRect(0, 0, w, h)
+
+    const cx = w / 2
+    const cy = h / 2
+
+    // Rosa huvud-glow
+    const rOuter = Math.min(w, h) * 0.48
+    const g1 = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter)
+    g1.addColorStop(0.0, 'rgba(255, 93, 177, 1.00)') // #ff5db1
+    g1.addColorStop(0.30, 'rgba(255, 93, 177, 0.65)')
+    g1.addColorStop(0.65, 'rgba(255, 93, 177, 0.18)')
+    g1.addColorStop(1.0, 'rgba(255, 93, 177, 0.00)')
+    ctx.fillStyle = g1
+    ctx.beginPath()
+    ctx.arc(cx, cy, rOuter, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Vit hot-core (lite mindre)
+    const rCore = rOuter * 0.38
+    const g2 = ctx.createRadialGradient(cx, cy, 0, cx, cy, rCore)
+    g2.addColorStop(0.0, 'rgba(255,255,255,0.95)')
+    g2.addColorStop(1.0, 'rgba(255,255,255,0.00)')
+    ctx.globalCompositeOperation = 'lighter'
+    ctx.fillStyle = g2
+    ctx.beginPath()
+    ctx.arc(cx, cy, rCore, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.globalCompositeOperation = 'source-over'
+
+    tex.refresh()
+  }
+ /* private makeSynthParticles() {
     const makeGlow = (key: string, color: number, size = 20) => {
       // Skapa grafik i scenen, men göm den så den inte syns när vi ritar texturen
       const g = this.add.graphics({ x: 0, y: 0 });
@@ -33,7 +82,7 @@ export default class BootScene extends Phaser.Scene {
     makeGlow('p_glow_cyan', 0x00e5ff, 20);
     makeGlow('p_glow_pink', 0xff5db1, 20);
   }
-  
+  */
 
   preload() {
     // Atlases (TexturePacker JSON Hash)
@@ -97,10 +146,30 @@ export default class BootScene extends Phaser.Scene {
       'src/assets/audio/sfx/metronome.mp3'
     ])
     // Note: pickup sound uses UI select as placeholder for browser compatibility
+
+    const plasmaBasePath = 'src/assets/sprites/plasmabeam'
+    const loadSequence = (prefix: string, count: number) => {
+      for (let i = 0; i < count; i++) {
+        this.load.image(`${prefix}_${i}`, `${plasmaBasePath}/${prefix}_${i}.png`)
+      }
+    }
+
+    loadSequence('bullet_plasma', 6)
+    loadSequence('bullet_plasma_charge', 5)
+    loadSequence('bullet_plasma_impact', 6)
+    loadSequence('plasma_trail', 4)
+    loadSequence('enemy_hit_plasma', 6)
+    loadSequence('enemy_explode_plasma', 8)
+    loadSequence('enemy_shard', 4)
+
+    this.load.image('pink_beam_arc', `${plasmaBasePath}/pink_beam_arc.png`)
+    this.load.image('plasma_glow_disc', `${plasmaBasePath}/plasma_glow_disc.png`)
+    this.load.image('particle_plasma_spark', `${plasmaBasePath}/particle_plasma_spark.png`)
+    this.load.image('particle_plasma_dot', `${plasmaBasePath}/particle_plasma_dot.png`)
   }
 
   create() {
-   /*
+ /*
     this.anims.create({
       key: 'spin',
       frames: this.anims.generateFrameNames('cube', { prefix: 'frame', start: 1, end: 23 }),
@@ -108,7 +177,9 @@ export default class BootScene extends Phaser.Scene {
       repeat: -1
   });
   */
-  this.makeSynthParticles();
+    //this.makeSynthParticles();
+    this.makeThrusterPinkCanvas('thruster_pink', 64, 64)
+    this.ensurePlasmaAnimations()
     const tracks = this.cache.json.get('tracks') as any[]
     this.registry.set('tracks', tracks)
     this.registry.set('selectedTrackId', tracks?.[0]?.id || null)
@@ -129,6 +200,78 @@ export default class BootScene extends Phaser.Scene {
       })
     } else {
       this.scene.start('MenuScene')
+    }
+  }
+
+  private ensurePlasmaAnimations() {
+    const makeFrames = (prefix: string, count: number) =>
+      Array.from({ length: count }, (_v, i) => ({ key: `${prefix}_${i}` }))
+
+    if (!this.anims.exists('bullet_plasma_idle')) {
+      this.anims.create({
+        key: 'bullet_plasma_idle',
+        frames: makeFrames('bullet_plasma', 6),
+        frameRate: 20,
+        repeat: -1
+      })
+    }
+
+    if (!this.anims.exists('bullet_plasma_charge')) {
+      this.anims.create({
+        key: 'bullet_plasma_charge',
+        frames: makeFrames('bullet_plasma_charge', 5),
+        frameRate: 24,
+        repeat: 0,
+        hideOnComplete: true
+      })
+    }
+
+    if (!this.anims.exists('bullet_plasma_impact')) {
+      this.anims.create({
+        key: 'bullet_plasma_impact',
+        frames: makeFrames('bullet_plasma_impact', 6),
+        frameRate: 30,
+        repeat: 0,
+        hideOnComplete: true
+      })
+    }
+
+    if (!this.anims.exists('plasma_trail_cycle')) {
+      this.anims.create({
+        key: 'plasma_trail_cycle',
+        frames: makeFrames('plasma_trail', 4),
+        frameRate: 18,
+        repeat: -1
+      })
+    }
+
+    if (!this.anims.exists('enemy_hit_plasma')) {
+      this.anims.create({
+        key: 'enemy_hit_plasma',
+        frames: makeFrames('enemy_hit_plasma', 6),
+        frameRate: 26,
+        repeat: 0,
+        hideOnComplete: true
+      })
+    }
+
+    if (!this.anims.exists('enemy_explode_plasma')) {
+      this.anims.create({
+        key: 'enemy_explode_plasma',
+        frames: makeFrames('enemy_explode_plasma', 8),
+        frameRate: 22,
+        repeat: 0,
+        hideOnComplete: true
+      })
+    }
+
+    if (!this.anims.exists('enemy_shard_twinkle')) {
+      this.anims.create({
+        key: 'enemy_shard_twinkle',
+        frames: makeFrames('enemy_shard', 4),
+        frameRate: 18,
+        repeat: -1
+      })
     }
   }
 }

@@ -127,6 +127,13 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     };
 */
     this.cursors = this.input.keyboard!.createCursorKeys()
+    const wasd = this.input.keyboard!.addKeys({
+      W: Phaser.Input.Keyboard.KeyCodes.W,
+      A: Phaser.Input.Keyboard.KeyCodes.A,
+      S: Phaser.Input.Keyboard.KeyCodes.S,
+      D: Phaser.Input.Keyboard.KeyCodes.D,
+    }) as any
+    this.registry.set('wasd', wasd)
 
     // Read balance
     const balance = this.registry.get('balance') as any
@@ -141,7 +148,14 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     }
 
     // Bullets group & fire mode
-    this.bullets = this.physics.add.group({ classType: Phaser.Physics.Arcade.Sprite })
+    this.bullets = this.physics.add.group({
+      classType: Phaser.Physics.Arcade.Sprite,
+      defaultKey: 'bullet_plasma_0'
+    })
+    this.physics.world.on('worldbounds', this.handleBulletWorldBounds, this)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.physics.world.off('worldbounds', this.handleBulletWorldBounds, this)
+    })
     this.input.on('pointerdown', () => {
       if (this.opts.fireMode === 'click') {
         const t = this.time.now
@@ -275,14 +289,14 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
       const bullet = _b as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
       const enemy = _e as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
       const etype = (enemy.getData('etype') as 'brute' | 'dasher' | 'swarm') || 'swarm'
-      
+
       const hp = (enemy.getData('hp') as number) ?? 1
       const dmg = 1
       const newHp = hp - dmg
       enemy.setData('hp', newHp)
       this.scoring.registerShot(0) // Perfect hit
-      bullet.disableBody(true, true)
-      this.effects.hitSpark(enemy.x, enemy.y)
+      this.disableBullet(bullet)
+      this.effects.enemyHitFx(enemy.x, enemy.y)
       this.effects.hitFlash(enemy)
       const skin = enemy.getData('skin') as any
       skin?.onHit?.()
@@ -320,6 +334,7 @@ if (newHp <= 0) {
   this.bumpBomb(10)
   this.maybeDropPickup(enemy.x, enemy.y)
 
+  this.effects.enemyExplodeFx(enemy.x, enemy.y)
   this.cleanupEnemy(enemy, true) // ← allt städas här
 }
 /*
@@ -413,10 +428,44 @@ if (newHp <= 0) {
     const body = this.player.body
     body.setVelocity(0, 0)
 //if (this.keys.)
-    if (this.cursors.left?.isDown) body.velocity.x = -speed
-    else if (this.cursors.right?.isDown) body.velocity.x = speed
-    if (this.cursors.up?.isDown) body.velocity.y = -speed
-    else if (this.cursors.down?.isDown) body.velocity.y = speed
+const pointer = this.input.activePointer
+const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+const wasdKeys = this.registry.get('wasd') as any
+    if (this.cursors.left?.isDown || wasdKeys?.A?.isDown) body.velocity.x = -speed
+    else if (this.cursors.right?.isDown || wasdKeys?.D?.isDown) body.velocity.x = speed
+    if (this.cursors.up?.isDown || wasdKeys?.W?.isDown) body.velocity.y = -speed
+    else if (this.cursors.down?.isDown || wasdKeys?.S?.isDown) body.velocity.y = speed
+
+/*
+const speed = 250
+const body = this.player.body as Phaser.Physics.Arcade.Body
+body.setVelocity(0, 0)
+
+// siktesvektor
+const pointer = this.input.activePointer
+const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+const forward = new Phaser.Math.Vector2(world.x - this.player.x, world.y - this.player.y).normalize()
+const left = new Phaser.Math.Vector2(-forward.y, forward.x) // 90° åt vänster
+
+// input (piltangenter + ev WASD)
+const wasdKeys = this.registry.get('wasd') as any
+let fwd = 0, strafe = 0
+if (this.cursors.up?.isDown    || wasdKeys?.W?.isDown) fwd += 1
+if (this.cursors.down?.isDown  || wasdKeys?.S?.isDown) fwd -= 1
+if (this.cursors.left?.isDown  || wasdKeys?.A?.isDown) strafe -= 1
+if (this.cursors.right?.isDown || wasdKeys?.D?.isDown) strafe += 1
+
+// rörelseriktning = fram/bak + strafe
+const move = forward.clone().scale(fwd).add(left.clone().scale(strafe))
+if (move.lengthSq() > 1) move.normalize() // diagonaler = clamp
+
+body.setVelocity(move.x * speed, move.y * speed)
+
+// meddela skinet hur mycket vi “gasar” (0..1)
+const thrustLevel = move.length() // 0..1
+const pskin = this.player.getData('skin') as any
+pskin?.setThrust?.(thrustLevel)
+*/
 
     // HUD update (score placeholder)
     const shots = this.scoring.shots || 1
@@ -447,8 +496,8 @@ if (newHp <= 0) {
     })
 
     // Aim rotation and crosshair follow
-    const pointer = this.input.activePointer
-    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+    //const pointer = this.input.activePointer
+    //const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
     const ang = Phaser.Math.Angle.Between(this.player.x, this.player.y, world.x, world.y)
     this.player.setRotation(ang+Math.PI/2) 
     // Draw reticle
@@ -470,63 +519,95 @@ if (newHp <= 0) {
   private fireBullet() {
     const pointer = this.input.activePointer
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
-    const from = new Phaser.Math.Vector2(this.player.x, this.player.y)
-    const to = new Phaser.Math.Vector2(world.x, world.y)
-    const dir = to.subtract(from).normalize()
-    const b = this.bullets.get(this.player.x, this.player.y, 'gameplay', 'bullet_basic') as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
-    if (!b) return
-    b.setActive(true).setVisible(true)
-    b.body.enable = true
-    b.body.setVelocity(dir.x * this.bulletSpeed, dir.y * this.bulletSpeed)
-    b.setRotation(Math.atan2(dir.y, dir.x) + Math.PI / 2)
-    // Set bullet lifetime
-    b.setData('spawnTime', this.time.now)
-    
-    // Disable bullet when it goes off-screen or hits something
-    b.body.onWorldBounds = true
-    b.body.world.on('worldbounds', (body: Phaser.Physics.Arcade.Body) => {
-      if (body.gameObject === b) {
-        b.disableBody(true, true)
-      }
-    })
+    const origin = new Phaser.Math.Vector2(this.player.x, this.player.y)
+    const direction = new Phaser.Math.Vector2(world.x - origin.x, world.y - origin.y).normalize()
+
+    const muzzleX = this.player.x + direction.x * 10
+    const muzzleY = this.player.y + direction.y * 10
+    this.effects.plasmaCharge(muzzleX, muzzleY, Math.atan2(direction.y, direction.x) + Math.PI / 2)
+    this.effects.muzzleFlash(muzzleX, muzzleY)
+
+    const bullet = this.spawnPlasmaBullet(direction)
+    if (!bullet) return
+
     this.sound.play('shot', { volume: this.opts.sfxVolume })
-   // Position the muzzle flash slightly in front of the player in the direction of fire
-   this.effects.muzzleFlash(
-     this.player.x + dir.x * 8,
-     this.player.y + dir.y * 8
-   )
-     
-   // Split-shot
+
     if (this.powerups.hasSplit) {
-      const ang = 12 * (Math.PI / 180)
-      const dirL = dir.clone().rotate(-ang)
-      const dirR = dir.clone().rotate(ang)
-      const bl = this.bullets.get(this.player.x, this.player.y, 'gameplay', 'bullet_basic') as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
-      const br = this.bullets.get(this.player.x, this.player.y, 'gameplay', 'bullet_basic') as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
-      if (bl) {
-        bl.setActive(true).setVisible(true)
-        bl.body.enable = true
-        bl.body.setVelocity(dirL.x * this.bulletSpeed, dirL.y * this.bulletSpeed)
-        bl.setRotation(Math.atan2(dirL.y, dirL.x) + Math.PI / 2)
-        this.time.addEvent({ delay: this.bulletTtlMs, callback: () => bl.disableBody(true, true) })
-      }
-      if (br) {
-        br.setActive(true).setVisible(true)
-        br.body.enable = true
-        br.body.setVelocity(dirR.x * this.bulletSpeed, dirR.y * this.bulletSpeed)
-        br.setRotation(Math.atan2(dirR.y, dirR.x) + Math.PI / 2)
-        this.time.addEvent({ delay: this.bulletTtlMs, callback: () => br.disableBody(true, true) })
-      }
+      const offset = Phaser.Math.DegToRad(12)
+      const leftDir = direction.clone().rotate(-offset)
+      const rightDir = direction.clone().rotate(offset)
+      this.spawnPlasmaBullet(leftDir)
+      this.spawnPlasmaBullet(rightDir)
     }
-    // Scoring based on nearest beat
+
     const deltaMs = this.analyzer.nearestBeatDeltaMs()
     this.scoring.registerShot(deltaMs)
 
-    // Beat indicator (optional): draw a short-lived ring around player
     const g = this.add.graphics({ x: this.player.x, y: this.player.y })
     g.lineStyle(2, 0x00e5ff, 0.8)
     g.strokeCircle(0, 0, 18)
     this.tweens.add({ targets: g, alpha: 0, scale: 1.6, duration: 180, onComplete: () => g.destroy() })
+  }
+
+  private spawnPlasmaBullet(direction: Phaser.Math.Vector2) {
+    const bullet = this.bullets.get(this.player.x, this.player.y) as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null
+    if (!bullet) return null
+
+    bullet.setActive(true).setVisible(true)
+    bullet.setTexture('bullet_plasma_0')
+    bullet.setBlendMode(Phaser.BlendModes.SCREEN)
+    bullet.setDepth(5)
+    bullet.play('bullet_plasma_idle')
+
+    const body = bullet.body as Phaser.Physics.Arcade.Body
+    body.enable = true
+    body.setAllowGravity(false)
+    body.setSize(12, 72, true)
+    body.onWorldBounds = true
+    body.setVelocity(direction.x * this.bulletSpeed, direction.y * this.bulletSpeed)
+
+    const rotation = Math.atan2(direction.y, direction.x) + Math.PI / 2
+    bullet.setRotation(rotation)
+    bullet.setScale(0.55)
+
+    bullet.setData('spawnTime', this.time.now)
+
+    this.effects.attachPlasmaTrail(bullet)
+    this.scheduleBulletTtl(bullet)
+
+    return bullet
+  }
+
+  private scheduleBulletTtl(bullet: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody) {
+    const prev = bullet.getData('ttlEvent') as Phaser.Time.TimerEvent | undefined
+    prev?.remove(false)
+    const ttlEvent = this.time.addEvent({
+      delay: this.bulletTtlMs,
+      callback: () => this.disableBullet(bullet)
+    })
+    bullet.setData('ttlEvent', ttlEvent)
+  }
+
+  private disableBullet(bullet: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody) {
+    if (!bullet.active) return
+    const ttlEvent = bullet.getData('ttlEvent') as Phaser.Time.TimerEvent | undefined
+    ttlEvent?.remove(false)
+    bullet.setData('ttlEvent', undefined)
+
+    this.effects.clearPlasmaTrail(bullet)
+    bullet.anims?.stop?.()
+    if (this.textures.exists('bullet_plasma_0')) {
+      bullet.setTexture('bullet_plasma_0')
+    }
+    bullet.setBlendMode(Phaser.BlendModes.SCREEN)
+    bullet.disableBody(true, true)
+  }
+
+  private handleBulletWorldBounds(body: Phaser.Physics.Arcade.Body) {
+    const gameObject = body.gameObject as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | undefined
+    if (!gameObject) return
+    if (!this.bullets.contains(gameObject)) return
+    this.disableBullet(gameObject)
   }
 
   private maybeDropPickup(x: number, y: number) {

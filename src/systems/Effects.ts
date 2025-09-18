@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { PowerupType } from './Powerups'
 
 export default class Effects {
   private scene: Phaser.Scene
@@ -306,5 +307,34 @@ export default class Effects {
     }
 
     this.scene.cameras.main.shake(150, 0.01)
+  }
+
+  powerupPickupText(x: number, y: number, type: PowerupType) {
+    const palette: Record<PowerupType, number> = {
+      shield: 0x74d0ff,
+      rapid: 0xff6b6b,
+      split: 0xba68ff,
+      slowmo: 0x78ffbc
+    }
+    const color = palette[type]
+    const label = type.toUpperCase()
+    const text = this.scene.add.text(x, y, `+${label}!`, {
+      fontFamily: 'AnnouncerFont, UiFont, sans-serif',
+      fontSize: '24px',
+      color: '#ffffff',
+      stroke: '#000',
+      strokeThickness: 4
+    }).setOrigin(0.5)
+    text.setTint(color)
+    text.setDepth(20)
+
+    this.scene.tweens.add({
+      targets: text,
+      y: y - 30,
+      alpha: 0,
+      duration: 600,
+      ease: 'Cubic.easeOut',
+      onComplete: () => text.destroy()
+    })
   }
 }

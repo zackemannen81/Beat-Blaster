@@ -50,6 +50,12 @@ export default class GameScene extends Phaser.Scene {
   private beatIndicator!: Phaser.GameObjects.Graphics;
   private lastHitEnemyId: string | null = null
   private neon!: NeonGrid
+  private powerupDurations: Record<PowerupType, number> = {
+    shield: 5,
+    rapid: 6,
+    split: 6,
+    slowmo: 3
+  }
   // inne i klassen GameScene, efter private-fälten
 private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
   // städa skin
@@ -154,7 +160,7 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     })
     this.physics.world.on('worldbounds', this.handleBulletWorldBounds, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.physics.world.off('worldbounds', this.handleBulletWorldBounds, this)
+      if (this.physics.world) this.physics.world.off('worldbounds', this.handleBulletWorldBounds, this)
     })
     this.input.on('pointerdown', () => {
       if (this.opts.fireMode === 'click') {
@@ -283,6 +289,7 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     // Effects
     this.effects = new Effects(this)
     this.powerups = new Powerups(this)
+    this.hud.bindPowerups(this.powerups)
 
     // Collisions: bullets -> enemies
     this.physics.add.overlap(this.bullets, this.spawner.getGroup(), (_b, _e) => {
@@ -615,22 +622,37 @@ pskin?.setThrust?.(thrustLevel)
     if (Math.random() > chance) return
     const types: PowerupType[] = ['shield', 'rapid', 'split', 'slowmo']
     const type = types[Math.floor(Math.random() * types.length)]
-    const frame =
-    type === 'shield' ? 'pickup_shield' : type === 'rapid' ? 'pickup_rapid' : type === 'split' ? 'pickup_split' : 'pickup_slowmo'
-    const s = this.physics.add.sprite(x, y, 'gameplay', frame)
+    const texture = `powerup_${type}_0`
+    const anim = `powerup_pickup_${type}`
+    const s = this.physics.add.sprite(x, y, texture)
+    if (this.anims.exists(anim)) s.play(anim)
     s.setData('ptype', type)
     s.setDepth(1)
+    s.setBlendMode(Phaser.BlendModes.ADD)
     // Fade after 6s
     this.tweens.add({ targets: s, alpha: 0.2, duration: 6000, onComplete: () => s.destroy() })
     // Overlap with player
     const overlap = this.physics.add.overlap(this.player, s, () => {
       overlap.destroy()
       const ptype = s.getData('ptype') as PowerupType
+      const pickupX = s.x
+      const pickupY = s.y
       s.destroy()
-      const dur = ptype === 'shield' ? 5 : ptype === 'rapid' ? 6 : ptype === 'split' ? 6 : 3
+      const dur = this.powerupDurations[ptype] ?? 5
       this.powerups.apply(ptype, dur)
-      this.sound.play('ui_select', { volume: 0.5 })
+      this.effects.powerupPickupText(pickupX, pickupY - 10, ptype)
+      this.playPowerupSound(ptype)
     })
+  }
+
+  private playPowerupSound(type: PowerupType) {
+    const key = `powerup_${type}`
+    const vol = this.opts.sfxVolume
+    if (this.sound.get(key)) {
+      this.sound.play(key, { volume: vol })
+    } else {
+      this.sound.play('ui_select', { volume: vol })
+    }
   }
 
   private triggerBomb() {

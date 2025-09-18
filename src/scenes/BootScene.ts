@@ -162,6 +162,22 @@ export default class BootScene extends Phaser.Scene {
     loadSequence('enemy_explode_plasma', 8)
     loadSequence('enemy_shard', 4)
 
+    const loadPowerupSeq = (prefix: string) => {
+      for (let i = 0; i < 8; i++) {
+        this.load.image(`${prefix}_${i}`, `src/assets/sprites/powerups/${prefix}_${i}.png`)
+      }
+    }
+
+    loadPowerupSeq('powerup_shield')
+    loadPowerupSeq('powerup_rapid')
+    loadPowerupSeq('powerup_split')
+    loadPowerupSeq('powerup_slowmo')
+
+    this.load.image('powerup_badge_shield', 'src/assets/sprites/powerups/powerup_badge_shield.png')
+    this.load.image('powerup_badge_rapid', 'src/assets/sprites/powerups/powerup_badge_rapid.png')
+    this.load.image('powerup_badge_split', 'src/assets/sprites/powerups/powerup_badge_split.png')
+    this.load.image('powerup_badge_slowmo', 'src/assets/sprites/powerups/powerup_badge_slowmo.png')
+
     this.load.image('pink_beam_arc', `${plasmaBasePath}/pink_beam_arc.png`)
     this.load.image('plasma_glow_disc', `${plasmaBasePath}/plasma_glow_disc.png`)
     this.load.image('particle_plasma_spark', `${plasmaBasePath}/particle_plasma_spark.png`)
@@ -273,5 +289,17 @@ export default class BootScene extends Phaser.Scene {
         repeat: -1
       })
     }
+
+    const ensurePowerupAnim = (type: 'shield' | 'rapid' | 'split' | 'slowmo') => {
+      const key = `powerup_pickup_${type}`
+      if (this.anims.exists(key)) return
+      const frames = makeFrames(`powerup_${type}`, 8)
+      this.anims.create({ key, frames, frameRate: 12, repeat: -1 })
+    }
+
+    ensurePowerupAnim('shield')
+    ensurePowerupAnim('rapid')
+    ensurePowerupAnim('split')
+    ensurePowerupAnim('slowmo')
   }
 }

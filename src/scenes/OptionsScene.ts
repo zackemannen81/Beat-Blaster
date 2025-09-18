@@ -1,17 +1,23 @@
 import Phaser from 'phaser'
 import { loadOptions, saveOptions, Options } from '../systems/Options'
 
+type OptionsSceneData = {
+  from?: string
+}
+
 export default class OptionsScene extends Phaser.Scene {
   private opts!: Options
   private cursor = 0
   private entries!: Phaser.GameObjects.Text[]
   private title!: Phaser.GameObjects.Text
+  private originScene: string = 'MenuScene'
 
   constructor() {
     super('OptionsScene')
   }
 
-  create() {
+  create(data: OptionsSceneData = {}) {
+    this.originScene = data.from ?? 'MenuScene'
     const { width, height } = this.scale
     this.cameras.main.setBackgroundColor('rgba(0,0,0,0.6)')
     this.opts = loadOptions()
@@ -83,7 +89,6 @@ export default class OptionsScene extends Phaser.Scene {
     this.scene.get('MenuScene')?.cameras.main.setBackgroundColor(color)
     this.scene.get('GameScene')?.cameras.main.setBackgroundColor(color)
     this.scene.stop()
-    this.scene.resume('MenuScene')
-    this.scene.resume('GameScene')
+    this.scene.resume(this.originScene)
   }
 }

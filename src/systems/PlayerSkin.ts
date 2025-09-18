@@ -86,12 +86,17 @@ const backY = Math.sin(rot + Math.PI)  // 180 degrees from forward
 
 // Updating the emitter with new settings (emitting angle) 
 const backDeg = Phaser.Math.RadToDeg(rot) + 90 
-this.pm?.updateConfig({ angle: { min: backDeg - 15, max: backDeg + 15 } })
+const emitter = this.pm as any
+if (emitter && emitter.manager) {
+  emitter.updateConfig({ angle: { min: backDeg - 15, max: backDeg + 15 } })
+}
 const body = this.host.body as Phaser.Physics.Arcade.Body
 const speed = body?.velocity?.length() ?? 0
 const t = Phaser.Math.Clamp(speed / 300, 0.1, 1)
 //this.pm?.updateConfig({ frequency: Phaser.Math.Linear(26, 8, t) +8})
-this.pm?.updateConfig({ scale: { start: 0.35 , end: 0 } })
+if (emitter && emitter.manager) {
+  emitter.updateConfig({ scale: { start: 0.35 , end: 0 } })
+}
 
   }
 

@@ -32,7 +32,10 @@ export default class Spawner {
         s.setData('hp', hp)
       } catch {}
       const style = enemyStyles[type]
-      s.body.setCircle(style.bodyRadius)
+      const radius = style.bodyRadius
+      const offsetX = (s.width - radius * 2) * 0.5
+      const offsetY = (s.height - radius * 2) * 0.5
+      s.body.setCircle(radius, offsetX, offsetY)
       // Move towards center
       const { width, height } = this.scene.scale
       const ang = Phaser.Math.Angle.Between(x, y, width / 2, height / 2)

@@ -65,7 +65,7 @@ export default class CubeSkin {
 
     this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.follow, this)
 
-    const rotateTargets = [this.gfx]
+    const rotateTargets: Phaser.GameObjects.GameObject[] = [this.gfx]
     if (this.glowSprite) rotateTargets.push(this.glowSprite)
 
     this.rotateTween = this.scene.tweens.add({
@@ -168,7 +168,7 @@ export default class CubeSkin {
   pulse(scaleMultiplier?: number) {
     const amplitude = scaleMultiplier ?? this.pulseScale
     const targetScale = this.baselineScale * (1 + amplitude)
-    const targets: Phaser.Types.Tweens.TweenTarget[] = [this.gfx]
+    const targets: Phaser.GameObjects.GameObject[] = [this.gfx]
     if (this.glowSprite) targets.push(this.glowSprite)
     this.pulseTween?.stop()
     this.pulseTween = this.scene.tweens.add({

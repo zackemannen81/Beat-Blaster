@@ -57,6 +57,7 @@ export default class GameScene extends Phaser.Scene {
     split: 6,
     slowmo: 3
   }
+  private isPaused = false
   // inne i klassen GameScene, efter private-fälten
 private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
   // städa skin
@@ -162,6 +163,10 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     this.physics.world.on('worldbounds', this.handleBulletWorldBounds, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       if (this.physics.world) this.physics.world.off('worldbounds', this.handleBulletWorldBounds, this)
+      this.music?.stop()
+      this.music?.destroy()
+      this.music = undefined
+      this.analyzer?.removeAllListeners?.()
     })
     this.input.on('pointerdown', () => {
       if (this.opts.fireMode === 'click') {
@@ -197,7 +202,9 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     this.analyzer.on('beat:high', () => {  this.conductor.onBeat(); this.lastBeatAt = this.time.now })
 
     this.analyzer.on('beat:low', () => this.pulseEnemies())
-    
+
+    this.sound.removeByKey('music')
+    this.cache.audio.remove('music')
 
     if (track) {
       // First, ensure the audio context is running
@@ -393,8 +400,8 @@ if (newHp <= 0) {
 
     // Back to menu
     this.input.keyboard!.on('keydown-ESC', () => {
-      this.sound.play('ui_back', { volume: this.opts.sfxVolume })
-      this.scene.start('MenuScene')
+      if (this.isPaused) return
+      this.pauseGame()
     })
 
     // Bomb on SPACE when charged
@@ -405,6 +412,12 @@ if (newHp <= 0) {
     // Crosshair (drawn reticle)
     this.crosshair = this.add.graphics().setDepth(1000)
     this.input.setDefaultCursor('none')
+
+    this.events.on(Phaser.Scenes.Events.RESUME, () => {
+      this.isPaused = false
+      this.music?.resume()
+      this.input.setDefaultCursor('none')
+    })
   }
 
   update(time: number, delta: number): void {
@@ -630,8 +643,36 @@ pskin?.setThrust?.(thrustLevel)
     const s = this.physics.add.sprite(x, y, texture)
     if (this.anims.exists(anim)) s.play(anim)
     s.setData('ptype', type)
-    s.setDepth(1)
-    s.setBlendMode(Phaser.BlendModes.ADD)
+    s.setDepth(4)
+
+    const glow = this.add.image(x, y, 'plasma_glow_disc')
+      .setDepth(3)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setAlpha(0.65)
+      .setScale(0.65)
+    const glowFollow = () => {
+      glow.x = s.x
+      glow.y = s.y
+    }
+    this.events.on(Phaser.Scenes.Events.UPDATE, glowFollow)
+    s.once(Phaser.GameObjects.Events.DESTROY, () => {
+      this.events.off(Phaser.Scenes.Events.UPDATE, glowFollow)
+      glow.destroy()
+    })
+    this.tweens.add({
+      targets: glow,
+      scale: { from: 0.6, to: 0.8 },
+      alpha: { from: 0.65, to: 0.3 },
+      yoyo: true,
+      repeat: -1,
+      duration: 700,
+      ease: 'Sine.easeInOut'
+    })
+
+    const radius = 24
+    const offsetX = s.width * 0.5 - radius
+    const offsetY = s.height * 0.5 - radius
+    s.body.setCircle(radius, offsetX, offsetY)
     // Fade after 6s
     this.tweens.add({ targets: s, alpha: 0.2, duration: 6000, onComplete: () => s.destroy() })
     // Overlap with player
@@ -729,7 +770,23 @@ pskin?.setThrust?.(thrustLevel)
   private endRun() {
     // Stop music
     this.music?.stop()
-    this.scene.start('ResultScene', { score: this.scoring.score })
+    this.sound.removeByKey('music')
+    this.cache.audio.remove('music')
+    const shots = this.scoring.shots || 0
+    const hits = this.scoring.perfect + this.scoring.good
+    const accuracy = shots > 0 ? (hits / shots) * 100 : 0
+    this.scene.start('ResultScene', { score: this.scoring.score, accuracy })
+  }
+
+  private pauseGame() {
+    if (this.isPaused) return
+    this.isPaused = true
+    this.sound.play('ui_back', { volume: this.opts.sfxVolume })
+    this.music?.pause()
+    this.scene.launch('MenuScene', { resume: true })
+    this.scene.bringToTop('MenuScene')
+    this.input.setDefaultCursor('default')
+    this.scene.pause('GameScene')
   }
   public getMusic(): Phaser.Sound.BaseSound | undefined {
     return this.music;

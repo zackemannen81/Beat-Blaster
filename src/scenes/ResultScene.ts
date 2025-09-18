@@ -15,10 +15,12 @@ export default class ResultScene extends Phaser.Scene {
       color: '#ffffff'
     }).setOrigin(0.5)
 
+    const accuracy = typeof data.accuracy === 'number' ? data.accuracy : 0
+    const accuracyText = `${accuracy.toFixed(1)}%`
     this.add.text(
       width / 2,
       height * 0.55,
-      `Score: ${data.score ?? 0}\nAccuracy: ${data.accuracy ?? 0}%`,
+      `Score: ${data.score ?? 0}\nAccuracy: ${accuracyText}`,
       { fontFamily: 'UiFont, sans-serif', fontSize: '18px', color: '#a0e9ff', align: 'center' }
     ).setOrigin(0.5)
 

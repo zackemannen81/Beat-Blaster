@@ -10,6 +10,7 @@ import Starfield from '../systems/Starfield'
 import { loadOptions } from '../systems/Options'
 import PlayerSkin from '../systems/PlayerSkin'
 import NeonGrid from '../systems/NeonGrid'
+import CubeSkin from '../systems/CubeSkin'
 
 type Enemy = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
 
@@ -194,6 +195,8 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     this.analyzer.on('beat:low', () => { this.conductor.onBeat(); this.lastBeatAt = this.time.now })
     this.analyzer.on('beat:mid', () => { this.conductor.onBeat(); this.lastBeatAt = this.time.now })
     this.analyzer.on('beat:high', () => {  this.conductor.onBeat(); this.lastBeatAt = this.time.now })
+
+    this.analyzer.on('beat:low', () => this.pulseEnemies())
     
 
     if (track) {
@@ -653,6 +656,19 @@ pskin?.setThrust?.(thrustLevel)
     } else {
       this.sound.play('ui_select', { volume: vol })
     }
+  }
+
+  private pulseEnemies(amplitudeMultiplier = 1) {
+    const group = this.spawner.getGroup()
+    group.children.each((obj: Phaser.GameObjects.GameObject) => {
+      const enemy = obj as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+      if (!enemy.active) return false
+      const skin = enemy.getData('skin') as CubeSkin | undefined
+      if (!skin) return true
+      const base = (enemy.getData('pulseScale') as number | undefined) ?? 0.1
+      skin.pulse(base * amplitudeMultiplier)
+      return true
+    })
   }
 
   private triggerBomb() {

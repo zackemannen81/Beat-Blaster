@@ -2,59 +2,94 @@ import Phaser from 'phaser'
 
 export type CubeVariant = 'solid' | 'wire' | 'plasma'
 
+export interface CubeSkinOptions {
+  variant?: CubeVariant
+  size?: number
+  primaryColor?: number
+  secondaryColor?: number
+  glowColor?: number
+  rotationDuration?: number
+  pulseScale?: number
+  pulseDuration?: number
+}
+
 export default class CubeSkin {
   private scene: Phaser.Scene
   private host: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
   private gfx: Phaser.GameObjects.Graphics
+  private glowSprite?: Phaser.GameObjects.Image
   private aura?: Phaser.GameObjects.Particles.ParticleEmitter
   private zapTimer?: Phaser.Time.TimerEvent
   private rotateTween?: Phaser.Tweens.Tween
+  private pulseTween?: Phaser.Tweens.Tween
+  private baselineScale = 1
+  private glowBaseScale = 1
   private variant: CubeVariant
   private size: number
+  private primaryColor: number
+  private secondaryColor: number
+  private glowColor?: number
+  private pulseScale: number
+  private pulseDuration: number
 
   constructor(
     scene: Phaser.Scene,
     host: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
-    variant: CubeVariant,
-    size = 28
+    options: CubeSkinOptions = {}
   ) {
     this.scene = scene
     this.host = host
-    this.variant = variant
-    this.size = size
+    this.variant = options.variant ?? 'solid'
+    this.size = options.size ?? 28
+    this.primaryColor = options.primaryColor ?? 0x00e5ff
+    this.secondaryColor = options.secondaryColor ?? 0x001a33
+    this.glowColor = options.glowColor
+    this.pulseScale = options.pulseScale ?? 0.1
+    this.pulseDuration = options.pulseDuration ?? 180
 
-    // Dölj originalspriten om du vill (vi ritar själva)
     host.setVisible(false)
 
-    // Grafiken ligger som separat Graphics som följer värdena från host
     this.gfx = scene.add.graphics({ x: host.x, y: host.y }).setDepth(host.depth + 1)
+    this.gfx.setScale(this.baselineScale)
     this.drawCube()
 
-    // Låt grafiken “följa” spriten varje frame
+    if (this.glowColor !== undefined && this.scene.textures.exists('plasma_glow_disc')) {
+      this.glowSprite = this.scene.add.image(host.x, host.y, 'plasma_glow_disc')
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setDepth(host.depth)
+      this.glowSprite.setTint(this.glowColor)
+      this.glowBaseScale = this.size / 24
+      this.glowSprite.setScale(this.glowBaseScale)
+      this.glowSprite.setAlpha(0.9)
+    }
+
     this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.follow, this)
 
-    // Idle-rotation
+    const rotateTargets = [this.gfx]
+    if (this.glowSprite) rotateTargets.push(this.glowSprite)
+
     this.rotateTween = this.scene.tweens.add({
-      targets: this.gfx,
+      targets: rotateTargets,
       angle: { from: 0, to: 360 },
-      duration: 4000,
+      duration: options.rotationDuration ?? 4000,
       repeat: -1,
       ease: 'Linear'
     })
 
-    // Variant-effekter
-    if (variant === 'solid') {
+    if (this.variant === 'solid') {
       this.addAura()
-    } else if (variant === 'wire') {
+    } else if (this.variant === 'wire') {
       this.startElectricZaps()
-    } else if (variant === 'plasma') {
-      this.startPlasmaPulse()
     }
   }
 
   private follow() {
     this.gfx.x = this.host.x
     this.gfx.y = this.host.y
+    if (this.glowSprite) {
+      this.glowSprite.x = this.host.x
+      this.glowSprite.y = this.host.y
+    }
   }
 
   private drawCube() {
@@ -63,19 +98,18 @@ export default class CubeSkin {
     g.clear()
 
     if (this.variant === 'solid' || this.variant === 'plasma') {
-      const color = this.variant === 'plasma' ? 0x69d2ff : 0x00e5ff
-      g.fillStyle(color, 0.9)
+      g.fillStyle(this.primaryColor, 0.92)
       g.fillRect(-s/2, -s/2, s, s)
-      g.lineStyle(2, 0x001a33, 0.9)
+      g.lineStyle(2, this.secondaryColor, 0.9)
       g.strokeRect(-s/2, -s/2, s, s)
       // liten highlight
       g.lineStyle(1, 0xffffff, 0.25)
       g.beginPath(); g.moveTo(-s/2+3, -s/2+6); g.lineTo(s/2-6, -s/2+6); g.strokePath()
     } else {
       // wireframe
-      g.lineStyle(2, 0x00e5ff, 1)
+      g.lineStyle(2, this.primaryColor, 1)
       g.strokeRect(-s/2, -s/2, s, s)
-      g.lineStyle(1, 0x00e5ff, 0.7)
+      g.lineStyle(1, this.primaryColor, 0.7)
       g.beginPath(); g.moveTo(-s/2, -s/2); g.lineTo(s/2, s/2); g.strokePath()
       g.beginPath(); g.moveTo(s/2, -s/2); g.lineTo(-s/2, s/2); g.strokePath()
     }
@@ -97,12 +131,13 @@ export default class CubeSkin {
   }
 
   private startElectricZaps() {
+    const zapColor = this.primaryColor
     this.zapTimer = this.scene.time.addEvent({
       delay: 220,
       loop: true,
       callback: () => {
         const flash = this.scene.add.graphics({ x: this.gfx.x, y: this.gfx.y }).setDepth(this.gfx.depth + 1)
-        flash.lineStyle(2, 0x66ccff, 1).setAlpha(0.9)
+        flash.lineStyle(2, zapColor, 1).setAlpha(0.9)
         // enkel sicksack-ram
         const l = 12
         flash.beginPath()
@@ -111,18 +146,6 @@ export default class CubeSkin {
         flash.lineTo(-l, l); flash.lineTo(-l+4, 0); flash.closePath(); flash.strokePath()
         this.scene.tweens.add({ targets: flash, alpha: 0, duration: 120, onComplete: () => flash.destroy() })
       }
-    })
-  }
-
-  private startPlasmaPulse() {
-    this.scene.tweens.add({
-      targets: this.gfx,
-      scale: { from: 0.92, to: 1.08 },
-      alpha: { from: 0.85, to: 1 },
-      yoyo: true,
-      duration: 600,
-      repeat: -1,
-      ease: 'Sine.easeInOut'
     })
   }
 
@@ -140,6 +163,35 @@ export default class CubeSkin {
     // kort flash
     this.gfx.setBlendMode(Phaser.BlendModes.ADD)
     this.scene.time.delayedCall(80, () => this.gfx.setBlendMode(Phaser.BlendModes.NORMAL))
+  }
+
+  pulse(scaleMultiplier?: number) {
+    const amplitude = scaleMultiplier ?? this.pulseScale
+    const targetScale = this.baselineScale * (1 + amplitude)
+    const targets: Phaser.Types.Tweens.TweenTarget[] = [this.gfx]
+    if (this.glowSprite) targets.push(this.glowSprite)
+    this.pulseTween?.stop()
+    this.pulseTween = this.scene.tweens.add({
+      targets,
+      scale: targetScale,
+      duration: this.pulseDuration,
+      yoyo: true,
+      ease: 'Sine.easeOut',
+      onComplete: () => {
+        this.gfx.setScale(this.baselineScale)
+        if (this.glowSprite) this.glowSprite.setScale(this.glowBaseScale)
+      }
+    })
+    if (this.glowSprite) {
+      this.scene.tweens.add({
+        targets: this.glowSprite,
+        alpha: { from: this.glowSprite.alpha, to: 1.4 },
+        duration: this.pulseDuration,
+        yoyo: true,
+        ease: 'Cubic.easeOut',
+        onComplete: () => this.glowSprite && this.glowSprite.setAlpha(0.9)
+      })
+    }
   }
 
   onDeath() {
@@ -162,6 +214,8 @@ export default class CubeSkin {
     this.rotateTween?.stop()
     this.zapTimer?.remove(false)
     this.aura?.destroy()
+    this.pulseTween?.stop()
+    this.glowSprite?.destroy()
     this.gfx.destroy()
   }
 }

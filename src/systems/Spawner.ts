@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import CubeSkin, { CubeVariant } from '../systems/CubeSkin' // <- importera
+import CubeSkin from '../systems/CubeSkin'
+import { enemyStyles, EnemyType } from '../config/enemyStyles'
 
 export type Enemy = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
 
@@ -12,12 +13,12 @@ export default class Spawner {
     this.group = this.scene.physics.add.group({ classType: Phaser.Physics.Arcade.Sprite })
   }
 
-  spawn(type: 'brute' | 'dasher' | 'swarm', count = 1) {
+  spawn(type: EnemyType, count = 1) {
     for (let i = 0; i < count; i++) {
-      const frame = this.pickFrame(type)
       const { x, y } = this.randomOffscreen()
-      const s = this.group.get(x, y, 'gameplay', frame) as Enemy
-      s.setActive(true).setVisible(true).setScale(0.5)
+      const placeholderFrame = type === 'brute' ? 'enemy_brute_0' : type === 'dasher' ? 'enemy_dasher_0' : 'enemy_swarm_0'
+      const s = this.group.get(x, y, 'gameplay', placeholderFrame) as Enemy
+      s.setActive(true).setVisible(true)
       s.body.enable = true
       s.setData('etype', type)
 
@@ -30,7 +31,8 @@ export default class Spawner {
  
         s.setData('hp', hp)
       } catch {}
-      s.body.setCircle(Math.max(s.width, s.height) / 2)
+      const style = enemyStyles[type]
+      s.body.setCircle(style.bodyRadius)
       // Move towards center
       const { width, height } = this.scene.scale
       const ang = Phaser.Math.Angle.Between(x, y, width / 2, height / 2)
@@ -38,23 +40,9 @@ export default class Spawner {
       s.body.setVelocity(Math.cos(ang) * speed, Math.sin(ang) * speed)
       const uid = Phaser.Utils.String.UUID()
 s.setData('eid', uid)
-    // === NYTT: koppla på kub-skin ===
-    const variant: CubeVariant =
-      Math.random() < 0.34 ? 'solid' : (Math.random() < 0.5 ? 'wire' : 'plasma')
-    const size = type === 'brute' ? 36 : (type === 'dasher' ? 28 : 22)
-    const skin = new CubeSkin(this.scene, s, variant, size)
+    const skin = new CubeSkin(this.scene, s, style)
     s.setData('skin', skin)
-    }
-  }
-
-  private pickFrame(type: 'brute' | 'dasher' | 'swarm') {
-    switch (type) {
-      case 'brute':
-        return 'enemy_brute_0'
-      case 'dasher':
-        return 'enemy_dasher_0'
-      case 'swarm':
-        return 'enemy_swarm_0'
+    s.setData('pulseScale', style.pulseScale)
     }
   }
 

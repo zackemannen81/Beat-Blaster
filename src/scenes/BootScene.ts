@@ -147,6 +147,22 @@ export default class BootScene extends Phaser.Scene {
     ])
     // Note: pickup sound uses UI select as placeholder for browser compatibility
 
+    const announcerClips = [
+      'announcer_powerup',
+      'announcer_shield',
+      'announcer_rapid_fire',
+      'announcer_split_shot',
+      'announcer_slowmo',
+      'announcer_bomb_ready',
+      'announcer_combo',
+      'announcer_new_game',
+      'announcer_warning',
+      'announcer_enemies_approching'
+    ]
+    announcerClips.forEach((key) => {
+      this.load.audio(key, [`src/assets/audio/sfx/${key}.wav`])
+    })
+
     const plasmaBasePath = 'src/assets/sprites/plasmabeam'
     const loadSequence = (prefix: string, count: number) => {
       for (let i = 0; i < count; i++) {

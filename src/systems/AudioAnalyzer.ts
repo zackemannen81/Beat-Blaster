@@ -18,6 +18,8 @@ export default class AudioAnalyzer extends Phaser.Events.EventEmitter {
   private lastBeat: Record<BeatBand, number> = { low: 0, mid: 0, high: 0 }
   private beatTimes: number[] = []
   private estPeriodMs = 500 // starta ~120 BPM
+  private latestBands = { low: 0, mid: 0, high: 0 }
+  private spectrumSnapshot?: Float32Array
 
   constructor(scene: Phaser.Scene) {
     super()
@@ -80,6 +82,11 @@ export default class AudioAnalyzer extends Phaser.Events.EventEmitter {
       }
 
       const bands = this.computeBands(this.freqData)
+      this.latestBands = bands
+      if (!this.spectrumSnapshot || this.spectrumSnapshot.length !== this.freqData.length) {
+        this.spectrumSnapshot = new Float32Array(this.freqData.length)
+      }
+      this.spectrumSnapshot.set(this.freqData)
       this.detectBeats(bands, flux)
     } catch (e) {
       console.error('Analyzer update error:', e)
@@ -179,5 +186,27 @@ export default class AudioAnalyzer extends Phaser.Events.EventEmitter {
       if (d > 800) break
     }
     return best
+  }
+
+  getSpectrumBins(count: number): number[] {
+    if (!this.spectrumSnapshot) return Array(count).fill(0)
+    const src = this.spectrumSnapshot
+    const len = src.length
+    const bins = Math.max(1, Math.floor(len / count))
+    const values: number[] = []
+    for (let i = 0; i < count; i++) {
+      const start = i * bins
+      let sum = 0
+      for (let j = 0; j < bins && start + j < len; j++) {
+        sum += src[start + j]
+      }
+      const avg = sum / bins
+      values.push(avg)
+    }
+    return values
+  }
+
+  getBandLevels() {
+    return { ...this.latestBands }
   }
 }

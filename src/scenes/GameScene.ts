@@ -5,12 +5,18 @@ import Spawner from '../systems/Spawner'
 import Scoring from '../systems/Scoring'
 import HUD from '../ui/HUD'
 import Effects from '../systems/Effects'
-import Powerups, { PowerupType } from '../systems/Powerups'
-import Starfield from '../systems/Starfield'
+import Powerups, { PowerupType, PowerupEvent } from '../systems/Powerups'
 import { loadOptions } from '../systems/Options'
 import PlayerSkin from '../systems/PlayerSkin'
-import NeonGrid from '../systems/NeonGrid'
 import CubeSkin from '../systems/CubeSkin'
+import { SceneBackground } from '../systems/SceneBackground'
+import ClassicBackground from '../systems/ClassicBackground'
+import DualGridBackground from '../systems/DualGridBackground'
+import AuroraBackground from '../systems/AuroraBackground'
+import CityscapeBackground from '../systems/CityscapeBackground'
+import OceanBackground from '../systems/OceanBackground'
+import TunnelBackground from '../systems/TunnelBackground'
+import Announcer from '../systems/Announcer'
 
 type Enemy = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
 
@@ -41,7 +47,7 @@ export default class GameScene extends Phaser.Scene {
   private nextQuantizedShotAt = 0
   private beatPeriodMs = 2000 // fallback
   private crosshair!: Phaser.GameObjects.Graphics
-  private starfield!: Starfield
+  private background?: SceneBackground
   private enemyCap = 25
   private fallbackCycle = 0
   private comboCount = 0
@@ -50,7 +56,6 @@ export default class GameScene extends Phaser.Scene {
   private opts = loadOptions()
   private beatIndicator!: Phaser.GameObjects.Graphics;
   private lastHitEnemyId: string | null = null
-  private neon!: NeonGrid
   private powerupDurations: Record<PowerupType, number> = {
     shield: 5,
     rapid: 6,
@@ -58,6 +63,10 @@ export default class GameScene extends Phaser.Scene {
     slowmo: 3
   }
   private isPaused = false
+  private announcer?: Announcer
+  private bombReadyAnnounced = false
+  private warningAnnounced = false
+  private enemyPressureAnnounced = false
   // inne i klassen GameScene, efter private-fälten
 private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
   // städa skin
@@ -78,14 +87,11 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
   }
 
   create() {
-    this.neon = new NeonGrid(this)
-    this.neon.create()
     const { width, height } = this.scale
     this.cameras.main.setBackgroundColor('#0a0a0f')
 
-    // Starfield background (procedural)
-    this.starfield = new Starfield(this)
-    this.starfield.create()
+    // Backgrounds
+    this.applyBackgroundSetting()
 
     // Player sprite from atlas
 /*
@@ -154,6 +160,9 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
       this.playerMaxHp = balance.player.hp ?? this.playerMaxHp
       this.playerHp = this.playerMaxHp
     }
+    this.warningAnnounced = false
+    this.bombReadyAnnounced = false
+    this.enemyPressureAnnounced = false
 
     // Bullets group & fire mode
     this.bullets = this.physics.add.group({
@@ -166,7 +175,10 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
       this.music?.stop()
       this.music?.destroy()
       this.music = undefined
-      this.analyzer?.removeAllListeners?.()
+      this.destroyBackground()
+      this.announcer?.destroy()
+      this.announcer = undefined
+      this.powerups.removeAllListeners()
     })
     this.input.on('pointerdown', () => {
       if (this.opts.fireMode === 'click') {
@@ -195,13 +207,26 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     // Initialize analyzer first
     this.analyzer = new AudioAnalyzer(this)
     this.conductor = new Conductor(this)
+    this.background?.setAnalyzer(this.analyzer)
     
     // Set up beat listeners
-    this.analyzer.on('beat:low', () => { this.conductor.onBeat(); this.lastBeatAt = this.time.now })
-    this.analyzer.on('beat:mid', () => { this.conductor.onBeat(); this.lastBeatAt = this.time.now })
-    this.analyzer.on('beat:high', () => {  this.conductor.onBeat(); this.lastBeatAt = this.time.now })
+    this.analyzer.on('beat:low', (level: number) => {
+      this.conductor.onBeat()
+      this.lastBeatAt = this.time.now
+      this.events.emit('beat:low', level)
+      this.pulseEnemies()
+    })
+    this.analyzer.on('beat:mid', (level: number) => {
+      this.conductor.onBeat()
+      this.lastBeatAt = this.time.now
+      this.events.emit('beat:mid', level)
+    })
+    this.analyzer.on('beat:high', (level: number) => {
+      this.conductor.onBeat()
+      this.lastBeatAt = this.time.now
+      this.events.emit('beat:high', level)
+    })
 
-    this.analyzer.on('beat:low', () => this.pulseEnemies())
 
     this.sound.removeByKey('music')
     this.cache.audio.remove('music')
@@ -298,7 +323,11 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
 
     // Effects
     this.effects = new Effects(this)
+    this.announcer = new Announcer(this, () => this.opts.sfxVolume, this.opts.announcerEnabled)
     this.powerups = new Powerups(this)
+    this.powerups.on('powerup', (event: PowerupEvent) => {
+      this.announcer?.playPowerup(event.type)
+    })
     this.hud.bindPowerups(this.powerups)
 
     // Collisions: bullets -> enemies
@@ -336,6 +365,7 @@ if (this.lastHitEnemyId !== enemyId) {
     // Visa text när multiplikatorn ökar
     this.effects.showComboText(enemy.x, enemy.y, this.comboCount)
     this.hud.setCombo(this.comboCount)
+    this.announcer?.playCombo(this.comboCount)
   } else {
     // Första träffen bara armerar combon
     this.comboCount = 1
@@ -390,6 +420,13 @@ if (newHp <= 0) {
         this.comboCount = 0
         this.hud.setCombo(this.comboCount)
         this.iframesUntil = now + 800
+        if (this.playerHp === 1 && !this.warningAnnounced) {
+          this.announcer?.playEvent('warning')
+          this.warningAnnounced = true
+        }
+        if (this.playerHp > 1 && this.warningAnnounced) {
+          this.warningAnnounced = false
+        }
       }
       this.hud.setHp(this.playerHp)
       this.cameras.main.shake(150, 0.01)
@@ -413,32 +450,50 @@ if (newHp <= 0) {
     this.crosshair = this.add.graphics().setDepth(1000)
     this.input.setDefaultCursor('none')
 
+    this.time.delayedCall(250, () => this.announcer?.playEvent('new_game'))
+
     this.events.on(Phaser.Scenes.Events.RESUME, () => {
       this.isPaused = false
       this.music?.resume()
+      this.opts = loadOptions()
+      this.applyBackgroundSetting()
       this.input.setDefaultCursor('none')
+      this.announcer?.setEnabled(this.opts.announcerEnabled)
     })
   }
 
   update(time: number, delta: number): void {
     // Analyzer update
     if (this.analyzer) this.analyzer.update()
-    // Starfield update
-    if (this.starfield) this.starfield.update(delta)
+    this.background?.update(time, delta)
 
-      if (this.time.now - this.lastBeatAt < 100) { // Visa cirkeln i 100ms efter varje beat
-        this.beatIndicator.setAlpha(1);
+    if (this.time.now - this.lastBeatAt < 100) { // Visa cirkeln i 100ms efter varje beat
+      this.beatIndicator.setAlpha(1)
     } else {
-        this.beatIndicator.setAlpha(0.3); // Gör den genomskinlig när inget beat
+      this.beatIndicator.setAlpha(0.3) // Gör den genomskinlig när inget beat
     }
-    this.neon.update(delta)
-    
+
     if (time - this.lastHitAt > this.comboTimeoutMs && this.comboCount > 0) {
       this.comboCount = 0
       this.hud.setCombo(0)
       this.lastHitEnemyId = null
     }
-    
+    if (this.playerHp > 1 && this.warningAnnounced) {
+      this.warningAnnounced = false
+    }
+
+    if (this.spawner) {
+      const activeEnemies = this.spawner.getGroup().countActive(true)
+      if (activeEnemies >= this.enemyCap - 5) {
+        if (!this.enemyPressureAnnounced) {
+          this.announcer?.playEvent('enemies')
+          this.enemyPressureAnnounced = true
+        }
+      } else if (this.enemyPressureAnnounced && activeEnemies < this.enemyCap / 2) {
+        this.enemyPressureAnnounced = false
+      }
+    }
+
 
     // Shooting
     const cooldown = this.powerups.hasRapid ? this.fireCooldownMs * 0.8 : this.fireCooldownMs
@@ -712,6 +767,40 @@ pskin?.setThrust?.(thrustLevel)
     })
   }
 
+  private applyBackgroundSetting() {
+    this.destroyBackground()
+    const mode = this.opts.backgroundMode ?? 'dual'
+    switch (mode) {
+      case 'classic':
+        this.background = new ClassicBackground(this)
+        break
+      case 'aurora':
+        this.background = new AuroraBackground(this)
+        break
+      case 'city':
+        this.background = new CityscapeBackground(this)
+        break
+      case 'ocean':
+        this.background = new OceanBackground(this)
+        break
+      case 'tunnel':
+        this.background = new TunnelBackground(this)
+        break
+      case 'dual':
+      default:
+        this.background = new DualGridBackground(this)
+        break
+    }
+    this.background?.setAnalyzer(this.analyzer)
+    this.background?.create()
+  }
+
+  private destroyBackground() {
+    this.background?.destroy()
+    this.background = undefined
+  }
+
+
   private triggerBomb() {
     // Clear enemies in radius by disabling all
     const group = this.spawner.getGroup()
@@ -737,6 +826,14 @@ pskin?.setThrust?.(thrustLevel)
   private bumpBomb(delta: number) {
     this.bombCharge = Phaser.Math.Clamp(this.bombCharge + delta, 0, 100)
     this.hud.setBombCharge(this.bombCharge / 100)
+    if (this.bombCharge >= 100) {
+      if (!this.bombReadyAnnounced) {
+        this.announcer?.playBombReady()
+        this.bombReadyAnnounced = true
+      }
+    } else if (this.bombReadyAnnounced && this.bombCharge < 100) {
+      this.bombReadyAnnounced = false
+    }
   }
 
   private drawHealthBar(enemy: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody) {

@@ -1,0 +1,80 @@
+[
+  {
+    "id": "track_01",
+    "name": "Backbeat",
+    "artist": "Unknown (FreePD)",
+    "inputOffsetMs": 0,
+    "lengthSec": 46,
+    "fileOgg": "",
+    "fileMp3": "./assets/audio/tracks/track_01.mp3",
+    "difficultyProfileId": "normal",
+    "hash": "60e768ef0395baadf5ee504e66cd56fc45108afd"
+  },
+  {
+    "id": "track_02",
+    "name": "Bit Bit Loop",
+    "artist": "Unknown (FreePD)",
+    "inputOffsetMs": 0,
+    "lengthSec": 77,
+    "fileOgg": "",
+    "fileMp3": "./assets/audio/tracks/track_02.mp3",
+    "difficultyProfileId": "normal",
+    "hash": "91913fcb63140356966ac881688e6ae6170bc333"
+  },
+  {
+    "id": "track_03",
+    "name": "Neon Reverie",
+    "artist": "Alex Harmony",
+    "inputOffsetMs": 0,
+    "lengthSec": 77,
+    "fileOgg": "",
+    "fileMp3": "./assets/audio/tracks/track_03.mp3",
+    "difficultyProfileId": "normal",
+    "hash": "91913fcb63140356966ac881688e6ae6170bc333"
+  },
+  {
+    "id": "track_04",
+    "name": "Electric heartbeat",
+    "artist": "Alex Harmony",
+    "inputOffsetMs": 0,
+    "lengthSec": 77,
+    "fileOgg": "",
+    "fileMp3": "./assets/audio/tracks/track_04.mp3",
+    "difficultyProfileId": "normal",
+    "hash": "91913fcb63140356966ac881688e6ae6170bc333"
+  },
+  {
+    "id": "track_05",
+    "name": "Electric Pulse",
+    "artist": "Alex Harmony",
+    "inputOffsetMs": 0,
+    "lengthSec": 120,
+    "fileOgg": "",
+    "fileMp3": "./assets/audio/tracks/track_05.mp3",
+    "difficultyProfileId": "hard",
+    "hash": "91913fcb63140356966ac881688e6ae6170bc333"
+  },
+  {
+    "id": "track_06",
+    "name": "Dark dancer",
+    "artist": "Alex Harmony",
+    "inputOffsetMs": 0,
+    "lengthSec": 138,
+    "fileOgg": "",
+    "fileMp3": "./assets/audio/tracks/track_06.mp3",
+    "difficultyProfileId": "easy",
+    "hash": "91913fcb63140356966ac881688e6ae6170bc333"
+  },
+  {
+    "id": "track_07",
+    "name": "White noice",
+    "artist": "Alex Harmony",
+    "inputOffsetMs": 0,
+    "lengthSec": 138,
+    "fileOgg": "",
+    "fileMp3": "./assets/audio/tracks/track_07.mp3",
+    "difficultyProfileId": "easy",
+    "hash": "91913fcb63140356966ac881688e6ae6170bc333"
+  }
+  
+]

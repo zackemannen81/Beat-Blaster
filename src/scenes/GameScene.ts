@@ -224,7 +224,8 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
       this.conductor?.off('bar:start', this.handleBarStart)
     })
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (this.gameplayMode === 'vertical' && pointer.pointerType !== 'mouse') {
+      const pointerType = (pointer as any)?.pointerType ?? 'mouse'
+      if (this.gameplayMode === 'vertical' && pointerType !== 'mouse') {
         const half = this.scale.width * 0.5
         if (pointer.x < half) {
           if (this.touchMovePointerId === undefined) {
@@ -242,7 +243,8 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
       this.handleFireInputDown()
     })
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-      if (this.gameplayMode === 'vertical' && pointer.pointerType !== 'mouse') {
+      const pointerType = (pointer as any)?.pointerType ?? 'mouse'
+      if (this.gameplayMode === 'vertical' && pointerType !== 'mouse') {
         if (pointer.id === this.touchMovePointerId) {
           this.touchMovePointerId = undefined
         }
@@ -254,7 +256,8 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
       this.handleFireInputUp()
     })
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      if (this.gameplayMode !== 'vertical' || pointer.pointerType === 'mouse') return
+      const pointerType = (pointer as any)?.pointerType ?? 'mouse'
+      if (this.gameplayMode !== 'vertical' || pointerType === 'mouse') return
       if (pointer.id !== this.touchMovePointerId) return
       const deltaX = pointer.x - this.touchMoveBaselineX
       const targetX = this.touchMoveBaselinePlayerX + deltaX
@@ -361,7 +364,10 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     // Spawner
     this.spawner = new Spawner(this)
     this.updateDifficultyForStage()
-    const canSpawn = () => this.spawner.getGroup().countActive(true) < this.enemyCap
+    const canSpawn = () => {
+      this.pruneEnemies()
+      return this.spawner.getGroup().countActive(true) < this.enemyCap
+    }
     this.setupSpawnHandlers(canSpawn)
 
     // Fallback BPM-driven spawns if analyzer events are not firing
@@ -373,18 +379,11 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     this.backgroundScroller.setBaseScroll(this.scrollBase)
     this.spawner.setScrollBase(this.scrollBase)
     this.registry.set('scrollBase', this.scrollBase)
-/*    this.time.addEvent({ delay: interval, loop: true, callback: () => {
-      if (!canSpawn()) return
-      // If no analyzer beat in the last 1.5 intervals, synthesize spawns (one type at a time)
-      if (this.time.now - this.lastBeatAt > interval * 1.5) {
-        const type = this.fallbackCycle % 3
-        if (type === 0) this.spawner.spawn('brute', 1)
-        else if (type === 1) this.spawner.spawn('dasher', 1)
-        else this.spawner.spawn('swarm', 2)
-        this.fallbackCycle++
-      }
-    }})
-*/
+    this.time.addEvent({
+      delay: interval,
+      loop: true,
+      callback: () => this.fallbackSpawn(canSpawn, interval)
+    })
     // HUD
     this.hud = new HUD(this)
     this.hud.create()
@@ -994,6 +993,76 @@ pskin?.setThrust?.(thrustLevel)
   private adjustedChance(base: number): number {
     const scaled = base * this.spawnRateMultiplier
     return Phaser.Math.Clamp(scaled, 0.02, 0.9)
+  }
+
+  private fallbackSpawn(canSpawn: () => boolean, interval: number) {
+    if (!canSpawn()) return
+    if (this.time.now - this.lastBeatAt <= interval * 1.5) return
+
+    if (this.gameplayMode === 'vertical') {
+      const cycle = this.fallbackCycle % 3
+      if (cycle === 0) {
+        const lane = Phaser.Math.Between(0, Math.max(0, this.verticalLaneCount - 1))
+        this.spawner.spawnVerticalLane('swarm', lane, this.adjustSpawnCount(2), 0.95)
+      } else if (cycle === 1) {
+        const spread = Phaser.Math.Between(45, 70)
+        this.spawner.spawnVFormation('dasher', Math.max(3, this.adjustSpawnCount(4)), spread, 1.05)
+      } else {
+        const amplitude = Phaser.Math.Between(60, 120)
+        const wavelength = Phaser.Math.Between(220, 360)
+        this.spawner.spawnSineWave('swarm', this.adjustSpawnCount(4), amplitude, wavelength, 1)
+      }
+      this.fallbackCycle++
+    } else {
+      const type = this.fallbackCycle % 3
+      if (type === 0) this.spawner.spawn('brute', this.adjustSpawnCount(1))
+      else if (type === 1) this.spawner.spawn('dasher', this.adjustSpawnCount(1))
+      else this.spawner.spawn('swarm', this.adjustSpawnCount(2))
+      this.fallbackCycle++
+    }
+    this.lastBeatAt = this.time.now
+  }
+
+  private pruneEnemies() {
+    const group = this.spawner?.getGroup()
+    if (!group) return
+    const height = this.scale.height
+    const width = this.scale.width
+    const bottomMargin = 160
+    const sideMargin = 220
+
+    group.children.each((obj: Phaser.GameObjects.GameObject) => {
+      const enemy = obj as Enemy
+      if (!enemy.active) return true
+      const body = enemy.body as Phaser.Physics.Arcade.Body | undefined
+      if (!body || !body.enable) {
+        this.cleanupEnemy(enemy, false)
+        return true
+      }
+
+      if (this.gameplayMode === 'vertical') {
+        if (enemy.y > height + bottomMargin) {
+          this.handleEnemyMiss(enemy)
+          return true
+        }
+        if (enemy.y < -bottomMargin) {
+          this.cleanupEnemy(enemy, false)
+          return true
+        }
+      } else {
+        if (
+          enemy.y > height + bottomMargin ||
+          enemy.y < -bottomMargin ||
+          enemy.x < -sideMargin ||
+          enemy.x > width + sideMargin
+        ) {
+          this.cleanupEnemy(enemy, false)
+          return true
+        }
+      }
+
+      return true
+    })
   }
 
   private setupSpawnHandlers(canSpawn: () => boolean) {

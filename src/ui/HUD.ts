@@ -70,9 +70,9 @@ export default class HUD {
       strokeThickness: 4
     }).setOrigin(0.5).setDepth(60).setVisible(false)
 
-    this.scene.events.on(Phaser.Scenes.Events.RESIZE, this.handleResize, this)
+    this.scene.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this)
     this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.scene.events.off(Phaser.Scenes.Events.RESIZE, this.handleResize, this)
+      this.scene.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this)
     })
   }
 

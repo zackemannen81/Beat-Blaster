@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import AudioAnalyzer from '../systems/AudioAnalyzer'
 import Conductor from '../systems/Conductor'
-import Spawner from '../systems/Spawner'
+import Spawner, { PatternData } from '../systems/Spawner'
 import Scoring from '../systems/Scoring'
 import HUD from '../ui/HUD'
 import Effects from '../systems/Effects'
@@ -73,6 +73,9 @@ export default class GameScene extends Phaser.Scene {
     slowmo: 3
   }
   private isPaused = false
+  private barsElapsed = 0
+  private bossSpawned = false
+  private verticalSpawnCycle = 0
   // inne i klassen GameScene, efter private-fälten
 private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
   // städa skin
@@ -161,6 +164,10 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     }) as any
     this.registry.set('wasd', wasd)
 
+    this.bossSpawned = false
+    this.verticalSpawnCycle = 0
+    this.barsElapsed = 0
+
     this.gameplayMode = resolveGameplayMode(this.opts.gameplayMode)
     this.registry.set('gameplayMode', this.gameplayMode)
     this.updateMovementBounds()
@@ -197,6 +204,7 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
       this.scale.off(Phaser.Scale.Events.RESIZE, this.updateMovementBounds, this)
       this.input.gamepad?.off('connected', this.onGamepadConnected, this)
       this.input.gamepad?.off('disconnected', this.onGamepadDisconnected, this)
+      this.conductor?.off('bar:start', this.handleBarStart)
     })
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (this.gameplayMode === 'vertical' && pointer.pointerType !== 'mouse') {
@@ -257,6 +265,7 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     // Initialize analyzer first
     this.analyzer = new AudioAnalyzer(this)
     this.conductor = new Conductor(this)
+    this.conductor.on('bar:start', this.handleBarStart)
     
     // Set up beat listeners
     this.analyzer.on('beat:low', () => { this.conductor.onBeat(); this.lastBeatAt = this.time.now })
@@ -323,18 +332,7 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     // Spawner
     this.spawner = new Spawner(this)
     const canSpawn = () => this.spawner.getGroup().countActive(true) < this.enemyCap
-    this.analyzer.on('beat:low', () => {
-      if (!canSpawn()) return
-      if (Math.random() < 0.3) this.spawner.spawn('brute', 1)
-    })
-    this.analyzer.on('beat:mid', () => {
-      if (!canSpawn()) return
-      if (Math.random() < 0.2) this.spawner.spawn('dasher', 1)
-    })
-    this.analyzer.on('beat:high', () => {
-      if (!canSpawn()) return
-      if (Math.random() < 0.2) this.spawner.spawn('swarm', 2)
-    })
+    this.setupSpawnHandlers(canSpawn)
 
     // Fallback BPM-driven spawns if analyzer events are not firing
     const bpm = (track && track.bpm) ? track.bpm : 120
@@ -343,6 +341,7 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     this.scrollBase = this.computeScrollBase(bpm)
     this.starfield.setBaseScroll(this.scrollBase)
     this.backgroundScroller.setBaseScroll(this.scrollBase)
+    this.spawner.setScrollBase(this.scrollBase)
     this.registry.set('scrollBase', this.scrollBase)
 /*    this.time.addEvent({ delay: interval, loop: true, callback: () => {
       if (!canSpawn()) return
@@ -515,6 +514,7 @@ if (newHp <= 0) {
       this.starfield.setBaseScroll(this.scrollBase)
       this.starfield.update(delta)
     }
+    this.spawner?.setScrollBase(this.scrollBase)
 
       if (this.time.now - this.lastBeatAt < 100) { // Visa cirkeln i 100ms efter varje beat
         this.beatIndicator.setAlpha(1);
@@ -625,28 +625,31 @@ pskin?.setThrust?.(thrustLevel)
     const accPct = ((this.scoring.perfect + this.scoring.good) / shots) * 100
     this.hud.update(this.scoring.score, this.scoring.multiplier, accPct)
 
-    // Enemy steering
     const group = this.spawner.getGroup()
-    const px = this.player.x, py = this.player.y
     const now = this.time.now
-    const dashBoost = 2.2
-    const dashPhase = Math.floor(now / 600) // toggle every 600ms
-    group.children.each((obj: Phaser.GameObjects.GameObject) => {
-      const s = obj as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
-      const healthBar = s.getData('healthBar') as Phaser.GameObjects.Graphics
-      if (!s.active) {
-        healthBar?.destroy()
-        return false
-      }
-      const etype = (s.getData('etype') as 'brute' | 'dasher' | 'swarm') || 'swarm'
-      const ang = Phaser.Math.Angle.Between(s.x, s.y, px, py)
-      let speed = (etype === 'swarm' ? 110 : etype === 'dasher' ? 160 : 80) * 0.5
-      if (etype === 'dasher' && dashPhase % 2 === 0) speed *= dashBoost
-      s.body.setVelocity(Math.cos(ang) * speed, Math.sin(ang) * speed)
-
-      this.drawHealthBar(s)
-      return true
-    })
+    if (this.gameplayMode === 'vertical') {
+      this.updateVerticalEnemies(group, now)
+    } else {
+      const px = this.player.x
+      const py = this.player.y
+      const dashBoost = 2.2
+      const dashPhase = Math.floor(now / 600)
+      group.children.each((obj: Phaser.GameObjects.GameObject) => {
+        const s = obj as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+        const healthBar = s.getData('healthBar') as Phaser.GameObjects.Graphics
+        if (!s.active) {
+          healthBar?.destroy()
+          return false
+        }
+        const etype = (s.getData('etype') as 'brute' | 'dasher' | 'swarm') || 'swarm'
+        const ang = Phaser.Math.Angle.Between(s.x, s.y, px, py)
+        let speed = (etype === 'swarm' ? 110 : etype === 'dasher' ? 160 : 80) * 0.5
+        if (etype === 'dasher' && dashPhase % 2 === 0) speed *= dashBoost
+        s.body.setVelocity(Math.cos(ang) * speed, Math.sin(ang) * speed)
+        this.drawHealthBar(s)
+        return true
+      })
+    }
 
     const aimDirection = this.getAimDirection()
     const reticle = this.getReticlePosition()
@@ -908,6 +911,136 @@ pskin?.setThrust?.(thrustLevel)
     const travelTimeMs = (distance / this.bulletSpeed) * 1000
     const clamped = Phaser.Math.Clamp(travelTimeMs + 120, this.bulletTtlMs * 0.5, this.bulletTtlMs * 1.8)
     return clamped
+  }
+
+  private setupSpawnHandlers(canSpawn: () => boolean) {
+    if (this.gameplayMode === 'vertical') {
+      this.setupVerticalSpawnHandlers(canSpawn)
+    } else {
+      this.setupOmniSpawnHandlers(canSpawn)
+    }
+  }
+
+  private setupOmniSpawnHandlers(canSpawn: () => boolean) {
+    this.analyzer.on('beat:low', () => {
+      if (!canSpawn()) return
+      if (Math.random() < 0.3) this.spawner.spawn('brute', 1)
+    })
+    this.analyzer.on('beat:mid', () => {
+      if (!canSpawn()) return
+      if (Math.random() < 0.2) this.spawner.spawn('dasher', 1)
+    })
+    this.analyzer.on('beat:high', () => {
+      if (!canSpawn()) return
+      if (Math.random() < 0.2) this.spawner.spawn('swarm', 2)
+    })
+  }
+
+  private setupVerticalSpawnHandlers(canSpawn: () => boolean) {
+    this.analyzer.on('beat:low', () => {
+      if (!canSpawn()) return
+      const cycle = this.verticalSpawnCycle % 3
+      if (cycle === 0) {
+        const lane = Phaser.Math.Between(0, 5)
+        const count = Phaser.Math.Between(2, 3)
+        const speedMul = 0.85 + Math.random() * 0.25
+        this.spawner.spawnVerticalLane('brute', lane, count, speedMul)
+      } else if (cycle === 1) {
+        const left = Phaser.Math.Between(0, 2)
+        const right = Phaser.Math.Between(3, 5)
+        this.spawner.spawnVerticalLane('dasher', left, 2, 1.15)
+        this.spawner.spawnVerticalLane('dasher', right, 2, 1.15)
+      } else {
+        const amplitude = Phaser.Math.Between(60, 110)
+        const wavelength = Phaser.Math.Between(240, 360)
+        this.spawner.spawnSineWave('swarm', 4, amplitude, wavelength, 1)
+      }
+      this.verticalSpawnCycle++
+    })
+
+    this.analyzer.on('beat:mid', () => {
+      if (!canSpawn()) return
+      const amplitude = Phaser.Math.Between(70, 130)
+      const wavelength = Phaser.Math.Between(260, 420)
+      this.spawner.spawnSineWave('swarm', 5, amplitude, wavelength, 1.05)
+    })
+
+    this.analyzer.on('beat:high', () => {
+      if (!canSpawn()) return
+      const spread = Phaser.Math.Between(45, 75)
+      const size = Phaser.Math.Between(4, 5)
+      this.spawner.spawnVFormation('dasher', size, spread, 1.2)
+    })
+  }
+
+  private updateVerticalEnemies(group: Phaser.Physics.Arcade.Group, now: number) {
+    const height = this.scale.height
+    const margin = 100
+    group.children.each((obj: Phaser.GameObjects.GameObject) => {
+      const enemy = obj as Enemy
+      const healthBar = enemy.getData('healthBar') as Phaser.GameObjects.Graphics
+      if (!enemy.active) {
+        healthBar?.destroy()
+        return false
+      }
+
+      const pattern = enemy.getData('pattern') as PatternData | null
+      const body = enemy.body as Phaser.Physics.Arcade.Body
+      if (pattern) {
+        switch (pattern.kind) {
+          case 'lane': {
+            enemy.x = pattern.anchorX
+            body.setVelocity(0, pattern.speedY)
+            break
+          }
+          case 'sine': {
+            const elapsed = (now - pattern.spawnTime) / 1000
+            const offset = Math.sin(elapsed * pattern.angularVelocity) * pattern.amplitude
+            enemy.x = pattern.anchorX + offset
+            body.setVelocity(0, pattern.speedY)
+            break
+          }
+          case 'drift': {
+            body.setVelocity(pattern.velocityX, pattern.speedY)
+            break
+          }
+          case 'boss': {
+            const settleLine = height * 0.25
+            const targetSpeed = enemy.y < settleLine ? pattern.speedY : pattern.speedY * 0.08
+            body.setVelocity(0, targetSpeed)
+            break
+          }
+        }
+      } else {
+        body.setVelocity(body.velocity.x, this.scrollBase)
+      }
+
+      this.drawHealthBar(enemy)
+
+      if (enemy.y > height + margin) {
+        this.handleEnemyMiss(enemy)
+        return false
+      }
+      return true
+    })
+  }
+
+  private handleEnemyMiss(enemy: Enemy) {
+    this.cleanupEnemy(enemy, false)
+    this.comboCount = 0
+    this.hud.setCombo(0)
+    this.lastHitEnemyId = null
+    // TODO: scoring penalty handled in Milestone 6
+  }
+
+  private handleBarStart = (event: { barIndex: number }) => {
+    this.barsElapsed = event.barIndex
+    if (this.gameplayMode !== 'vertical') return
+    if (this.bossSpawned) return
+    if (event.barIndex >= 8 && this.spawner.getGroup().countActive(true) < 4) {
+      this.spawner.spawnBoss('brute', { hp: 120, speedMultiplier: 0.55 })
+      this.bossSpawned = true
+    }
   }
 
   private handleFireInputDown() {

@@ -50,6 +50,7 @@
 - Bygga spawn-API för lanes, sinus, V-formationer och boss-intros ovanför viewport.
 - Anpassa fiende-AI och bullet patterns till vertikal riktning, inklusive telegraphy och varningar.
 - Implementera boss-faser med Conductor-triggers och tydlig telegraphy.
+- Status 2025-09-20: Spawner utökad med lanes/sine/V, GameScene uppdaterar vertikala mönster och första boss-stub triggas via Conductor bar-index.
 
 ### 4.6 HUD, scoring och regler
 - Uppdatera HUD med stage-progress, boss-HP, bombindikator och miss-feedback.

@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import Starfield from '../systems/Starfield'
+import { loadOptions, detectGameplayModeOverride, resolveGameplayMode } from '../systems/Options'
 
 type MenuItem =
   | { type: 'resume' }
@@ -19,6 +20,7 @@ export default class MenuScene extends Phaser.Scene {
   private menuItems: MenuItem[] = []
   private pausedBanner?: Phaser.GameObjects.Text
   private resumeAvailable = false
+  private modeLabel!: Phaser.GameObjects.Text
 
   constructor() {
     super('MenuScene')
@@ -61,6 +63,13 @@ export default class MenuScene extends Phaser.Scene {
       yoyo: true,
       repeat: -1
     })
+
+    this.modeLabel = this.add.text(width / 2, height * 0.92, '', {
+      fontFamily: 'UiFont, sans-serif',
+      fontSize: '14px',
+      color: '#7ddff2'
+    }).setOrigin(0.5)
+    this.refreshModeLabel()
 
     this.tracks = this.registry.get('tracks') || []
     const initialId = this.registry.get('selectedTrackId')
@@ -145,7 +154,10 @@ export default class MenuScene extends Phaser.Scene {
       k.off('keydown-DOWN', this.handleDown, this)
       k.off('keydown-SPACE', this.handlePlay, this)
       k.off('keydown-O', this.handleOptions, this)
+      this.events.off(Phaser.Scenes.Events.RESUME, this.refreshModeLabel, this)
     })
+
+    this.events.on(Phaser.Scenes.Events.RESUME, this.refreshModeLabel, this)
   }
 
   update(_time: number, delta: number) {
@@ -164,5 +176,14 @@ export default class MenuScene extends Phaser.Scene {
       return `${prefix} ${t.name} — ${t.artist || ''}`
     })
     this.list.setText(lines.join('\n'))
+  }
+
+  private refreshModeLabel = () => {
+    const opts = loadOptions()
+    const override = detectGameplayModeOverride()
+    const mode = override ? override.mode : resolveGameplayMode(opts.gameplayMode)
+    const friendly = mode === 'vertical' ? 'Vertical Scroll' : 'Omni Scroll'
+    const suffix = override ? ' (Override)' : ''
+    this.modeLabel.setText(`Mode: ${friendly}${suffix}`)
   }
 }

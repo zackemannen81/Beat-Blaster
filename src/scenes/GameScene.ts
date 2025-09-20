@@ -7,7 +7,7 @@ import HUD from '../ui/HUD'
 import Effects from '../systems/Effects'
 import Powerups, { PowerupType } from '../systems/Powerups'
 import Starfield from '../systems/Starfield'
-import { loadOptions } from '../systems/Options'
+import { loadOptions, resolveGameplayMode, GameplayMode } from '../systems/Options'
 import PlayerSkin from '../systems/PlayerSkin'
 import NeonGrid from '../systems/NeonGrid'
 import CubeSkin from '../systems/CubeSkin'
@@ -48,6 +48,7 @@ export default class GameScene extends Phaser.Scene {
   private comboTimeoutMs = 2000
   private lastHitAt = 0
   private opts = loadOptions()
+  private gameplayMode: GameplayMode = resolveGameplayMode(this.opts.gameplayMode)
   private beatIndicator!: Phaser.GameObjects.Graphics;
   private lastHitEnemyId: string | null = null
   private neon!: NeonGrid
@@ -142,6 +143,9 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
       D: Phaser.Input.Keyboard.KeyCodes.D,
     }) as any
     this.registry.set('wasd', wasd)
+
+    this.gameplayMode = resolveGameplayMode(this.opts.gameplayMode)
+    this.registry.set('gameplayMode', this.gameplayMode)
 
     // Read balance
     const balance = this.registry.get('balance') as any

@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { loadOptions, saveOptions, Options } from '../systems/Options'
+import { loadOptions, saveOptions, Options, detectGameplayModeOverride, resolveGameplayMode } from '../systems/Options'
 
 type OptionsSceneData = {
   from?: string
@@ -23,14 +23,11 @@ export default class OptionsScene extends Phaser.Scene {
     this.opts = loadOptions()
     this.title = this.add.text(width / 2, height * 0.2, 'Options', { fontFamily: 'HudFont, UiFont', fontSize: '32px', color: '#fff' }).setOrigin(0.5)
 
-    this.entries = [
-      this.add.text(width / 2, height * 0.34, '', { fontFamily: 'UiFont', fontSize: '18px' }).setOrigin(0.5),
-      this.add.text(width / 2, height * 0.41, '', { fontFamily: 'UiFont', fontSize: '18px' }).setOrigin(0.5),
-      this.add.text(width / 2, height * 0.48, '', { fontFamily: 'UiFont', fontSize: '18px' }).setOrigin(0.5),
-      this.add.text(width / 2, height * 0.55, '', { fontFamily: 'UiFont', fontSize: '18px' }).setOrigin(0.5),
-      this.add.text(width / 2, height * 0.62, '', { fontFamily: 'UiFont', fontSize: '18px' }).setOrigin(0.5),
-      this.add.text(width / 2, height * 0.69, '', { fontFamily: 'UiFont', fontSize: '18px' }).setOrigin(0.5)
-    ]
+    const baseY = 0.34
+    const stepY = 0.07
+    this.entries = Array.from({ length: 7 }, (_, i) =>
+      this.add.text(width / 2, height * (baseY + stepY * i), '', { fontFamily: 'UiFont', fontSize: '18px' }).setOrigin(0.5)
+    )
     this.render()
 
     const k = this.input.keyboard!
@@ -46,13 +43,19 @@ export default class OptionsScene extends Phaser.Scene {
     const trackId = (this.registry.get('selectedTrackId') as string) || 'default'
     const io = this.opts.inputOffsetMs[trackId] ?? 0
     const fm = this.opts.fireMode
+    const override = detectGameplayModeOverride()
+    const activeMode = override ? override.mode : resolveGameplayMode(this.opts.gameplayMode)
+    const modeLabel = activeMode === 'vertical' ? 'Vertical Scroll' : 'Omni Scroll'
+    const overrideSuffix = override ? ' (Override)' : ''
+
     const rows = [
       `Music Volume: ${(this.opts.musicVolume * 100) | 0}%`,
       `SFX Volume: ${(this.opts.sfxVolume * 100) | 0}%`,
       `Metronome: ${this.opts.metronome ? 'On' : 'Off'}`,
       `High Contrast: ${this.opts.highContrast ? 'On' : 'Off'}`,
       `Input Offset: ${io} ms`,
-      `Fire Mode: ${fm === 'click' ? 'Click' : fm === 'hold_quantized' ? 'Hold (Quantized)' : 'Hold (Raw)'}`
+      `Fire Mode: ${fm === 'click' ? 'Click' : fm === 'hold_quantized' ? 'Hold (Quantized)' : 'Hold (Raw)'}`,
+      `Gameplay Mode: ${modeLabel}${overrideSuffix}`
     ]
     this.entries.forEach((t, i) => t.setText(`${i === this.cursor ? '▶ ' : '  '}${rows[i]}`).setColor(i === this.cursor ? '#00e5ff' : '#ffffff'))
   }
@@ -74,6 +77,14 @@ export default class OptionsScene extends Phaser.Scene {
         const order: Options['fireMode'][] = ['click', 'hold_quantized', 'hold_raw']
         const idx = order.indexOf(this.opts.fireMode)
         this.opts.fireMode = order[(idx + (dir > 0 ? 1 : order.length - 1)) % order.length]
+        break
+      }
+      case 6: {
+        const override = detectGameplayModeOverride()
+        if (override) break
+        const order: Options['gameplayMode'][] = ['omni', 'vertical']
+        const idx = order.indexOf(this.opts.gameplayMode)
+        this.opts.gameplayMode = order[(idx + (dir > 0 ? 1 : order.length - 1)) % order.length]
         break
       }
     }

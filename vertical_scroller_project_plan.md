@@ -26,6 +26,7 @@
 - Introducera `Options.gameplayMode` (`'omni' | 'vertical'`, default `'omni'`).
 - Implementera URL/env override (`?mode=vertical` / `VERTICAL_MODE=1`).
 - Migrera sparade options och uppdatera `MenuScene` för lägesväxling.
+- Status 2025-09-20: Slutförd (branch skapad, gameplayMode och overrides aktiva, Options/Menu uppdaterade).
 
 ### 4.2 Kameralogik och bakgrunder
 - Införa global `SCROLL_BASE` med koppling till Conductor/BPM.

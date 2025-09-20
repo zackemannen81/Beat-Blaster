@@ -56,6 +56,7 @@
 - Uppdatera HUD med stage-progress, boss-HP, bombindikator och miss-feedback.
 - Justera scoring/combo-system för "miss bottom" och loggning av räddade/kapade fiender.
 - Säkerställa att Reduced Motion-läge minskar visuella störmoment.
+- Status 2025-09-20: HUD visar stage/boss/miss, scoring straffar bottenmissar och Reduced Motion styr effekter & UI tweens.
 
 ### 4.7 Balans, optimering och QA
 - Parametriserade svårighetsgrader (lätt/normal/svår) baserade på scrollhastighet, spawn-täthet, bullet-density och HP.

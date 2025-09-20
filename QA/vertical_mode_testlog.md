@@ -7,4 +7,5 @@
 - npm run build (pass) - player input updates
 - npm run build (pass) - projectile direction & pooling
 - npm run build (pass) - vertical spawns & boss scaffold
+- npm run build (pass) - HUD & scoring adjustments
 

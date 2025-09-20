@@ -5,6 +5,7 @@ export type Options = {
   sfxVolume: number // 0..1
   metronome: boolean
   highContrast: boolean
+  reducedMotion: boolean
   shaderEnabled: boolean
   inputOffsetMs: Record<string, number> // per track id
   fireMode: 'click' | 'hold_raw' | 'hold_quantized'
@@ -20,6 +21,7 @@ export const DEFAULT_OPTIONS: Options = {
   sfxVolume: 0.8,
   metronome: false,
   highContrast: false,
+  reducedMotion: false,
   shaderEnabled: true,
   inputOffsetMs: {},
   fireMode: 'click',
@@ -63,6 +65,7 @@ function withDefaults(raw: Partial<Options> | null | undefined): Options {
     : DEFAULT_OPTIONS.sfxVolume
   merged.metronome = Boolean(merged.metronome)
   merged.highContrast = Boolean(merged.highContrast)
+  merged.reducedMotion = Boolean(raw?.reducedMotion)
   merged.shaderEnabled = merged.shaderEnabled !== false
 
   if (!VALID_FIRE_MODES.includes(merged.fireMode)) merged.fireMode = DEFAULT_OPTIONS.fireMode

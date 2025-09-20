@@ -76,6 +76,9 @@ export default class GameScene extends Phaser.Scene {
   private barsElapsed = 0
   private bossSpawned = false
   private verticalSpawnCycle = 0
+  private reducedMotion = false
+  private currentStage = 1
+  private activeBoss: Enemy | null = null
   // inne i klassen GameScene, efter private-fälten
 private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
   // städa skin
@@ -167,9 +170,11 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     this.bossSpawned = false
     this.verticalSpawnCycle = 0
     this.barsElapsed = 0
+    this.activeBoss = null
 
     this.gameplayMode = resolveGameplayMode(this.opts.gameplayMode)
     this.registry.set('gameplayMode', this.gameplayMode)
+    this.reducedMotion = !!this.opts.reducedMotion
     this.updateMovementBounds()
     this.scale.on(Phaser.Scale.Events.RESIZE, this.updateMovementBounds, this)
     this.input.addPointer(2)
@@ -361,9 +366,14 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     this.hud.setupHearts(this.playerMaxHp)
     this.hud.setHp(this.playerHp)
     this.hud.setBombCharge(this.bombCharge / 100)
+    this.hud.setReducedMotion(this.reducedMotion)
+    this.hud.setStage(this.currentStage)
+    this.hud.setBossHealth(null)
+    this.hud.setCombo(0)
 
     // Effects
     this.effects = new Effects(this)
+    this.effects.setReducedMotion(this.reducedMotion)
     this.powerups = new Powerups(this)
     this.hud.bindPowerups(this.powerups)
 
@@ -377,6 +387,11 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
       const dmg = 1
       const newHp = hp - dmg
       enemy.setData('hp', newHp)
+      const maxHp = (enemy.getData('maxHp') as number) ?? hp
+      const isBoss = enemy.getData('isBoss') === true
+      if (isBoss) {
+        this.hud.setBossHealth(Math.max(newHp, 0) / Math.max(maxHp, 1), enemy.getData('etype') as string)
+      }
       this.scoring.registerShot(0) // Perfect hit
       this.disableBullet(bullet)
       this.effects.enemyHitFx(enemy.x, enemy.y)
@@ -411,14 +426,22 @@ if (this.lastHitEnemyId !== enemyId) {
 
 // Reset timer
 this.lastHitAt = this.time.now
-if (newHp <= 0) {
-  this.sound.play('hit_enemy', { volume: this.opts.sfxVolume })
-  this.scoring.addKill(etype)
-  this.bumpBomb(10)
-  this.maybeDropPickup(enemy.x, enemy.y)
+  if (newHp <= 0) {
+    this.sound.play('hit_enemy', { volume: this.opts.sfxVolume })
+    this.scoring.addKill(etype)
+    this.bumpBomb(10)
+    this.maybeDropPickup(enemy.x, enemy.y)
 
-  this.effects.enemyExplodeFx(enemy.x, enemy.y)
+    this.effects.enemyExplodeFx(enemy.x, enemy.y)
   this.cleanupEnemy(enemy, true) // ← allt städas här
+  if (isBoss) {
+    this.hud.setBossHealth(null)
+    this.bossSpawned = false
+    this.activeBoss = null
+    this.currentStage += 1
+    this.hud.setStage(this.currentStage)
+    this.verticalSpawnCycle = 0
+  }
 }
 /*
       if (newHp <= 0) {
@@ -458,7 +481,7 @@ if (newHp <= 0) {
         this.iframesUntil = now + 800
       }
       this.hud.setHp(this.playerHp)
-      this.cameras.main.shake(150, 0.01)
+      if (!this.reducedMotion) this.cameras.main.shake(150, 0.01)
       if (this.playerHp <= 0) {
         this.endRun()
       }
@@ -489,6 +512,17 @@ if (newHp <= 0) {
       this.registry.set('gameplayMode', this.gameplayMode)
       this.gamepadDeadzone = this.opts.gamepadDeadzone
       this.gamepadSensitivity = this.opts.gamepadSensitivity
+      this.reducedMotion = !!this.opts.reducedMotion
+      this.effects.setReducedMotion(this.reducedMotion)
+      this.hud.setReducedMotion(this.reducedMotion)
+      this.hud.setStage(this.currentStage)
+      if (this.activeBoss && this.activeBoss.active) {
+        const maxHp = (this.activeBoss.getData('maxHp') as number) ?? 1
+        const hp = (this.activeBoss.getData('hp') as number) ?? maxHp
+        this.hud.setBossHealth(Math.max(hp, 0) / Math.max(maxHp, 1), this.activeBoss.getData('etype') as string)
+      } else {
+        this.hud.setBossHealth(null)
+      }
       this.updateMovementBounds()
     })
   }
@@ -939,6 +973,7 @@ pskin?.setThrust?.(thrustLevel)
   private setupVerticalSpawnHandlers(canSpawn: () => boolean) {
     this.analyzer.on('beat:low', () => {
       if (!canSpawn()) return
+      if (this.activeBoss) return
       const cycle = this.verticalSpawnCycle % 3
       if (cycle === 0) {
         const lane = Phaser.Math.Between(0, 5)
@@ -960,6 +995,7 @@ pskin?.setThrust?.(thrustLevel)
 
     this.analyzer.on('beat:mid', () => {
       if (!canSpawn()) return
+      if (this.activeBoss) return
       const amplitude = Phaser.Math.Between(70, 130)
       const wavelength = Phaser.Math.Between(260, 420)
       this.spawner.spawnSineWave('swarm', 5, amplitude, wavelength, 1.05)
@@ -967,6 +1003,7 @@ pskin?.setThrust?.(thrustLevel)
 
     this.analyzer.on('beat:high', () => {
       if (!canSpawn()) return
+      if (this.activeBoss) return
       const spread = Phaser.Math.Between(45, 75)
       const size = Phaser.Math.Between(4, 5)
       this.spawner.spawnVFormation('dasher', size, spread, 1.2)
@@ -1026,20 +1063,36 @@ pskin?.setThrust?.(thrustLevel)
   }
 
   private handleEnemyMiss(enemy: Enemy) {
+    const isBoss = enemy.getData('isBoss') === true
     this.cleanupEnemy(enemy, false)
     this.comboCount = 0
     this.hud.setCombo(0)
     this.lastHitEnemyId = null
-    // TODO: scoring penalty handled in Milestone 6
+    this.scoring.registerMiss(isBoss ? 120 : 50)
+    this.hud.showMissFeedback(isBoss ? 'Boss Escaped!' : 'Miss!')
+    if (isBoss) {
+      this.hud.setBossHealth(null)
+      this.bossSpawned = false
+      this.activeBoss = null
+    }
   }
 
   private handleBarStart = (event: { barIndex: number }) => {
     this.barsElapsed = event.barIndex
+    const estimatedStage = Math.max(1, Math.floor(event.barIndex / 8) + 1)
+    if (estimatedStage > this.currentStage && !this.bossSpawned) {
+      this.currentStage = estimatedStage
+      this.hud.setStage(this.currentStage)
+    }
     if (this.gameplayMode !== 'vertical') return
-    if (this.bossSpawned) return
+    if (this.bossSpawned || this.activeBoss) return
     if (event.barIndex >= 8 && this.spawner.getGroup().countActive(true) < 4) {
-      this.spawner.spawnBoss('brute', { hp: 120, speedMultiplier: 0.55 })
-      this.bossSpawned = true
+      const boss = this.spawner.spawnBoss('brute', { hp: 120, speedMultiplier: 0.55 })
+      if (boss) {
+        this.bossSpawned = true
+        this.activeBoss = boss
+        this.hud.setBossHealth(1, boss.getData('etype') as string)
+      }
     }
   }
 

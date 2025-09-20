@@ -11,6 +11,7 @@ export default class Scoring {
   shots = 0
   perfect = 0
   good = 0
+  misses = 0
 
   registerShot(deltaToNearestBeatMs: number) {
     const ad = Math.abs(deltaToNearestBeatMs)
@@ -41,5 +42,12 @@ export default class Scoring {
   addKill(type: 'brute' | 'dasher' | 'swarm') {
     const base = type === 'brute' ? 100 : type === 'dasher' ? 75 : 25
     this.score += Math.round(base * this.multiplier)
+  }
+
+  registerMiss(penalty = 50) {
+    this.misses++
+    this.combo = 0
+    this.multiplier = 1
+    this.score = Math.max(0, this.score - penalty)
   }
 }

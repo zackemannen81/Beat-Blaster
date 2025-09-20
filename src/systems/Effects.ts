@@ -3,13 +3,22 @@ import { PowerupType } from './Powerups'
 
 export default class Effects {
   private scene: Phaser.Scene
+  private reducedMotion = false
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene
   }
 
+  setReducedMotion(flag: boolean) {
+    this.reducedMotion = flag
+  }
+
   hitSpark(x: number, y: number) {
-    // Create and position the emitter at the target coordinates
+    if (this.reducedMotion) {
+      const sprite = this.scene.add.rectangle(x, y, 6, 6, 0xffffff, 0.6)
+      this.scene.tweens.add({ targets: sprite, alpha: 0, duration: 120, onComplete: () => sprite.destroy() })
+      return
+    }
     const emitter = this.scene.add.particles(x, y, 'particles', {
       frame: ['particle_glow_small', 'particle_circle_small', 'star_small'],
       speed: { min: 80, max: 200 },
@@ -26,6 +35,10 @@ export default class Effects {
   }
 
   explosion(x: number, y: number) {
+    if (this.reducedMotion) {
+      this.hitSpark(x, y)
+      return
+    }
     const emitter = this.scene.add.particles(x, y, 'particles', {
       frame: ['particle_glow_small', 'particle_circle_small','star_small'],
       speed: { min: 120, max: 300 },
@@ -40,6 +53,7 @@ export default class Effects {
   }
 
   muzzleFlash(x: number, y: number) {
+    if (this.reducedMotion) return
     if (this.scene.textures.exists('plasma_glow_disc')) {
       const sprite = this.scene.add.sprite(x, y, 'plasma_glow_disc')
       sprite.setBlendMode(Phaser.BlendModes.ADD)
@@ -70,6 +84,7 @@ export default class Effects {
   }
 
   showComboText(x: number, y: number, count: number) {
+    if (this.reducedMotion) return
     console.log('Creating combo text:', count, 'at', x, y)
     const text = this.scene.add.text(x, y - 30, `COMBO x${count}`, {
       fontFamily: 'AnnouncerFont, UiFont, sans-serif',
@@ -92,6 +107,7 @@ export default class Effects {
   }
 
   beatPulse() {
+    if (this.reducedMotion) return
     const cam = this.scene.cameras.main
     const originalZoom = cam.zoom
     this.scene.tweens.add({
@@ -115,6 +131,7 @@ export default class Effects {
   }
 
   plasmaCharge(x: number, y: number, rotation: number) {
+    if (this.reducedMotion) return
     if (!this.scene.textures.exists('bullet_plasma_charge_0')) return
     const sprite = this.scene.add.sprite(x, y, 'bullet_plasma_charge_0')
     sprite.setRotation(rotation)
@@ -136,6 +153,7 @@ export default class Effects {
 
   attachPlasmaTrail(bullet: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody) {
     if (!this.scene) return
+    if (this.reducedMotion) return
     this.clearPlasmaTrail(bullet)
 
     const trailEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = []
@@ -230,6 +248,10 @@ export default class Effects {
   }
 
   enemyHitFx(x: number, y: number) {
+    if (this.reducedMotion) {
+      this.hitSpark(x, y)
+      return
+    }
     if (this.scene.textures.exists('enemy_hit_plasma_0')) {
       const sprite = this.scene.add.sprite(x, y, 'enemy_hit_plasma_0')
       sprite.setBlendMode(Phaser.BlendModes.ADD)
@@ -255,6 +277,10 @@ export default class Effects {
   }
 
   enemyExplodeFx(x: number, y: number) {
+    if (this.reducedMotion) {
+      this.hitSpark(x, y)
+      return
+    }
     if (this.scene.textures.exists('enemy_explode_plasma_0')) {
       const sprite = this.scene.add.sprite(x, y, 'enemy_explode_plasma_0')
       sprite.setBlendMode(Phaser.BlendModes.ADD)

@@ -111,7 +111,7 @@ export default class Spawner {
   spawnBoss(type: EnemyType = 'brute', options: { hp?: number; speedMultiplier?: number } = {}) {
     const { width } = this.scene.scale
     const speedY = this.scrollBase * (options.speedMultiplier ?? 0.6)
-    this.createEnemy({
+    return this.createEnemy({
       type,
       x: width / 2,
       y: -160,
@@ -127,7 +127,7 @@ export default class Spawner {
     return this.group
   }
 
-  private createEnemy(config: SpawnConfig) {
+  private createEnemy(config: SpawnConfig): Enemy {
     const placeholderFrame = this.getFrameForType(config.type)
     const sprite = this.group.get(config.x, config.y, 'gameplay', placeholderFrame) as Enemy
     sprite.setActive(true).setVisible(true)
@@ -139,7 +139,9 @@ export default class Spawner {
 
     const balance = this.scene.registry.get('balance') as any
     const baseHp = balance?.enemies?.[config.type]?.hp ?? (config.type === 'brute' ? 6 : config.type === 'dasher' ? 3 : 1)
-    sprite.setData('hp', config.hpOverride ?? baseHp)
+    const hp = config.hpOverride ?? baseHp
+    sprite.setData('hp', hp)
+    sprite.setData('maxHp', hp)
 
     const style = enemyStyles[config.type]
     const radius = style.bodyRadius
@@ -160,6 +162,7 @@ export default class Spawner {
     sprite.setData('skin', skin)
     sprite.setData('pulseScale', style.pulseScale)
     if (config.tint !== undefined) sprite.setTint(config.tint)
+    return sprite
   }
 
   private getFrameForType(type: EnemyType) {

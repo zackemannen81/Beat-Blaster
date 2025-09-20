@@ -25,7 +25,7 @@ export default class OptionsScene extends Phaser.Scene {
 
     const baseY = 0.32
     const stepY = 0.055
-    const rowCount = 9
+    const rowCount = 10
     this.entries = Array.from({ length: rowCount }, (_, i) =>
       this.add.text(width / 2, height * (baseY + stepY * i), '', { fontFamily: 'UiFont', fontSize: '18px' }).setOrigin(0.5)
     )
@@ -54,6 +54,7 @@ export default class OptionsScene extends Phaser.Scene {
       `SFX Volume: ${(this.opts.sfxVolume * 100) | 0}%`,
       `Metronome: ${this.opts.metronome ? 'On' : 'Off'}`,
       `High Contrast: ${this.opts.highContrast ? 'On' : 'Off'}`,
+      `Reduced Motion: ${this.opts.reducedMotion ? 'On' : 'Off'}`,
       `Input Offset: ${io} ms`,
       `Fire Mode: ${fm === 'click' ? 'Click' : fm === 'hold_quantized' ? 'Hold (Quantized)' : 'Hold (Raw)'}`,
       `Gameplay Mode: ${modeLabel}${overrideSuffix}`,
@@ -72,17 +73,21 @@ export default class OptionsScene extends Phaser.Scene {
       case 2: this.opts.metronome = !this.opts.metronome; break
       case 3: this.opts.highContrast = !this.opts.highContrast; break
       case 4: {
+        this.opts.reducedMotion = !this.opts.reducedMotion
+        break
+      }
+      case 5: {
         const prev = this.opts.inputOffsetMs[trackId] ?? 0
         this.opts.inputOffsetMs[trackId] = Phaser.Math.Clamp(prev + step * 5, -200, 200)
         break
       }
-      case 5: {
+      case 6: {
         const order: Options['fireMode'][] = ['click', 'hold_quantized', 'hold_raw']
         const idx = order.indexOf(this.opts.fireMode)
         this.opts.fireMode = order[(idx + (dir > 0 ? 1 : order.length - 1)) % order.length]
         break
       }
-      case 6: {
+      case 7: {
         const override = detectGameplayModeOverride()
         if (override) break
         const order: Options['gameplayMode'][] = ['omni', 'vertical']
@@ -90,11 +95,11 @@ export default class OptionsScene extends Phaser.Scene {
         this.opts.gameplayMode = order[(idx + (dir > 0 ? 1 : order.length - 1)) % order.length]
         break
       }
-      case 7: {
+      case 8: {
         this.opts.gamepadDeadzone = Phaser.Math.Clamp(this.opts.gamepadDeadzone + step * 0.05, 0, 0.6)
         break
       }
-      case 8: {
+      case 9: {
         this.opts.gamepadSensitivity = Phaser.Math.Clamp(this.opts.gamepadSensitivity + step * 0.1, 0.5, 2)
         break
       }

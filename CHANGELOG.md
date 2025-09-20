@@ -8,4 +8,5 @@
 - 2025-09-20: Reoriented projectile flow for vertical mode and tightened bullet pooling culling.
 - 2025-09-20: Introduced vertical spawn formations and boss scaffold tied to beat cycles.
 - 2025-09-20: Updated HUD/boss UI, bottom-miss penalties, and Reduced Motion support for vertical mode.
+- 2025-09-20: Introduced difficulty profiles, stage ramping, and documented vertical-mode QA.
 

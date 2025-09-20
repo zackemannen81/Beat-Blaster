@@ -12,6 +12,7 @@ import { loadOptions, resolveGameplayMode, GameplayMode } from '../systems/Optio
 import PlayerSkin from '../systems/PlayerSkin'
 import NeonGrid from '../systems/NeonGrid'
 import CubeSkin from '../systems/CubeSkin'
+import { getDifficultyProfile, DifficultyProfile } from '../config/difficultyProfiles'
 
 type Enemy = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
 
@@ -76,8 +77,17 @@ export default class GameScene extends Phaser.Scene {
   private barsElapsed = 0
   private bossSpawned = false
   private verticalSpawnCycle = 0
-  private reducedMotion = false
+  private difficultyProfile: DifficultyProfile = getDifficultyProfile('normal')
+  private difficultyLabel = 'Normal'
+  private baseSpawnRateMultiplier = 1
+  private spawnRateMultiplier = 1
+  private enemyHpMultiplier = 1
+  private bossHpMultiplier = 1
+  private missPenalty = 50
+  private bossMissPenalty = 120
+  private verticalLaneCount = 6
   private currentStage = 1
+  private reducedMotion = false
   private activeBoss: Enemy | null = null
   // inne i klassen GameScene, efter private-fälten
 private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
@@ -103,6 +113,8 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     this.neon.create()
     const { width, height } = this.scale
     this.cameras.main.setBackgroundColor('#0a0a0f')
+
+    this.reducedMotion = !!this.opts.reducedMotion
 
     this.backgroundScroller = new BackgroundScroller(this)
     this.backgroundScroller.create()
@@ -266,6 +278,18 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     const tracks = this.registry.get('tracks') as any[]
     const selId = this.registry.get('selectedTrackId') as string | null
     const track = tracks?.find((t) => t.id === selId)
+
+    this.difficultyProfile = getDifficultyProfile(track?.difficultyProfileId)
+    this.difficultyLabel = this.difficultyProfile.label
+    this.baseSpawnRateMultiplier = this.difficultyProfile.spawnRateMultiplier
+    this.spawnRateMultiplier = this.baseSpawnRateMultiplier
+    this.enemyHpMultiplier = this.difficultyProfile.enemyHpMultiplier
+    this.bossHpMultiplier = this.difficultyProfile.bossHpMultiplier
+    this.missPenalty = this.difficultyProfile.missPenalty
+    this.bossMissPenalty = this.difficultyProfile.bossMissPenalty
+    this.verticalLaneCount = this.difficultyProfile.laneCount ?? this.verticalLaneCount
+    this.enemyCap = this.difficultyProfile.enemyCap
+    this.currentStage = this.difficultyProfile.startingStage ?? 1
     
     // Initialize analyzer first
     this.analyzer = new AudioAnalyzer(this)
@@ -336,6 +360,7 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
 
     // Spawner
     this.spawner = new Spawner(this)
+    this.updateDifficultyForStage()
     const canSpawn = () => this.spawner.getGroup().countActive(true) < this.enemyCap
     this.setupSpawnHandlers(canSpawn)
 
@@ -367,6 +392,7 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     this.hud.setHp(this.playerHp)
     this.hud.setBombCharge(this.bombCharge / 100)
     this.hud.setReducedMotion(this.reducedMotion)
+    this.hud.setDifficultyLabel(this.difficultyLabel)
     this.hud.setStage(this.currentStage)
     this.hud.setBossHealth(null)
     this.hud.setCombo(0)
@@ -433,15 +459,10 @@ this.lastHitAt = this.time.now
     this.maybeDropPickup(enemy.x, enemy.y)
 
     this.effects.enemyExplodeFx(enemy.x, enemy.y)
-  this.cleanupEnemy(enemy, true) // ← allt städas här
-  if (isBoss) {
-    this.hud.setBossHealth(null)
-    this.bossSpawned = false
-    this.activeBoss = null
-    this.currentStage += 1
-    this.hud.setStage(this.currentStage)
-    this.verticalSpawnCycle = 0
-  }
+    this.cleanupEnemy(enemy, true)
+    if (isBoss) {
+      this.onBossDown()
+    }
 }
 /*
       if (newHp <= 0) {
@@ -467,14 +488,14 @@ this.lastHitAt = this.time.now
       const now = this.time.now
       if (now < this.iframesUntil) return
       const enemy = _e as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+      const isBoss = enemy.getData('isBoss') === true
       if (this.powerups.hasShield) {
         // shield blocks one hit
         this.effects.hitSpark(this.player.x, this.player.y)
         //this.effects.hitSpark(20, 20)
       
       } else {
-        //enemy.disableBody(true, true)
-        this.cleanupEnemy(enemy, false) // inga extra death-FX om du inte vill
+        if (!isBoss) this.cleanupEnemy(enemy, false)
         this.playerHp = Math.max(0, this.playerHp - 1)
         this.comboCount = 0
         this.hud.setCombo(this.comboCount)
@@ -482,6 +503,10 @@ this.lastHitAt = this.time.now
       }
       this.hud.setHp(this.playerHp)
       if (!this.reducedMotion) this.cameras.main.shake(150, 0.01)
+      if (isBoss && !this.powerups.hasShield) {
+        this.scoring.registerMiss(this.bossMissPenalty)
+        this.hud.showMissFeedback('Boss Crash!')
+      }
       if (this.playerHp <= 0) {
         this.endRun()
       }
@@ -515,6 +540,7 @@ this.lastHitAt = this.time.now
       this.reducedMotion = !!this.opts.reducedMotion
       this.effects.setReducedMotion(this.reducedMotion)
       this.hud.setReducedMotion(this.reducedMotion)
+      this.hud.setDifficultyLabel(this.difficultyLabel)
       this.hud.setStage(this.currentStage)
       if (this.activeBoss && this.activeBoss.active) {
         const maxHp = (this.activeBoss.getData('maxHp') as number) ?? 1
@@ -947,6 +973,29 @@ pskin?.setThrust?.(thrustLevel)
     return clamped
   }
 
+  private updateDifficultyForStage() {
+    const stageFactor = 1 + Math.max(0, this.currentStage - 1) * 0.12
+    const cappedFactor = Math.min(stageFactor, 1.6)
+    this.spawnRateMultiplier = this.baseSpawnRateMultiplier * cappedFactor
+    this.enemyCap = Math.max(10, Math.round(this.difficultyProfile.enemyCap * cappedFactor))
+
+    const hpStageFactor = 1 + Math.max(0, this.currentStage - 1) * 0.08
+    this.spawner?.setDifficulty({
+      hpMultiplier: this.enemyHpMultiplier * hpStageFactor,
+      bossHpMultiplier: this.bossHpMultiplier * hpStageFactor,
+      laneCount: this.verticalLaneCount
+    })
+  }
+
+  private adjustSpawnCount(base: number): number {
+    return Math.max(1, Math.round(base * this.spawnRateMultiplier))
+  }
+
+  private adjustedChance(base: number): number {
+    const scaled = base * this.spawnRateMultiplier
+    return Phaser.Math.Clamp(scaled, 0.02, 0.9)
+  }
+
   private setupSpawnHandlers(canSpawn: () => boolean) {
     if (this.gameplayMode === 'vertical') {
       this.setupVerticalSpawnHandlers(canSpawn)
@@ -958,15 +1007,21 @@ pskin?.setThrust?.(thrustLevel)
   private setupOmniSpawnHandlers(canSpawn: () => boolean) {
     this.analyzer.on('beat:low', () => {
       if (!canSpawn()) return
-      if (Math.random() < 0.3) this.spawner.spawn('brute', 1)
+      if (Math.random() < this.adjustedChance(0.3)) {
+        this.spawner.spawn('brute', this.adjustSpawnCount(1))
+      }
     })
     this.analyzer.on('beat:mid', () => {
       if (!canSpawn()) return
-      if (Math.random() < 0.2) this.spawner.spawn('dasher', 1)
+      if (Math.random() < this.adjustedChance(0.2)) {
+        this.spawner.spawn('dasher', this.adjustSpawnCount(1))
+      }
     })
     this.analyzer.on('beat:high', () => {
       if (!canSpawn()) return
-      if (Math.random() < 0.2) this.spawner.spawn('swarm', 2)
+      if (Math.random() < this.adjustedChance(0.2)) {
+        this.spawner.spawn('swarm', this.adjustSpawnCount(2))
+      }
     })
   }
 
@@ -976,19 +1031,24 @@ pskin?.setThrust?.(thrustLevel)
       if (this.activeBoss) return
       const cycle = this.verticalSpawnCycle % 3
       if (cycle === 0) {
-        const lane = Phaser.Math.Between(0, 5)
-        const count = Phaser.Math.Between(2, 3)
+        const lane = Phaser.Math.Between(0, Math.max(0, this.verticalLaneCount - 1))
+        const count = this.adjustSpawnCount(Phaser.Math.Between(2, 3))
         const speedMul = 0.85 + Math.random() * 0.25
         this.spawner.spawnVerticalLane('brute', lane, count, speedMul)
       } else if (cycle === 1) {
-        const left = Phaser.Math.Between(0, 2)
-        const right = Phaser.Math.Between(3, 5)
-        this.spawner.spawnVerticalLane('dasher', left, 2, 1.15)
-        this.spawner.spawnVerticalLane('dasher', right, 2, 1.15)
+        const half = Math.max(1, Math.floor(this.verticalLaneCount / 2))
+        const left = Phaser.Math.Between(0, Math.max(0, half - 1))
+        let right = Phaser.Math.Between(half, Math.max(half, this.verticalLaneCount - 1))
+        if (this.verticalLaneCount > 1 && right === left) {
+          right = (right + 1) % this.verticalLaneCount
+        }
+        const dashCount = this.adjustSpawnCount(2)
+        this.spawner.spawnVerticalLane('dasher', left, dashCount, 1.15)
+        if (this.verticalLaneCount > 1) this.spawner.spawnVerticalLane('dasher', right, dashCount, 1.15)
       } else {
         const amplitude = Phaser.Math.Between(60, 110)
         const wavelength = Phaser.Math.Between(240, 360)
-        this.spawner.spawnSineWave('swarm', 4, amplitude, wavelength, 1)
+        this.spawner.spawnSineWave('swarm', this.adjustSpawnCount(4), amplitude, wavelength, 1)
       }
       this.verticalSpawnCycle++
     })
@@ -998,14 +1058,14 @@ pskin?.setThrust?.(thrustLevel)
       if (this.activeBoss) return
       const amplitude = Phaser.Math.Between(70, 130)
       const wavelength = Phaser.Math.Between(260, 420)
-      this.spawner.spawnSineWave('swarm', 5, amplitude, wavelength, 1.05)
+      this.spawner.spawnSineWave('swarm', this.adjustSpawnCount(5), amplitude, wavelength, 1.05)
     })
 
     this.analyzer.on('beat:high', () => {
       if (!canSpawn()) return
       if (this.activeBoss) return
       const spread = Phaser.Math.Between(45, 75)
-      const size = Phaser.Math.Between(4, 5)
+      const size = Math.max(3, this.adjustSpawnCount(Phaser.Math.Between(4, 5)))
       this.spawner.spawnVFormation('dasher', size, spread, 1.2)
     })
   }
@@ -1068,7 +1128,7 @@ pskin?.setThrust?.(thrustLevel)
     this.comboCount = 0
     this.hud.setCombo(0)
     this.lastHitEnemyId = null
-    this.scoring.registerMiss(isBoss ? 120 : 50)
+    this.scoring.registerMiss(isBoss ? this.bossMissPenalty : this.missPenalty)
     this.hud.showMissFeedback(isBoss ? 'Boss Escaped!' : 'Miss!')
     if (isBoss) {
       this.hud.setBossHealth(null)
@@ -1077,22 +1137,26 @@ pskin?.setThrust?.(thrustLevel)
     }
   }
 
+  private onBossDown() {
+    this.activeBoss = null
+    this.bossSpawned = false
+    this.currentStage += 1
+    this.verticalSpawnCycle = 0
+    this.hud.setBossHealth(null)
+    this.hud.setStage(this.currentStage)
+    this.updateDifficultyForStage()
+  }
+
   private handleBarStart = (event: { barIndex: number }) => {
     this.barsElapsed = event.barIndex
-    const estimatedStage = Math.max(1, Math.floor(event.barIndex / 8) + 1)
-    if (estimatedStage > this.currentStage && !this.bossSpawned) {
-      this.currentStage = estimatedStage
-      this.hud.setStage(this.currentStage)
-    }
     if (this.gameplayMode !== 'vertical') return
     if (this.bossSpawned || this.activeBoss) return
-    if (event.barIndex >= 8 && this.spawner.getGroup().countActive(true) < 4) {
+    const barsPerBoss = 8
+    if (event.barIndex > 0 && event.barIndex % barsPerBoss === 0 && this.spawner.getGroup().countActive(true) < Math.max(4, Math.round(this.enemyCap * 0.45))) {
       const boss = this.spawner.spawnBoss('brute', { hp: 120, speedMultiplier: 0.55 })
-      if (boss) {
-        this.bossSpawned = true
-        this.activeBoss = boss
-        this.hud.setBossHealth(1, boss.getData('etype') as string)
-      }
+      this.bossSpawned = true
+      this.activeBoss = boss
+      this.hud.setBossHealth(1, boss.getData('etype') as string)
     }
   }
 
@@ -1136,8 +1200,11 @@ pskin?.setThrust?.(thrustLevel)
     const maxSpeed = 420
     const ratio = bpm > 0 ? bpm / referenceBpm : 1
     const clampedRatio = Math.min(Math.max(ratio, 0.5), 1.8)
-    const raw = baseAtReference * clampedRatio
-    return Math.min(Math.max(raw, minSpeed), maxSpeed)
+    const base = baseAtReference * clampedRatio
+    const scaled = base * this.difficultyProfile.scrollMultiplier
+    const min = minSpeed * this.difficultyProfile.scrollMultiplier
+    const max = maxSpeed * this.difficultyProfile.scrollMultiplier
+    return Phaser.Math.Clamp(scaled, min, max)
   }
 
   private pulseEnemies(amplitudeMultiplier = 1) {
@@ -1169,6 +1236,7 @@ pskin?.setThrust?.(thrustLevel)
       if (!s.active) return true
       this.effects.explosion(s.x, s.y)
       this.cleanupEnemy(s, true)   // ← viktigt, städar skin + bar
+      if (s.getData('isBoss') === true) this.onBossDown()
       return true
     })
     this.sound.play('explode_big', { volume: this.opts.sfxVolume })
@@ -1187,11 +1255,8 @@ pskin?.setThrust?.(thrustLevel)
     healthBar.clear()
 
     const hp = enemy.getData('hp') as number
-    const etype = enemy.getData('etype') as 'brute' | 'dasher' | 'swarm'
-    const balance = this.registry.get('balance') as any
-    const maxHp =
-      balance?.enemies?.[etype]?.hp ?? (etype === 'brute' ? 6 : etype === 'dasher' ? 3 : 1)
-    const healthPercentage = hp > 0 ? hp / maxHp : 0
+    const maxHp = (enemy.getData('maxHp') as number) ?? hp
+    const healthPercentage = maxHp > 0 && hp > 0 ? hp / maxHp : 0
 
     const barWidth = 20
     const barHeight = 3

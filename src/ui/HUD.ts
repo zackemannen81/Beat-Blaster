@@ -38,6 +38,8 @@ export default class HUD {
   }
   private reducedMotion = false
   private missResetTimer?: Phaser.Time.TimerEvent
+  private stageValue = 1
+  private difficultyLabel = ''
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene
@@ -69,6 +71,9 @@ export default class HUD {
     }).setOrigin(0.5).setDepth(60).setVisible(false)
 
     this.scene.events.on(Phaser.Scenes.Events.RESIZE, this.handleResize, this)
+    this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scene.events.off(Phaser.Scenes.Events.RESIZE, this.handleResize, this)
+    })
   }
 
   update(score: number, multiplier: number, accPct?: number) {
@@ -119,7 +124,9 @@ export default class HUD {
   }
 
   setStage(stage: number) {
-    this.stageText.setText(`Stage ${stage}`)
+    this.stageValue = stage
+    const suffix = this.difficultyLabel ? ` – ${this.difficultyLabel}` : ''
+    this.stageText.setText(`Stage ${stage}${suffix}`)
   }
 
   setBossHealth(fraction: number | null, label = 'BOSS') {
@@ -161,6 +168,11 @@ export default class HUD {
     if (flag) {
       this.comboText.setAlpha(1)
     }
+  }
+
+  setDifficultyLabel(label: string) {
+    this.difficultyLabel = label
+    this.setStage(this.stageValue)
   }
 
   bindPowerups(powerups: Powerups) {

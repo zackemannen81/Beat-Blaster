@@ -28,6 +28,8 @@ export default class Spawner {
   private group: Phaser.Physics.Arcade.Group
   private scrollBase = 220
   private laneCount = 6
+  private hpMultiplier = 1
+  private bossHpMultiplier = 1
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene
@@ -36,6 +38,12 @@ export default class Spawner {
 
   setScrollBase(speed: number) {
     this.scrollBase = speed
+  }
+
+  setDifficulty(config: { hpMultiplier?: number; bossHpMultiplier?: number; laneCount?: number }) {
+    if (typeof config.hpMultiplier === 'number' && config.hpMultiplier > 0) this.hpMultiplier = config.hpMultiplier
+    if (typeof config.bossHpMultiplier === 'number' && config.bossHpMultiplier > 0) this.bossHpMultiplier = config.bossHpMultiplier
+    if (typeof config.laneCount === 'number' && config.laneCount >= 3) this.laneCount = Math.floor(config.laneCount)
   }
 
   spawn(type: EnemyType, count = 1) {
@@ -108,7 +116,7 @@ export default class Spawner {
     }
   }
 
-  spawnBoss(type: EnemyType = 'brute', options: { hp?: number; speedMultiplier?: number } = {}) {
+  spawnBoss(type: EnemyType = 'brute', options: { hp?: number; speedMultiplier?: number } = {}): Enemy {
     const { width } = this.scene.scale
     const speedY = this.scrollBase * (options.speedMultiplier ?? 0.6)
     return this.createEnemy({
@@ -139,7 +147,9 @@ export default class Spawner {
 
     const balance = this.scene.registry.get('balance') as any
     const baseHp = balance?.enemies?.[config.type]?.hp ?? (config.type === 'brute' ? 6 : config.type === 'dasher' ? 3 : 1)
-    const hp = config.hpOverride ?? baseHp
+    const rawHp = config.hpOverride ?? baseHp
+    const multiplier = config.isBoss ? this.bossHpMultiplier : this.hpMultiplier
+    const hp = Math.max(1, Math.round(rawHp * multiplier))
     sprite.setData('hp', hp)
     sprite.setData('maxHp', hp)
 

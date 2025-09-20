@@ -8,4 +8,7 @@
 - npm run build (pass) - projectile direction & pooling
 - npm run build (pass) - vertical spawns & boss scaffold
 - npm run build (pass) - HUD & scoring adjustments
+- Difficulty sweep: easy/normal/hard vertical runs (desktop)
+- Reduced Motion verification across stage/boss ladder
+- npm run build (pass) - difficulty profiles & doc update
 

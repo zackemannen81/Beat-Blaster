@@ -62,6 +62,7 @@
 - Parametriserade svårighetsgrader (lätt/normal/svår) baserade på scrollhastighet, spawn-täthet, bullet-density och HP.
 - Prestandaprofilering på desktop + mobil, inkl. FPS och GC-övervakning.
 - Regressionstester för horisontellt läge, beat-synk och optionsflöden.
+- Status 2025-09-20: Easy/Normal/Hard profiler aktiverade med ramp, QA-logg uppdaterad och dokumentation finns i `docs/vertical-mode.md`.
 
 ## 5. Tidslinje och milstolpar
 | Dag | Fokus | Milstolpar |

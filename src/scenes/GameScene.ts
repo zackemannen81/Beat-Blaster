@@ -52,6 +52,17 @@ export default class GameScene extends Phaser.Scene {
   private gameplayMode: GameplayMode = resolveGameplayMode(this.opts.gameplayMode)
   private scrollBase = 220
   private backgroundScroller!: BackgroundScroller
+  private movementMinY = 0
+  private movementMaxY = 0
+  private activeGamepad?: Phaser.Input.Gamepad.Gamepad
+  private gamepadDeadzone = this.opts.gamepadDeadzone
+  private gamepadSensitivity = this.opts.gamepadSensitivity
+  private gamepadFireActive = false
+  private touchMovePointerId?: number
+  private touchMoveBaselineX = 0
+  private touchMoveBaselinePlayerX = 0
+  private touchFirePointers = new Set<number>()
+  private touchTapTimes: number[] = []
   private beatIndicator!: Phaser.GameObjects.Graphics;
   private lastHitEnemyId: string | null = null
   private neon!: NeonGrid
@@ -152,6 +163,9 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
 
     this.gameplayMode = resolveGameplayMode(this.opts.gameplayMode)
     this.registry.set('gameplayMode', this.gameplayMode)
+    this.updateMovementBounds()
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.updateMovementBounds, this)
+    this.input.addPointer(2)
 
     // Read balance
     const balance = this.registry.get('balance') as any
@@ -179,25 +193,60 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
       this.analyzer?.removeAllListeners?.()
       this.backgroundScroller?.destroy()
       this.starfield?.destroy()
+      this.scale.off(Phaser.Scale.Events.RESIZE, this.updateMovementBounds, this)
+      this.input.gamepad?.off('connected', this.onGamepadConnected, this)
+      this.input.gamepad?.off('disconnected', this.onGamepadDisconnected, this)
     })
-    this.input.on('pointerdown', () => {
-      if (this.opts.fireMode === 'click') {
-        const t = this.time.now
-        if (t - this.lastShotAt >= this.fireCooldownMs) {
-          this.fireBullet()
-          this.lastShotAt = t
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (this.gameplayMode === 'vertical' && pointer.pointerType !== 'mouse') {
+        const half = this.scale.width * 0.5
+        if (pointer.x < half) {
+          if (this.touchMovePointerId === undefined) {
+            this.touchMovePointerId = pointer.id
+            this.touchMoveBaselineX = pointer.x
+            this.touchMoveBaselinePlayerX = this.player.x
+          }
+        } else {
+          this.touchFirePointers.add(pointer.id)
+          this.handleFireInputDown()
+          this.registerTouchTap(this.time.now)
         }
-      } else {
-        this.isShooting = true
-        if (this.opts.fireMode === 'hold_quantized') {
-          this.nextQuantizedShotAt = this.lastBeatAt + this.beatPeriodMs
-        }
+        return
       }
+      this.handleFireInputDown()
     })
-    this.input.on('pointerup', () => {
-      this.isShooting = false
-      this.nextQuantizedShotAt = 0
+    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (this.gameplayMode === 'vertical' && pointer.pointerType !== 'mouse') {
+        if (pointer.id === this.touchMovePointerId) {
+          this.touchMovePointerId = undefined
+        }
+        if (this.touchFirePointers.delete(pointer.id) && this.touchFirePointers.size === 0) {
+          this.handleFireInputUp()
+        }
+        return
+      }
+      this.handleFireInputUp()
     })
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (this.gameplayMode !== 'vertical' || pointer.pointerType === 'mouse') return
+      if (pointer.id !== this.touchMovePointerId) return
+      const deltaX = pointer.x - this.touchMoveBaselineX
+      const targetX = this.touchMoveBaselinePlayerX + deltaX
+      const body = this.player.body as Phaser.Physics.Arcade.Body
+      const halfWidth = body.width * 0.5
+      const minX = halfWidth
+      const maxX = this.scale.width - halfWidth
+      const clamped = Phaser.Math.Clamp(targetX, minX, maxX)
+      this.player.setX(clamped)
+      body.setVelocityX(0)
+    })
+
+    if (this.input.gamepad) {
+      this.input.gamepad.on('connected', this.onGamepadConnected, this)
+      this.input.gamepad.on('disconnected', this.onGamepadDisconnected, this)
+      const pad = this.input.gamepad.gamepads.find(p => p && p.connected)
+      if (pad) this.activeGamepad = pad
+    }
 
     // Load selected track on demand
     const tracks = this.registry.get('tracks') as any[]
@@ -434,6 +483,13 @@ if (newHp <= 0) {
       this.isPaused = false
       this.music?.resume()
       this.input.setDefaultCursor('none')
+      this.opts = loadOptions()
+      this.metronome = this.opts.metronome
+      this.gameplayMode = resolveGameplayMode(this.opts.gameplayMode)
+      this.registry.set('gameplayMode', this.gameplayMode)
+      this.gamepadDeadzone = this.opts.gamepadDeadzone
+      this.gamepadSensitivity = this.opts.gamepadSensitivity
+      this.updateMovementBounds()
     })
   }
 
@@ -480,17 +536,57 @@ if (newHp <= 0) {
       this.lastShotAt = time
     }
 
-    const speed = 250
-    const body = this.player.body
-    body.setVelocity(0, 0)
-//if (this.keys.)
-const pointer = this.input.activePointer
-const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
-const wasdKeys = this.registry.get('wasd') as any
-    if (this.cursors.left?.isDown || wasdKeys?.A?.isDown) body.velocity.x = -speed
-    else if (this.cursors.right?.isDown || wasdKeys?.D?.isDown) body.velocity.x = speed
-    if (this.cursors.up?.isDown || wasdKeys?.W?.isDown) body.velocity.y = -speed
-    else if (this.cursors.down?.isDown || wasdKeys?.S?.isDown) body.velocity.y = speed
+    const movementSpeed = this.gameplayMode === 'vertical' ? 280 : 250
+    const body = this.player.body as Phaser.Physics.Arcade.Body
+    const wasdKeys = this.registry.get('wasd') as any
+    let moveX = 0
+    let moveY = 0
+
+    if (this.cursors.left?.isDown || wasdKeys?.A?.isDown) moveX -= 1
+    if (this.cursors.right?.isDown || wasdKeys?.D?.isDown) moveX += 1
+    if (this.cursors.up?.isDown || wasdKeys?.W?.isDown) moveY -= 1
+    if (this.cursors.down?.isDown || wasdKeys?.S?.isDown) moveY += 1
+
+    if (this.activeGamepad && this.activeGamepad.connected) {
+      const pad = this.activeGamepad
+      const axisX = pad.axes.length > 0 ? pad.axes[0].getValue() : 0
+      const axisY = pad.axes.length > 1 ? pad.axes[1].getValue() : 0
+      moveX += this.applyGamepadDeadzone(axisX) * this.gamepadSensitivity
+      moveY += this.applyGamepadDeadzone(axisY) * this.gamepadSensitivity
+
+      const shootPressed = pad.buttons[0]?.pressed || pad.buttons[1]?.pressed
+      if (shootPressed && !this.gamepadFireActive) {
+        this.handleFireInputDown()
+        this.gamepadFireActive = true
+      } else if (!shootPressed && this.gamepadFireActive) {
+        this.gamepadFireActive = false
+        this.handleFireInputUp()
+      }
+
+      const bombPressed = pad.buttons[5]?.pressed || pad.buttons[7]?.pressed
+      if (bombPressed && this.bombCharge >= 100) this.triggerBomb()
+    } else if (this.gamepadFireActive) {
+      this.gamepadFireActive = false
+      this.handleFireInputUp()
+    }
+
+    if (this.touchMovePointerId !== undefined) moveX = 0
+
+    const magnitude = Math.hypot(moveX, moveY)
+    if (magnitude > 1) {
+      moveX /= magnitude
+      moveY /= magnitude
+    }
+
+    body.setVelocity(moveX * movementSpeed, moveY * movementSpeed)
+
+    if (this.gameplayMode === 'vertical') {
+      const halfHeight = body.height * 0.5
+      const minY = this.movementMinY - halfHeight
+      const maxY = this.movementMaxY - halfHeight
+      body.y = Phaser.Math.Clamp(body.y, minY, maxY)
+      this.player.y = body.y + halfHeight
+    }
 
 /*
 const speed = 250
@@ -552,8 +648,8 @@ pskin?.setThrust?.(thrustLevel)
     })
 
     // Aim rotation and crosshair follow
-    //const pointer = this.input.activePointer
-    //const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+    const pointer = this.input.activePointer
+    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
     const ang = Phaser.Math.Angle.Between(this.player.x, this.player.y, world.x, world.y)
     this.player.setRotation(ang+Math.PI/2) 
     // Draw reticle
@@ -729,6 +825,68 @@ pskin?.setThrust?.(thrustLevel)
       this.sound.play(key, { volume: vol })
     } else {
       this.sound.play('ui_select', { volume: vol })
+    }
+  }
+
+  private registerTouchTap(time: number) {
+    this.touchTapTimes = this.touchTapTimes.filter(t => time - t < 600)
+    this.touchTapTimes.push(time)
+    if (this.touchTapTimes.length >= 3) {
+      this.touchTapTimes = []
+      if (this.bombCharge >= 100) this.triggerBomb()
+    }
+  }
+
+  private updateMovementBounds() {
+    const { height } = this.scale
+    if (this.gameplayMode === 'vertical') {
+      this.movementMinY = height * 0.65
+      this.movementMaxY = height * 0.94
+    } else {
+      this.movementMinY = 0
+      this.movementMaxY = height
+    }
+  }
+
+  private applyGamepadDeadzone(value: number): number {
+    const abs = Math.abs(value)
+    if (abs < this.gamepadDeadzone) return 0
+    const sign = value < 0 ? -1 : 1
+    const range = 1 - this.gamepadDeadzone
+    const scaled = (abs - this.gamepadDeadzone) / (range || 1)
+    return sign * Math.min(Math.max(scaled, 0), 1)
+  }
+
+  private handleFireInputDown() {
+    if (this.opts.fireMode === 'click') {
+      const t = this.time.now
+      if (t - this.lastShotAt >= this.fireCooldownMs) {
+        this.fireBullet()
+        this.lastShotAt = t
+      }
+      return
+    }
+    this.isShooting = true
+    if (this.opts.fireMode === 'hold_quantized') {
+      this.nextQuantizedShotAt = this.lastBeatAt + this.beatPeriodMs
+    }
+  }
+
+  private handleFireInputUp() {
+    this.isShooting = false
+    this.nextQuantizedShotAt = 0
+  }
+
+  private onGamepadConnected(pad: Phaser.Input.Gamepad.Gamepad) {
+    if (!pad) return
+    this.activeGamepad = pad
+  }
+
+  private onGamepadDisconnected(pad: Phaser.Input.Gamepad.Gamepad) {
+    if (this.activeGamepad === pad) {
+      this.activeGamepad = undefined
+      this.gamepadFireActive = false
+      this.handleFireInputUp()
     }
   }
 

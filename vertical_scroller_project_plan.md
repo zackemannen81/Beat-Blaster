@@ -38,6 +38,7 @@
 - Kalibrera desktop-kontroller (WASD/pilar) för horisontellt fokus och begränsad vertikal zon.
 - Implementera gamepad-profil med justerbara deadzones och känslighet.
 - Designa mobil/touch-lösning (slider + autofire + specialkommando) och koppla Reduced Motion-inställning till input-feedback.
+- Status 2025-09-20: Desktop/gamepad/touch-klämma klar (bounded zon, slider + triple tap, gamepad deadzone/sens i Options). Reduced Motion-anpassning planeras till Milestone 6.
 
 ### 4.4 Projektiler och pooling
 - Vända riktningen på befintliga projektiler och säkerställa korrekta hastigheter.

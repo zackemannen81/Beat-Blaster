@@ -23,9 +23,10 @@ export default class OptionsScene extends Phaser.Scene {
     this.opts = loadOptions()
     this.title = this.add.text(width / 2, height * 0.2, 'Options', { fontFamily: 'HudFont, UiFont', fontSize: '32px', color: '#fff' }).setOrigin(0.5)
 
-    const baseY = 0.34
-    const stepY = 0.07
-    this.entries = Array.from({ length: 7 }, (_, i) =>
+    const baseY = 0.32
+    const stepY = 0.055
+    const rowCount = 9
+    this.entries = Array.from({ length: rowCount }, (_, i) =>
       this.add.text(width / 2, height * (baseY + stepY * i), '', { fontFamily: 'UiFont', fontSize: '18px' }).setOrigin(0.5)
     )
     this.render()
@@ -55,7 +56,9 @@ export default class OptionsScene extends Phaser.Scene {
       `High Contrast: ${this.opts.highContrast ? 'On' : 'Off'}`,
       `Input Offset: ${io} ms`,
       `Fire Mode: ${fm === 'click' ? 'Click' : fm === 'hold_quantized' ? 'Hold (Quantized)' : 'Hold (Raw)'}`,
-      `Gameplay Mode: ${modeLabel}${overrideSuffix}`
+      `Gameplay Mode: ${modeLabel}${overrideSuffix}`,
+      `Gamepad Deadzone: ${(this.opts.gamepadDeadzone * 100).toFixed(0)}%`,
+      `Gamepad Sensitivity: ${this.opts.gamepadSensitivity.toFixed(2)}x`
     ]
     this.entries.forEach((t, i) => t.setText(`${i === this.cursor ? '▶ ' : '  '}${rows[i]}`).setColor(i === this.cursor ? '#00e5ff' : '#ffffff'))
   }
@@ -85,6 +88,14 @@ export default class OptionsScene extends Phaser.Scene {
         const order: Options['gameplayMode'][] = ['omni', 'vertical']
         const idx = order.indexOf(this.opts.gameplayMode)
         this.opts.gameplayMode = order[(idx + (dir > 0 ? 1 : order.length - 1)) % order.length]
+        break
+      }
+      case 7: {
+        this.opts.gamepadDeadzone = Phaser.Math.Clamp(this.opts.gamepadDeadzone + step * 0.05, 0, 0.6)
+        break
+      }
+      case 8: {
+        this.opts.gamepadSensitivity = Phaser.Math.Clamp(this.opts.gamepadSensitivity + step * 0.1, 0.5, 2)
         break
       }
     }

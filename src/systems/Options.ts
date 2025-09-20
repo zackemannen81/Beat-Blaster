@@ -9,6 +9,8 @@ export type Options = {
   inputOffsetMs: Record<string, number> // per track id
   fireMode: 'click' | 'hold_raw' | 'hold_quantized'
   gameplayMode: GameplayMode
+  gamepadDeadzone: number
+  gamepadSensitivity: number
 }
 
 const KEY = 'bb_options_v1'
@@ -21,7 +23,9 @@ export const DEFAULT_OPTIONS: Options = {
   shaderEnabled: true,
   inputOffsetMs: {},
   fireMode: 'click',
-  gameplayMode: 'omni'
+  gameplayMode: 'omni',
+  gamepadDeadzone: 0.25,
+  gamepadSensitivity: 1
 }
 
 const VALID_FIRE_MODES: Options['fireMode'][] = ['click', 'hold_raw', 'hold_quantized']
@@ -65,6 +69,12 @@ function withDefaults(raw: Partial<Options> | null | undefined): Options {
 
   const mode = normalizeGameplayMode((raw as any)?.gameplayMode)
   merged.gameplayMode = mode ?? DEFAULT_OPTIONS.gameplayMode
+
+  const deadzone = typeof raw?.gamepadDeadzone === 'number' ? raw.gamepadDeadzone : DEFAULT_OPTIONS.gamepadDeadzone
+  merged.gamepadDeadzone = Math.min(Math.max(deadzone, 0), 0.6)
+
+  const sensitivity = typeof raw?.gamepadSensitivity === 'number' ? raw.gamepadSensitivity : DEFAULT_OPTIONS.gamepadSensitivity
+  merged.gamepadSensitivity = Math.min(Math.max(sensitivity, 0.5), 2)
 
   return merged
 }

@@ -32,6 +32,7 @@
 - Införa global `SCROLL_BASE` med koppling till Conductor/BPM.
 - Uppdatera `GameScene` så världsflödet simuleras via bakgrund/parallax-scroll (`tilePositionY`).
 - Justera `Starfield` och övriga bakgrundssystem för vertikalt parallax, samt säkerställa sömlöst loopande texturer.
+- Status 2025-09-20: Slutförd (SCROLL_BASE kopplat till BPM, Starfield/BackgroundScroller uppdaterar tilePositionY, registry syncar värden).
 
 ### 4.3 Spelarstyrning och input
 - Kalibrera desktop-kontroller (WASD/pilar) för horisontellt fokus och begränsad vertikal zon.

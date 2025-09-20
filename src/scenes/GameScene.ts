@@ -7,6 +7,7 @@ import HUD from '../ui/HUD'
 import Effects from '../systems/Effects'
 import Powerups, { PowerupType } from '../systems/Powerups'
 import Starfield from '../systems/Starfield'
+import BackgroundScroller from '../systems/BackgroundScroller'
 import { loadOptions, resolveGameplayMode, GameplayMode } from '../systems/Options'
 import PlayerSkin from '../systems/PlayerSkin'
 import NeonGrid from '../systems/NeonGrid'
@@ -49,6 +50,8 @@ export default class GameScene extends Phaser.Scene {
   private lastHitAt = 0
   private opts = loadOptions()
   private gameplayMode: GameplayMode = resolveGameplayMode(this.opts.gameplayMode)
+  private scrollBase = 220
+  private backgroundScroller!: BackgroundScroller
   private beatIndicator!: Phaser.GameObjects.Graphics;
   private lastHitEnemyId: string | null = null
   private neon!: NeonGrid
@@ -83,6 +86,9 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     this.neon.create()
     const { width, height } = this.scale
     this.cameras.main.setBackgroundColor('#0a0a0f')
+
+    this.backgroundScroller = new BackgroundScroller(this)
+    this.backgroundScroller.create()
 
     // Starfield background (procedural)
     this.starfield = new Starfield(this)
@@ -171,6 +177,8 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
       this.music?.destroy()
       this.music = undefined
       this.analyzer?.removeAllListeners?.()
+      this.backgroundScroller?.destroy()
+      this.starfield?.destroy()
     })
     this.input.on('pointerdown', () => {
       if (this.opts.fireMode === 'click') {
@@ -281,6 +289,11 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     // Fallback BPM-driven spawns if analyzer events are not firing
     const bpm = (track && track.bpm) ? track.bpm : 120
     const interval = 60000 / bpm
+    this.beatPeriodMs = interval
+    this.scrollBase = this.computeScrollBase(bpm)
+    this.starfield.setBaseScroll(this.scrollBase)
+    this.backgroundScroller.setBaseScroll(this.scrollBase)
+    this.registry.set('scrollBase', this.scrollBase)
 /*    this.time.addEvent({ delay: interval, loop: true, callback: () => {
       if (!canSpawn()) return
       // If no analyzer beat in the last 1.5 intervals, synthesize spawns (one type at a time)
@@ -426,9 +439,25 @@ if (newHp <= 0) {
 
   update(time: number, delta: number): void {
     // Analyzer update
-    if (this.analyzer) this.analyzer.update()
-    // Starfield update
-    if (this.starfield) this.starfield.update(delta)
+    if (this.analyzer) {
+      this.analyzer.update()
+      const estPeriod = this.analyzer.getEstimatedPeriodMs()
+      if (estPeriod && isFinite(estPeriod) && estPeriod > 0) {
+        const estBpm = 60000 / estPeriod
+        const targetScroll = this.computeScrollBase(estBpm)
+        this.scrollBase = Phaser.Math.Linear(this.scrollBase, targetScroll, 0.05)
+        this.beatPeriodMs = Phaser.Math.Linear(this.beatPeriodMs, estPeriod, 0.1)
+      }
+    }
+    this.registry.set('scrollBase', this.scrollBase)
+    if (this.backgroundScroller) {
+      this.backgroundScroller.setBaseScroll(this.scrollBase)
+      this.backgroundScroller.update(delta)
+    }
+    if (this.starfield) {
+      this.starfield.setBaseScroll(this.scrollBase)
+      this.starfield.update(delta)
+    }
 
       if (this.time.now - this.lastBeatAt < 100) { // Visa cirkeln i 100ms efter varje beat
         this.beatIndicator.setAlpha(1);
@@ -701,6 +730,17 @@ pskin?.setThrust?.(thrustLevel)
     } else {
       this.sound.play('ui_select', { volume: vol })
     }
+  }
+
+  private computeScrollBase(bpm: number): number {
+    const referenceBpm = 120
+    const baseAtReference = 260
+    const minSpeed = 140
+    const maxSpeed = 420
+    const ratio = bpm > 0 ? bpm / referenceBpm : 1
+    const clampedRatio = Math.min(Math.max(ratio, 0.5), 1.8)
+    const raw = baseAtReference * clampedRatio
+    return Math.min(Math.max(raw, minSpeed), maxSpeed)
   }
 
   private pulseEnemies(amplitudeMultiplier = 1) {

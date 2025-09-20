@@ -180,4 +180,12 @@ export default class AudioAnalyzer extends Phaser.Events.EventEmitter {
     }
     return best
   }
+
+  getEstimatedPeriodMs(): number {
+    return this.estPeriodMs
+  }
+
+  getEstimatedBpm(): number {
+    return this.estPeriodMs > 0 ? 60000 / this.estPeriodMs : 0
+  }
 }

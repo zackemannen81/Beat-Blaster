@@ -1104,8 +1104,8 @@ pskin?.setThrust?.(thrustLevel)
       const cycle = this.verticalSpawnCycle % 3
       if (cycle === 0) {
         const lane = Phaser.Math.Between(0, Math.max(0, this.verticalLaneCount - 1))
-        const count = this.adjustSpawnCount(Phaser.Math.Between(2, 3))
-        const speedMul = 0.85 + Math.random() * 0.25
+        const count = Math.max(1, Math.min(2, this.adjustSpawnCount(Phaser.Math.Between(2, 3))))
+        const speedMul = 0.8 + Math.random() * 0.2
         this.spawner.spawnVerticalLane('brute', lane, count, speedMul)
       } else if (cycle === 1) {
         const half = Math.max(1, Math.floor(this.verticalLaneCount / 2))
@@ -1114,13 +1114,14 @@ pskin?.setThrust?.(thrustLevel)
         if (this.verticalLaneCount > 1 && right === left) {
           right = (right + 1) % this.verticalLaneCount
         }
-        const dashCount = this.adjustSpawnCount(2)
-        this.spawner.spawnVerticalLane('dasher', left, dashCount, 1.15)
-        if (this.verticalLaneCount > 1) this.spawner.spawnVerticalLane('dasher', right, dashCount, 1.15)
+        const dashCount = 1
+        const dashSpeed = 0.9
+        this.spawner.spawnVerticalLane('dasher', left, dashCount, dashSpeed)
+        if (this.verticalLaneCount > 1) this.spawner.spawnVerticalLane('dasher', right, dashCount, dashSpeed)
       } else {
         const amplitude = Phaser.Math.Between(60, 110)
         const wavelength = Phaser.Math.Between(240, 360)
-        this.spawner.spawnSineWave('swarm', this.adjustSpawnCount(4), amplitude, wavelength, 1)
+        this.spawner.spawnSineWave('swarm', Math.max(2, Math.min(4, this.adjustSpawnCount(3))), amplitude, wavelength, 0.95)
       }
       this.verticalSpawnCycle++
     })
@@ -1130,15 +1131,15 @@ pskin?.setThrust?.(thrustLevel)
       if (this.activeBoss) return
       const amplitude = Phaser.Math.Between(70, 130)
       const wavelength = Phaser.Math.Between(260, 420)
-      this.spawner.spawnSineWave('swarm', this.adjustSpawnCount(5), amplitude, wavelength, 1.05)
+      this.spawner.spawnSineWave('swarm', Math.max(2, Math.min(4, this.adjustSpawnCount(4))), amplitude, wavelength, 1)
     })
 
     this.analyzer.on('beat:high', () => {
       if (!canSpawn()) return
       if (this.activeBoss) return
       const spread = Phaser.Math.Between(45, 75)
-      const size = Math.max(3, this.adjustSpawnCount(Phaser.Math.Between(4, 5)))
-      this.spawner.spawnVFormation('dasher', size, spread, 1.2)
+      const size = Math.max(2, Math.min(4, this.adjustSpawnCount(Phaser.Math.Between(3, 5))))
+      this.spawner.spawnVFormation('dasher', size, spread, 1.05)
     })
   }
 

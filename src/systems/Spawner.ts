@@ -50,7 +50,7 @@ export default class Spawner {
     for (let i = 0; i < count; i++) {
       const { x, y } = this.randomOffscreen()
       const angle = Phaser.Math.Angle.Between(x, y, this.scene.scale.width / 2, this.scene.scale.height / 2)
-      const speed = (type === 'swarm' ? 110 : type === 'dasher' ? 160 : 80) * 0.5
+      const speed = (type === 'swarm' ? 110 : type === 'dasher' ? 130 : 80) * 0.5
       this.createEnemy({
         type,
         x,
@@ -147,7 +147,8 @@ export default class Spawner {
 
     const balance = this.scene.registry.get('balance') as any
     const baseHp = balance?.enemies?.[config.type]?.hp ?? (config.type === 'brute' ? 6 : config.type === 'dasher' ? 3 : 1)
-    const rawHp = config.hpOverride ?? baseHp
+    let rawHp = config.hpOverride ?? baseHp
+    if (config.type === 'dasher' && !config.isBoss) rawHp = Math.max(1, Math.round(rawHp * 0.85))
     const multiplier = config.isBoss ? this.bossHpMultiplier : this.hpMultiplier
     const hp = Math.max(1, Math.round(rawHp * multiplier))
     sprite.setData('hp', hp)

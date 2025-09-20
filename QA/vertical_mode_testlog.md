@@ -5,4 +5,5 @@
 - npm run build (pass)
 - npm run build (pass) - background/scroll integration
 - npm run build (pass) - player input updates
+- npm run build (pass) - projectile direction & pooling
 

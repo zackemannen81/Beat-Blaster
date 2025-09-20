@@ -44,6 +44,7 @@
 - Vända riktningen på befintliga projektiler och säkerställa korrekta hastigheter.
 - Förbättra återvinningslogik med skärm-margin och stress-test av poolstorlekar.
 - Säkerställa kompatibilitet med horisontellt läge via betade tester.
+- Status 2025-09-20: Slutförd (projektiler skjuter uppåt i vertical-läge, pooling max-size & offscreen-culling införda, `npm run build` verifierar båda lägena).
 
 ### 4.5 Fiender, formationer och bossar
 - Bygga spawn-API för lanes, sinus, V-formationer och boss-intros ovanför viewport.

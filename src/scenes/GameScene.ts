@@ -182,7 +182,8 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     // Bullets group & fire mode
     this.bullets = this.physics.add.group({
       classType: Phaser.Physics.Arcade.Sprite,
-      defaultKey: 'bullet_plasma_0'
+      defaultKey: 'bullet_plasma_0',
+      maxSize: 200
     })
     this.physics.world.on('worldbounds', this.handleBulletWorldBounds, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -647,39 +648,57 @@ pskin?.setThrust?.(thrustLevel)
       return true
     })
 
-    // Aim rotation and crosshair follow
-    const pointer = this.input.activePointer
-    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
-    const ang = Phaser.Math.Angle.Between(this.player.x, this.player.y, world.x, world.y)
-    this.player.setRotation(ang+Math.PI/2) 
-    // Draw reticle
+    const aimDirection = this.getAimDirection()
+    const reticle = this.getReticlePosition()
+    const aimAngle = Math.atan2(aimDirection.y, aimDirection.x) + Math.PI / 2
+    if (this.gameplayMode === 'vertical') {
+      this.player.setRotation(-Math.PI / 2)
+    } else {
+      this.player.setRotation(aimAngle)
+    }
+
     this.crosshair.clear()
-    this.crosshair.lineStyle(2, 0x00e5ff, 0.9)
-    this.crosshair.strokeCircle(world.x, world.y, 10)
+    const crosshairColor = this.gameplayMode === 'vertical' ? 0xff5db1 : 0x00e5ff
+    this.crosshair.lineStyle(2, crosshairColor, 0.9)
+    this.crosshair.strokeCircle(reticle.x, reticle.y, 10)
     this.crosshair.beginPath()
-    this.crosshair.moveTo(world.x - 14, world.y)
-    this.crosshair.lineTo(world.x - 4, world.y)
-    this.crosshair.moveTo(world.x + 4, world.y)
-    this.crosshair.lineTo(world.x + 14, world.y)
-    this.crosshair.moveTo(world.x, world.y - 14)
-    this.crosshair.lineTo(world.x, world.y - 4)
-    this.crosshair.moveTo(world.x, world.y + 4)
-    this.crosshair.lineTo(world.x, world.y + 14)
+    this.crosshair.moveTo(reticle.x - 14, reticle.y)
+    this.crosshair.lineTo(reticle.x - 4, reticle.y)
+    this.crosshair.moveTo(reticle.x + 4, reticle.y)
+    this.crosshair.lineTo(reticle.x + 14, reticle.y)
+    this.crosshair.moveTo(reticle.x, reticle.y - 14)
+    this.crosshair.lineTo(reticle.x, reticle.y - 4)
+    this.crosshair.moveTo(reticle.x, reticle.y + 4)
+    this.crosshair.lineTo(reticle.x, reticle.y + 14)
     this.crosshair.strokePath()
+
+    const bulletMargin = 64
+    this.bullets.children.each((obj: Phaser.GameObjects.GameObject) => {
+      const bullet = obj as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+      if (!bullet.active) return true
+      if (
+        bullet.x < -bulletMargin ||
+        bullet.x > this.scale.width + bulletMargin ||
+        bullet.y < -bulletMargin ||
+        bullet.y > this.scale.height + bulletMargin
+      ) {
+        this.disableBullet(bullet)
+      }
+      return true
+    })
   }
 
   private fireBullet() {
-    const pointer = this.input.activePointer
-    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
-    const origin = new Phaser.Math.Vector2(this.player.x, this.player.y)
-    const direction = new Phaser.Math.Vector2(world.x - origin.x, world.y - origin.y).normalize()
+    const direction = this.getAimDirection()
+    if (direction.lengthSq() === 0) return
 
     const muzzleX = this.player.x + direction.x * 10
     const muzzleY = this.player.y + direction.y * 10
     this.effects.plasmaCharge(muzzleX, muzzleY, Math.atan2(direction.y, direction.x) + Math.PI / 2)
     this.effects.muzzleFlash(muzzleX, muzzleY)
 
-    const bullet = this.spawnPlasmaBullet(direction)
+    const ttl = this.computeBulletLifetime(direction)
+    const bullet = this.spawnPlasmaBullet(direction, ttl)
     if (!bullet) return
 
     this.sound.play('shot', { volume: this.opts.sfxVolume })
@@ -688,8 +707,8 @@ pskin?.setThrust?.(thrustLevel)
       const offset = Phaser.Math.DegToRad(12)
       const leftDir = direction.clone().rotate(-offset)
       const rightDir = direction.clone().rotate(offset)
-      this.spawnPlasmaBullet(leftDir)
-      this.spawnPlasmaBullet(rightDir)
+      this.spawnPlasmaBullet(leftDir, ttl)
+      this.spawnPlasmaBullet(rightDir, ttl)
     }
 
     const deltaMs = this.analyzer.nearestBeatDeltaMs()
@@ -701,7 +720,7 @@ pskin?.setThrust?.(thrustLevel)
     this.tweens.add({ targets: g, alpha: 0, scale: 1.6, duration: 180, onComplete: () => g.destroy() })
   }
 
-  private spawnPlasmaBullet(direction: Phaser.Math.Vector2) {
+  private spawnPlasmaBullet(direction: Phaser.Math.Vector2, lifetimeMs?: number) {
     const bullet = this.bullets.get(this.player.x, this.player.y) as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null
     if (!bullet) return null
 
@@ -725,16 +744,16 @@ pskin?.setThrust?.(thrustLevel)
     bullet.setData('spawnTime', this.time.now)
 
     this.effects.attachPlasmaTrail(bullet)
-    this.scheduleBulletTtl(bullet)
+    this.scheduleBulletTtl(bullet, lifetimeMs)
 
     return bullet
   }
 
-  private scheduleBulletTtl(bullet: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody) {
+  private scheduleBulletTtl(bullet: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody, lifetimeMs?: number) {
     const prev = bullet.getData('ttlEvent') as Phaser.Time.TimerEvent | undefined
     prev?.remove(false)
     const ttlEvent = this.time.addEvent({
-      delay: this.bulletTtlMs,
+      delay: lifetimeMs ?? this.bulletTtlMs,
       callback: () => this.disableBullet(bullet)
     })
     bullet.setData('ttlEvent', ttlEvent)
@@ -855,6 +874,40 @@ pskin?.setThrust?.(thrustLevel)
     const range = 1 - this.gamepadDeadzone
     const scaled = (abs - this.gamepadDeadzone) / (range || 1)
     return sign * Math.min(Math.max(scaled, 0), 1)
+  }
+
+  private getAimDirection(): Phaser.Math.Vector2 {
+    if (this.gameplayMode === 'vertical') {
+      return new Phaser.Math.Vector2(0, -1)
+    }
+    const pointer = this.input.activePointer
+    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+    const dir = new Phaser.Math.Vector2(world.x - this.player.x, world.y - this.player.y)
+    if (dir.lengthSq() < 0.0001) return new Phaser.Math.Vector2(0, -1)
+    return dir.normalize()
+  }
+
+  private getReticlePosition(): Phaser.Math.Vector2 {
+    if (this.gameplayMode === 'vertical') {
+      const offset = this.scale.height * 0.35
+      const targetY = this.player.y - offset
+      const minY = 60
+      return new Phaser.Math.Vector2(this.player.x, Math.max(minY, targetY))
+    }
+    const pointer = this.input.activePointer
+    return this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+  }
+
+  private computeBulletLifetime(direction: Phaser.Math.Vector2): number {
+    if (this.gameplayMode !== 'vertical') return this.bulletTtlMs
+    const dy = direction.y
+    if (Math.abs(dy) < 0.0001) return this.bulletTtlMs
+    const margin = 80
+    const targetY = -margin
+    const distance = Math.abs((targetY - this.player.y) / dy)
+    const travelTimeMs = (distance / this.bulletSpeed) * 1000
+    const clamped = Phaser.Math.Clamp(travelTimeMs + 120, this.bulletTtlMs * 0.5, this.bulletTtlMs * 1.8)
+    return clamped
   }
 
   private handleFireInputDown() {

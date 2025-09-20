@@ -973,12 +973,12 @@ pskin?.setThrust?.(thrustLevel)
   }
 
   private updateDifficultyForStage() {
-    const stageFactor = 1 + Math.max(0, this.currentStage - 1) * 0.12
+    const stageFactor = 1 + Math.max(0, this.currentStage - 1) * 0.08
     const cappedFactor = Math.min(stageFactor, 1.6)
     this.spawnRateMultiplier = this.baseSpawnRateMultiplier * cappedFactor
     this.enemyCap = Math.max(10, Math.round(this.difficultyProfile.enemyCap * cappedFactor))
 
-    const hpStageFactor = 1 + Math.max(0, this.currentStage - 1) * 0.08
+    const hpStageFactor = 1 + Math.max(0, this.currentStage - 1) * 0.05
     this.spawner?.setDifficulty({
       hpMultiplier: this.enemyHpMultiplier * hpStageFactor,
       bossHpMultiplier: this.bossHpMultiplier * hpStageFactor,
@@ -996,30 +996,33 @@ pskin?.setThrust?.(thrustLevel)
   }
 
   private fallbackSpawn(canSpawn: () => boolean, interval: number) {
+    const sinceBeat = this.time.now - this.lastBeatAt
     if (!canSpawn()) return
-    if (this.time.now - this.lastBeatAt <= interval * 1.5) return
+    if (sinceBeat <= interval * 4) return
 
+    const active = this.spawner.getGroup().countActive(true)
+    if (active > Math.max(2, Math.floor(this.enemyCap * 0.2))) return
+
+    const cycle = this.fallbackCycle % 3
     if (this.gameplayMode === 'vertical') {
-      const cycle = this.fallbackCycle % 3
       if (cycle === 0) {
         const lane = Phaser.Math.Between(0, Math.max(0, this.verticalLaneCount - 1))
-        this.spawner.spawnVerticalLane('swarm', lane, this.adjustSpawnCount(2), 0.95)
+        this.spawner.spawnVerticalLane('swarm', lane, 1, 0.9)
       } else if (cycle === 1) {
-        const spread = Phaser.Math.Between(45, 70)
-        this.spawner.spawnVFormation('dasher', Math.max(3, this.adjustSpawnCount(4)), spread, 1.05)
+        const amplitude = Phaser.Math.Between(50, 90)
+        const wavelength = Phaser.Math.Between(260, 360)
+        this.spawner.spawnSineWave('swarm', 2, amplitude, wavelength, 0.95)
       } else {
-        const amplitude = Phaser.Math.Between(60, 120)
-        const wavelength = Phaser.Math.Between(220, 360)
-        this.spawner.spawnSineWave('swarm', this.adjustSpawnCount(4), amplitude, wavelength, 1)
+        const spread = Phaser.Math.Between(40, 60)
+        this.spawner.spawnVFormation('dasher', 3, spread, 1)
       }
-      this.fallbackCycle++
     } else {
-      const type = this.fallbackCycle % 3
-      if (type === 0) this.spawner.spawn('brute', this.adjustSpawnCount(1))
-      else if (type === 1) this.spawner.spawn('dasher', this.adjustSpawnCount(1))
-      else this.spawner.spawn('swarm', this.adjustSpawnCount(2))
-      this.fallbackCycle++
+      if (cycle === 0) this.spawner.spawn('brute', 1)
+      else if (cycle === 1) this.spawner.spawn('dasher', 1)
+      else this.spawner.spawn('swarm', 1)
     }
+
+    this.fallbackCycle++
     this.lastBeatAt = this.time.now
   }
 

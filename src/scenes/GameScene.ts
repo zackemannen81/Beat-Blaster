@@ -1268,9 +1268,9 @@ pskin?.setThrust?.(thrustLevel)
 
   private computeScrollBase(bpm: number): number {
     const referenceBpm = 120
-    const baseAtReference = 210
-    const minSpeed = 120
-    const maxSpeed = 360
+    const baseAtReference = 130
+    const minSpeed = 70
+    const maxSpeed = 220
     const ratio = bpm > 0 ? bpm / referenceBpm : 1
     const clampedRatio = Math.min(Math.max(ratio, 0.5), 1.8)
     const base = baseAtReference * clampedRatio

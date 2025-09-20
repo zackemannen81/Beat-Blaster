@@ -51,7 +51,7 @@ export default class Spawner {
       const { x, y } = this.randomOffscreen()
       const angle = Phaser.Math.Angle.Between(x, y, this.scene.scale.width / 2, this.scene.scale.height / 2)
       const speedBase = type === 'swarm' ? 85 : type === 'dasher' ? 110 : 65
-      const speed = speedBase * 0.5
+      const speed = speedBase * 0.25
       this.createEnemy({
         type,
         x,
@@ -105,7 +105,7 @@ export default class Spawner {
     for (let i = 0; i < size; i++) {
       const offsetIndex = i - (size - 1) / 2
       const offset = offsetIndex * spreadPx
-        const velocityX = offsetIndex * 6
+      const velocityX = offsetIndex * 3
       this.createEnemy({
         type,
         x: centerX + offset,

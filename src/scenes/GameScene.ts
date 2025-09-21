@@ -81,10 +81,10 @@ export default class GameScene extends Phaser.Scene {
   private lastHitEnemyId: string | null = null
   private neon!: NeonGrid
   private powerupDurations: Record<PowerupType, number> = {
-    shield: 5,
-    rapid: 6,
-    split: 6,
-    slowmo: 3
+    shield: 8,
+    rapid: 10,
+    split: 15,
+    slowmo: 5
   }
   private activePowerups = new Set<PowerupSprite>()
   private enemyLifecycle!: EnemyLifecycle
@@ -959,7 +959,7 @@ pskin?.setThrust?.(thrustLevel)
   }
 
   private maybeDropPickup(x: number, y: number) {
-    const chance = 0.2
+    const chance = 0.05
     if (Math.random() > chance) return
     const types: PowerupType[] = ['shield', 'rapid', 'split', 'slowmo']
     const type = types[Math.floor(Math.random() * types.length)]
@@ -992,7 +992,7 @@ pskin?.setThrust?.(thrustLevel)
     }
     const glowTween = this.tweens.add({
       targets: glow,
-      scale: { from: 0.7, to: 1.05 },
+      scale: { from: 0.7, to: 1.95 },
       alpha: { from: 0.85, to: 0.35 },
       yoyo: true,
       repeat: -1,

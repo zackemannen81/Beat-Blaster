@@ -1,6 +1,6 @@
 {
   "player": {"speed": 250, "accel": 1800, "friction": 0.9, "hp": 3},
-  "bullets": {"speed": 900, "cooldownMs": 120, "damage": 1, "ttlMs": 1000},
+  "bullets": {"speed": 900, "cooldownMs": 200, "damage": 1, "ttlMs": 2000},
   "enemies": {
     "brute": {"hp": 4, "speed": 30, "damage": 1, "score": 100},
     "dasher": {"hp": 1, "speed": 50, "damage": 1, "score": 75},

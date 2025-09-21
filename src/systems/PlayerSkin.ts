@@ -1,20 +1,27 @@
-// systems/PlayerSkin.ts
+// src/systems/PlayerSkin.ts
+
 import Phaser from 'phaser'
 
 type SpriteBody = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
-type ParticleManager = ReturnType<Phaser.GameObjects.GameObjectFactory['particles']>
 
 export default class PlayerSkin {
   private scene: Phaser.Scene
   private host: SpriteBody
   private gfx: Phaser.GameObjects.Graphics
 
-  private pm?: ParticleManager
-  private emitter?: Phaser.GameObjects.Particles.ParticleEmitter
+  private emMain!: Phaser.GameObjects.Particles.ParticleEmitter
+  private emWingL!: Phaser.GameObjects.Particles.ParticleEmitter
+  private emWingR!: Phaser.GameObjects.Particles.ParticleEmitter
 
   private size = 18
-  private tailOffset = this.size * 1.86   // Distance to the middle of the base from center
-  private speedOn = 0                     // 0 = always on (change to 5 to enable only when moving)
+  private tiltMaxDeg = 16
+  private tiltSmoothing = 0.18
+  private expectMaxVX = 260
+  private expectMaxVY = 340
+
+  private tailOffset = { x: 0, y: this.size * 1.08 }
+  private wingLOffset = { x: -this.size * 0.95, y: this.size * 0.35 }
+  private wingROffset = { x:  this.size * 0.95, y: this.size * 0.35 }
 
   constructor(scene: Phaser.Scene, host: SpriteBody) {
     this.scene = scene
@@ -22,92 +29,180 @@ export default class PlayerSkin {
     this.host.setVisible(false)
 
     this.gfx = scene.add.graphics({ x: host.x, y: host.y }).setDepth(900)
-    this.drawTriangle(this.size)
+    this.drawShip(this.size)
 
-    this.createThruster()
-
+    this.createThrusters()
     scene.events.on(Phaser.Scenes.Events.UPDATE, this.follow, this)
   }
 
-  private drawTriangle(size: number) {
+  private drawShip(size: number) {
     const g = this.gfx
     g.clear()
 
-    const tip = size * 1.92
-    const halfBase = size * 0.52
-    const baseY = size * 0.86
+    const tip = size * 1.9
+    const bodyW = size * 1.0
+    const baseY = size * 0.82
+    const wingSpan = size * 1.6
+    const wingDepth = size * 0.55
 
-    g.fillStyle(0x00e5ff, 0.20)
+    // Glow bak
+    g.fillStyle(0x00e5ff, 0.12)
     g.beginPath()
     g.moveTo(0, -tip)
-    g.lineTo(-halfBase, baseY)
-    g.lineTo( halfBase, baseY)
+    g.lineTo(-bodyW, baseY)
+    g.lineTo(bodyW, baseY)
     g.closePath()
     g.fillPath()
 
+    // Kropp
     g.lineStyle(2, 0xffffff, 0.9)
+    g.fillStyle(0x00e5ff, 0.18)
+    g.beginPath()
+    g.moveTo(0, -tip)
+    g.lineTo(-bodyW * 0.78, baseY * 0.28)
+    g.lineTo(-bodyW, baseY)
+    g.lineTo(bodyW, baseY)
+    g.lineTo(bodyW * 0.78, baseY * 0.28)
+    g.closePath()
+    g.fillPath()
+    g.strokePath()
+
+    // Cockpit-feature
+    g.lineStyle(2, 0x9efcff, 0.8)
+    g.beginPath()
+    g.moveTo(0, -tip * 0.55)
+    g.lineTo(0, -tip * 0.25)
+    g.strokePath()
+
+    // Vingar
+    g.lineStyle(2, 0xffffff, 0.8)
+    g.fillStyle(0x00e5ff, 0.14)
+    // Vänster vinge
+    g.beginPath()
+    g.moveTo(-wingSpan, baseY - wingDepth * 0.2)
+    g.lineTo(-bodyW * 0.88, baseY - wingDepth)
+    g.lineTo(-bodyW * 0.66, baseY)
+    g.closePath()
+    g.fillPath()
+    g.strokePath()
+    // Höger vinge
+    g.beginPath()
+    g.moveTo(wingSpan, baseY - wingDepth * 0.2)
+    g.lineTo(bodyW * 0.88, baseY - wingDepth)
+    g.lineTo(bodyW * 0.66, baseY)
+    g.closePath()
+    g.fillPath()
     g.strokePath()
   }
 
-  private createThruster() {
+  private createThrusters() {
     const hasPink = this.scene.textures.exists('thruster_pink')
     const texKey = hasPink ? 'thruster_pink' : 'particles'
-    const frame = hasPink ? undefined : 'particle_glow_small'
+    const frame: string | undefined = hasPink ? undefined : 'particle_glow_small'
 
-    // Skapa MANAGER + EMITTER via config (Phaser 3.90-way)
-    this.pm = this.scene.add.particles(0, 0, texKey, {
-      frame,
-      lifespan: { min: 220, max: 768  },
-      speed: { min: 40, max: 100 },
+    // I Phaser 3.90: add.particles(x, y, texture, particleEmitterConfig)
+    // Skapa tre emitters direkt med densamma config
+    const baseCfg: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig = {
+      frame: frame,
+      lifespan: { min: 220, max: 760 },
+      speed: { min: 40, max: 110 },
       scale: { start: 0.35, end: 0 },
       alpha: { start: 1, end: 0 },
       quantity: 1,
-      frequency: 14,
-      angle: { min: -15, max: 30},     // riktas bakåt per frame i follow()
+      frequency: 16,
+      angle: { min: 85, max: 95 },
       blendMode: Phaser.BlendModes.ADD,
-      follow: this.gfx,                // emitter följer grafiken (viktigt!)
-      followOffset: { x: 0, y: 0 }     // vi flyttar den till baken i follow()
-    })
+      follow: this.gfx,
+      followOffset: { x: 0, y: 0 }
+    }
 
-    this.pm.setDepth(this.gfx.depth - 1)
-    this.pm.setRadial(true)
+    this.emMain  = this.scene.add.particles(0, 0, texKey, baseCfg)
+    this.emWingL = this.scene.add.particles(0, 0, texKey, baseCfg)
+    this.emWingR = this.scene.add.particles(0, 0, texKey, baseCfg)
+  }
 
+  private localToWorld(offset: {x: number, y: number}, rot: number) {
+    const c = Math.cos(rot), s = Math.sin(rot)
+    return { x: offset.x * c - offset.y * s, y: offset.x * s + offset.y * c }
   }
 
   private follow = () => {
-    // keep graphics in sync with host
+    // Synka position
     this.gfx.x = this.host.x
     this.gfx.y = this.host.y
-    this.gfx.rotation = this.host.rotation
-const rot = this.gfx.rotation
-// Calculate direction to the base (180 degrees from the triangle's forward)
-const backX = Math.cos(rot + Math.PI)  // 180 degrees from forward
-const backY = Math.sin(rot + Math.PI)  // 180 degrees from forward
 
-// Updating the emitter with new settings (emitting angle) 
-const backDeg = Phaser.Math.RadToDeg(rot) + 90 
-const emitter = this.pm as any
-if (emitter && emitter.manager) {
-  emitter.updateConfig({ angle: { min: backDeg - 15, max: backDeg + 15 } })
-}
-const body = this.host.body as Phaser.Physics.Arcade.Body
-const speed = body?.velocity?.length() ?? 0
-const t = Phaser.Math.Clamp(speed / 300, 0.1, 1)
-//this.pm?.updateConfig({ frequency: Phaser.Math.Linear(26, 8, t) +8})
-if (emitter && emitter.manager) {
-  emitter.updateConfig({ scale: { start: 0.35 , end: 0 } })
-}
+    const body = this.host.body as Phaser.Physics.Arcade.Body
+    const vx = body?.velocity?.x ?? 0
+    const vy = body?.velocity?.y ?? 0
 
+    // Tilt baserat på vx
+    const maxTiltRad = Phaser.Math.DegToRad(this.tiltMaxDeg)   // <- ger ett number
+    const targetTilt = Phaser.Math.Clamp(
+      (vx / this.expectMaxVX) * maxTiltRad,
+      -maxTiltRad,
+      +maxTiltRad
+    )
+    this.gfx.rotation = Phaser.Math.Angle.RotateTo(this.gfx.rotation, targetTilt, this.tiltSmoothing)
+
+    // Beräkna offsets för thrusters
+    const rot = this.gfx.rotation
+    const tailW = this.localToWorld(this.tailOffset, rot)
+    const wingLW = this.localToWorld(this.wingLOffset, rot)
+    const wingRW = this.localToWorld(this.wingROffset, rot)
+
+    this.emMain.followOffset.set(tailW.x, tailW.y)
+    this.emWingL.followOffset.set(wingLW.x, wingLW.y)
+    this.emWingR.followOffset.set(wingRW.x, wingRW.y)
+
+    // Intensitet baserat på Y-hastighet
+    const upNorm   = Phaser.Math.Clamp((-vy) / this.expectMaxVY, 0, 1)
+    const backNorm = Phaser.Math.Clamp(( vy) / this.expectMaxVY, 0, 1)
+
+    const baseScale = 0.30
+    const upBoost   = 0.32
+    const backCut   = 0.20
+
+    const startScale = Phaser.Math.Clamp(baseScale + upBoost * upNorm - backCut * backNorm, 0.18, 0.72)
+    const sideNorm = Phaser.Math.Clamp(Math.abs(vx) / this.expectMaxVX, 0, 1)
+    const wingScale = Phaser.Math.Clamp(startScale + 0.12 * sideNorm, 0.18, 0.84)
+
+    const freqMain = Phaser.Math.Clamp(Phaser.Math.Linear(40, 8, upNorm) + Phaser.Math.Linear(0, 12, backNorm), 8, 52)
+    const freqWing = Phaser.Math.Clamp(freqMain - 6 * sideNorm, 6, 52)
+
+    this.emMain.setScale(startScale)
+    this.emMain.setFrequency(freqMain)
+    this.emMain.setAngle(90)
+
+    this.emWingL.setScale(wingScale)
+    this.emWingL.setFrequency(freqWing)
+    this.emWingL.setAngle(90)
+
+    this.emWingR.setScale(wingScale)
+    this.emWingR.setFrequency(freqWing)
+    this.emWingR.setAngle(90)
   }
 
-  // Hooks (no-op)
-  setThrust(_level01: number) {}
+  setThrust(level01: number) {
+    const f = Phaser.Math.Clamp(level01, 0, 1)
+    const extra = Phaser.Math.Linear(0, 0.18, f)
+    const freqB = Phaser.Math.Linear(0, -10, f)
+
+    const bump = (em: Phaser.GameObjects.Particles.ParticleEmitter) => {
+      const s = Phaser.Math.Clamp(0.30 + extra, 0.18, 0.9)
+      em.setScale(s)
+      em.setFrequency(Math.max(6, (em.frequency ?? 16) + freqB))
+    }
+    bump(this.emMain); bump(this.emWingL); bump(this.emWingR)
+  }
+
   onHit() {}
   onDeath() {}
 
   destroy() {
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.follow, this)
-    this.pm?.destroy()
+    this.emMain.destroy()
+    this.emWingL.destroy()
+    this.emWingR.destroy()
     this.gfx.destroy()
   }
 }

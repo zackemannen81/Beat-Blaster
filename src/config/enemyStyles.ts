@@ -24,7 +24,7 @@ export const enemyStyles: Record<EnemyType, EnemyStyle> = {
   dasher: {
     variant: 'wire',
     size: 32,
-    bodyRadius: 20,
+    bodyRadius: 24,
     primaryColor: 0x63f7ff,
     secondaryColor: 0x0b1a3d,
     glowColor: 0x1ac8ff,
@@ -35,7 +35,7 @@ export const enemyStyles: Record<EnemyType, EnemyStyle> = {
   swarm: {
     variant: 'plasma',
     size: 26,
-    bodyRadius: 16,
+    bodyRadius: 20,
     primaryColor: 0xa880ff,
     secondaryColor: 0x1b0733,
     glowColor: 0xb57aff,

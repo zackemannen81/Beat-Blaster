@@ -12,7 +12,7 @@ import { loadOptions, resolveGameplayMode, GameplayMode } from '../systems/Optio
 import PlayerSkin from '../systems/PlayerSkin'
 import NeonGrid from '../systems/NeonGrid'
 import CubeSkin from '../systems/CubeSkin'
-import { getDifficultyProfile, DifficultyProfile } from '../config/difficultyProfiles'
+import { getDifficultyProfile, DifficultyProfile, DifficultyProfileId } from '../config/difficultyProfiles'
 import WaveDirector from '../systems/WaveDirector'
 import { getWavePlaylist } from '../systems/WaveLibrary'
 
@@ -368,11 +368,15 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
 
     // Spawner & wave director
     this.spawner = new Spawner(this)
-    const playlist = getWavePlaylist(this.difficultyProfile.id)
+    const playlistId = (this.difficultyProfile.wavePlaylistId ?? this.difficultyProfile.id) as DifficultyProfileId
+    const playlist = getWavePlaylist(playlistId)
     this.waveDirector = new WaveDirector(this, this.spawner, {
-      profileId: this.difficultyProfile.id,
+      profileId: playlistId,
       playlist,
-      anchorProvider: () => ({ x: this.scale.width / 2, y: -140 })
+      anchorProvider: () => ({ x: this.scale.width / 2, y: -140 }),
+      defaultDelayMs: 320,
+      fallbackCooldownMs: this.difficultyProfile.fallbackDelayMs ?? 5000,
+      maxQueuedWaves: this.difficultyProfile.maxQueuedWaves ?? 3
     })
     this.updateDifficultyForStage()
 
@@ -973,15 +977,18 @@ pskin?.setThrust?.(thrustLevel)
   }
 
   private updateDifficultyForStage() {
-    const stageFactor = 1 + Math.max(0, this.currentStage - 1) * 0.08
-    const cappedFactor = Math.min(stageFactor, 1.6)
-    this.spawnRateMultiplier = this.baseSpawnRateMultiplier * cappedFactor
-    this.enemyCap = Math.max(10, Math.round(this.difficultyProfile.enemyCap * cappedFactor))
+    const stageIndex = Math.max(0, this.currentStage - 1)
+    const spawnScaleTable = this.difficultyProfile.stageSpawnMultipliers ?? []
+    const hpScaleTable = this.difficultyProfile.stageHpMultipliers ?? []
+    const spawnScale = spawnScaleTable[Math.min(stageIndex, spawnScaleTable.length - 1)] ?? (1 + stageIndex * 0.1)
+    const hpScale = hpScaleTable[Math.min(stageIndex, hpScaleTable.length - 1)] ?? (1 + stageIndex * 0.07)
 
-    const hpStageFactor = 1 + Math.max(0, this.currentStage - 1) * 0.05
+    this.spawnRateMultiplier = this.baseSpawnRateMultiplier * spawnScale
+    this.enemyCap = Math.max(6, Math.round(this.difficultyProfile.enemyCap * spawnScale))
+
     this.spawner?.setDifficulty({
-      hpMultiplier: this.enemyHpMultiplier * hpStageFactor,
-      bossHpMultiplier: this.bossHpMultiplier * hpStageFactor,
+      hpMultiplier: this.enemyHpMultiplier * hpScale,
+      bossHpMultiplier: this.bossHpMultiplier * hpScale,
       laneCount: this.verticalLaneCount
     })
   }

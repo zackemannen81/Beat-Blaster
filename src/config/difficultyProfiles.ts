@@ -13,6 +13,11 @@ export type DifficultyProfile = {
   laneCount?: number
   startingStage?: number
   description: string
+  wavePlaylistId?: string
+  maxQueuedWaves?: number
+  fallbackDelayMs?: number
+  stageSpawnMultipliers?: number[]
+  stageHpMultipliers?: number[]
 }
 
 const profiles: Record<DifficultyProfileId, DifficultyProfile> = {
@@ -28,7 +33,12 @@ const profiles: Record<DifficultyProfileId, DifficultyProfile> = {
     bossMissPenalty: 80,
     laneCount: 5,
     startingStage: 1,
-    description: 'Lower scroll speed, fewer formations and softer penalties for new players.'
+    description: 'Lower scroll speed, fewer formations and softer penalties for new players.',
+    wavePlaylistId: 'easy',
+    maxQueuedWaves: 2,
+    fallbackDelayMs: 6000,
+    stageSpawnMultipliers: [1, 1.05, 1.12, 1.18],
+    stageHpMultipliers: [1, 1.05, 1.1, 1.16]
   },
   normal: {
     id: 'normal',
@@ -42,7 +52,12 @@ const profiles: Record<DifficultyProfileId, DifficultyProfile> = {
     bossMissPenalty: 120,
     laneCount: 6,
     startingStage: 1,
-    description: 'Baseline Beat-Blaster experience tuned for balanced challenge.'
+    description: 'Baseline Beat-Blaster experience tuned for balanced challenge.',
+    wavePlaylistId: 'normal',
+    maxQueuedWaves: 3,
+    fallbackDelayMs: 5500,
+    stageSpawnMultipliers: [1, 1.1, 1.2, 1.3],
+    stageHpMultipliers: [1, 1.08, 1.16, 1.25]
   },
   hard: {
     id: 'hard',
@@ -56,7 +71,12 @@ const profiles: Record<DifficultyProfileId, DifficultyProfile> = {
     bossMissPenalty: 160,
     laneCount: 6,
     startingStage: 1,
-    description: 'Faster scroll, denser formations, heavier penalties for expert players.'
+    description: 'Faster scroll, denser formations, heavier penalties for expert players.',
+    wavePlaylistId: 'hard',
+    maxQueuedWaves: 4,
+    fallbackDelayMs: 5000,
+    stageSpawnMultipliers: [1, 1.15, 1.3, 1.45],
+    stageHpMultipliers: [1, 1.12, 1.25, 1.4]
   }
 }
 

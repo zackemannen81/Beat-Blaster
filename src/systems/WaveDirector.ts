@@ -17,6 +17,7 @@ type WaveDirectorOptions = {
   anchorProvider?: () => Phaser.Types.Math.Vector2Like
   defaultDelayMs?: number
   fallbackCooldownMs?: number
+  maxQueuedWaves?: number
 }
 
 export default class WaveDirector {
@@ -31,6 +32,7 @@ export default class WaveDirector {
   private readonly defaultDelay: number
   private readonly fallbackCooldown: number
   private readonly fallbackDescriptor: WaveDescriptor
+  private readonly maxQueuedWaves: number
 
   constructor(scene: Phaser.Scene, spawner: Spawner, options: WaveDirectorOptions) {
     this.scene = scene
@@ -50,9 +52,11 @@ export default class WaveDirector {
         formationParams: {},
         telegraph: { type: 'zone', durationMs: 500 }
       } as WaveDescriptor)
+    this.maxQueuedWaves = options.maxQueuedWaves ?? 3
   }
 
   enqueueBeat(band: BeatBand) {
+    if (this.queue.length >= this.maxQueuedWaves) return
     this.lastBeatAt = this.scene.time.now
     const descriptor = this.pickNextWave(band)
     if (!descriptor) return
@@ -74,6 +78,7 @@ export default class WaveDirector {
       const anchor = this.anchorProvider()
       this.spawner.spawnWave(this.fallbackDescriptor, anchor)
       this.lastFallbackAt = now
+      this.lastBeatAt = now
     }
   }
 

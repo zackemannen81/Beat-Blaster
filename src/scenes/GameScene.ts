@@ -17,6 +17,7 @@ import WaveDirector from '../systems/WaveDirector'
 import EnemyLifecycle from '../systems/EnemyLifecycle'
 import type { WaveDescriptor } from '../types/waves'
 import { getWavePlaylist } from '../systems/WaveLibrary'
+import Announcer from '../systems/Announcer'
 
 type Enemy = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
 type PowerupSprite = Phaser.Physics.Arcade.Sprite
@@ -42,7 +43,9 @@ export default class GameScene extends Phaser.Scene {
   private playerMaxHp = 3
   private iframesUntil = 0
   private bombCharge = 0 // 0..100
+  private bombReadyAnnounced = false
   private metronome = false
+  private announcer!: Announcer
   private lastDashToggle = 0
   private lastBeatAt = 0
   private nextQuantizedShotAt = 0
@@ -50,7 +53,6 @@ export default class GameScene extends Phaser.Scene {
   private crosshair!: Phaser.GameObjects.Graphics
   private opts = loadOptions()
   private crosshairMode: 'pointer' | 'fixed' | 'pad-relative' = this.opts.crosshairMode
-  
   private verticalSafetyBand = this.opts.verticalSafetyBand
   private padAimVector = new Phaser.Math.Vector2(0, -1)
   private starfield!: Starfield
@@ -129,6 +131,10 @@ export default class GameScene extends Phaser.Scene {
     this.gameplayMode = resolveGameplayMode(this.opts.gameplayMode)
     this.gamepadDeadzone = this.opts.gamepadDeadzone
     this.gamepadSensitivity = this.opts.gamepadSensitivity
+
+    this.announcer = new Announcer(this, () => this.opts.sfxVolume, {
+      voice: 'bee'
+    })
 
     this.neon = new NeonGrid(this)
     this.neon.create()
@@ -408,8 +414,10 @@ export default class GameScene extends Phaser.Scene {
       maxSimultaneousHeavy: this.currentStageConfig?.maxSimultaneousHeavy ?? this.difficultyProfile.heavyControls.maxSimultaneous,
       categoryCooldowns: this.difficultyProfile.categoryCooldowns,
       logEvents: (import.meta as any)?.env?.DEV ?? false,
-      onWaveSpawn: (_instanceId, enemies) => this.enemyLifecycle?.registerSpawn(enemies)
+      onWaveSpawn: (_instanceId, enemies) => this.enemyLifecycle?.registerSpawn(enemies),
+      enableFallback: this.opts.allowFallbackWaves
     })
+    this.waveDirector.setFallbackEnabled(this.opts.allowFallbackWaves)
     this.enemyLifecycle = new EnemyLifecycle({
       scene: this,
       spawner: this.spawner,
@@ -433,6 +441,7 @@ export default class GameScene extends Phaser.Scene {
       this.events.off('wave:fallback', this.onWaveFallbackHandler, this)
       this.events.off('wave:spawned', this.handleWaveSpawned, this)
       this.events.off('wave:telegraph', this.handleWaveTelegraph, this)
+      this.announcer.destroy()
     })
     this.updateDifficultyForStage()
 
@@ -456,6 +465,8 @@ export default class GameScene extends Phaser.Scene {
     this.hud.setCrosshairMode(this.crosshairMode)
     this.hud.setBossHealth(null)
     this.hud.setCombo(0)
+
+    this.announcer.playEvent('new_game')
 
     // Effects
     this.effects = new Effects(this)
@@ -503,6 +514,7 @@ if (this.lastHitEnemyId !== enemyId) {
     // Visa text när multiplikatorn ökar
     this.effects.showComboText(enemy.x, enemy.y, this.comboCount)
     this.hud.setCombo(this.comboCount)
+    this.announcer.playCombo(this.comboCount)
   } else {
     // Första träffen bara armerar combon
     this.comboCount = 1
@@ -603,11 +615,14 @@ this.lastHitAt = this.time.now
       this.crosshairMode = this.opts.crosshairMode
       this.verticalSafetyBand = !!this.opts.verticalSafetyBand
       this.padAimVector.set(0, -1)
+      this.announcer.setVoice('bee')
+      this.announcer.setEnabled(true)
       this.effects.setReducedMotion(this.reducedMotion)
       this.hud.setReducedMotion(this.reducedMotion)
       this.hud.setCrosshairMode(this.crosshairMode)
       this.hud.setDifficultyLabel(this.difficultyLabel)
       this.hud.setStage(this.currentStage)
+      this.waveDirector?.setFallbackEnabled(this.opts.allowFallbackWaves)
       if (this.activeBoss && this.activeBoss.active) {
         const maxHp = (this.activeBoss.getData('maxHp') as number) ?? 1
         const hp = (this.activeBoss.getData('hp') as number) ?? maxHp
@@ -1019,6 +1034,7 @@ pskin?.setThrust?.(thrustLevel)
       const dur = this.powerupDurations[ptype] ?? 5
       this.powerups.apply(ptype, dur)
       this.effects.powerupPickupText(pickupX, pickupY - 10, ptype)
+      this.announcer.playPowerup(ptype)
       this.playPowerupSound(ptype)
     })
 
@@ -1335,11 +1351,16 @@ pskin?.setThrust?.(thrustLevel)
       this.nextWaveInfo = null
     }
     this.hud?.clearTelegraphMessage()
+    const descriptor = this.resolveWaveDescriptor(payload.descriptorId)
+    if (!descriptor.telegraph) {
+      this.announcer.playAudioKey(descriptor.audioCue, payload.fallback ? 0 : 1)
+    }
   }
 
   private handleWaveTelegraph = (payload: any) => {
     if (!this.hud) return
     const descriptor = this.resolveWaveDescriptor(payload.descriptorId)
+    this.announcer.playAudioKey(descriptor.audioCue, payload.fallback ? 0 : 1)
     if (descriptor.telegraph) {
       const typeLabel = descriptor.telegraph.type === 'circle'
         ? 'Circular Telegraph'
@@ -1374,6 +1395,7 @@ pskin?.setThrust?.(thrustLevel)
     this.hud.setBossHealth(null)
     this.hud.setStage(this.currentStage)
     this.updateDifficultyForStage()
+    this.announcer.playEvent('get_ready')
   }
 
   private handleBarStart = (event: { barIndex: number }) => {
@@ -1386,6 +1408,7 @@ pskin?.setThrust?.(thrustLevel)
       this.bossSpawned = true
       this.activeBoss = boss
       this.hud.setBossHealth(1, boss.getData('etype') as string)
+      this.announcer.playEvent('boss')
     }
   }
 
@@ -1471,8 +1494,15 @@ pskin?.setThrust?.(thrustLevel)
   }
 
   private bumpBomb(delta: number) {
+    const previous = this.bombCharge
     this.bombCharge = Phaser.Math.Clamp(this.bombCharge + delta, 0, 100)
     this.hud.setBombCharge(this.bombCharge / 100)
+    if (this.bombCharge >= 100 && previous < 100 && !this.bombReadyAnnounced) {
+      this.announcer.playBombReady()
+      this.bombReadyAnnounced = true
+    } else if (this.bombCharge < 100) {
+      this.bombReadyAnnounced = false
+    }
   }
 
   private drawHealthBar(enemy: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody) {

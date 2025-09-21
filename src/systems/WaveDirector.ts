@@ -315,12 +315,6 @@ export default class WaveDirector {
       options.angle = params.angle ?? -Math.PI / 2
     }
     showTelegraph(this.scene, descriptor.telegraph, entry.anchor, options)
-    if (descriptor.audioCue) {
-      try {
-        const volume = (this.scene.registry.get('options')?.sfxVolume ?? 0.8) * 0.65
-        this.scene.sound.play(descriptor.audioCue, { volume })
-      } catch {}
-    }
     entry.telegraphTriggered = true
     this.emitEvent('wave:telegraph', {
       descriptorId: descriptor.id,

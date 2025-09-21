@@ -1,6 +1,8 @@
 import Phaser from 'phaser'
 import CubeSkin from '../systems/CubeSkin'
 import { enemyStyles, EnemyType } from '../config/enemyStyles'
+import { WaveDescriptor, FormationId } from '../types/waves'
+import { showTelegraph } from './Telegraph'
 
 export type Enemy = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
 
@@ -8,6 +10,9 @@ export type PatternData =
   | { kind: 'lane'; anchorX: number; speedY: number }
   | { kind: 'sine'; anchorX: number; amplitude: number; angularVelocity: number; spawnTime: number; speedY: number }
   | { kind: 'drift'; velocityX: number; speedY: number }
+  | { kind: 'circle'; radius: number; angularVelocity: number }
+  | { kind: 'spiral'; angularVelocity: number }
+  | { kind: 'burst'; speedY: number }
   | { kind: 'boss'; speedY: number }
 
 type SpawnConfig = {
@@ -114,6 +119,178 @@ export default class Spawner {
         velocityY: speedY,
         pattern: { kind: 'drift', velocityX, speedY }
       })
+    }
+  }
+
+  spawnWave(descriptor: WaveDescriptor, anchor: Phaser.Types.Math.Vector2Like) {
+    const formation = descriptor.formation as FormationId
+    switch (formation) {
+      case 'lane':
+        this.spawnLaneWave(descriptor, anchor)
+        break
+      case 'sine':
+        this.spawnSineWaveDescriptor(descriptor)
+        break
+      case 'v':
+        this.spawnVWaveDescriptor(descriptor)
+        break
+      case 'swirl':
+        this.spawnSwirlWave(descriptor, anchor)
+        break
+      case 'circle':
+        this.spawnCircleWave(descriptor, anchor)
+        break
+      case 'spiral':
+        this.spawnSpiralWave(descriptor, anchor)
+        break
+      case 'burst':
+        this.spawnBurstWave(descriptor, anchor)
+        break
+      default:
+        this.spawn(descriptor.enemyType, descriptor.count ?? 3)
+    }
+  }
+
+  private spawnLaneWave(descriptor: WaveDescriptor, anchor: Phaser.Types.Math.Vector2Like) {
+    const params = descriptor.formationParams ?? {}
+    const laneIndex = typeof params.laneIndex === 'number' ? params.laneIndex : Math.floor(this.laneCount / 2)
+    const count = descriptor.count ?? 4
+    const speedMul = descriptor.speedMultiplier ?? 1
+    if (descriptor.telegraph) {
+      showTelegraph(this.scene, descriptor.telegraph, { x: anchor.x, y: anchor.y }, { radius: params.radius ?? 140 })
+    }
+    this.spawnVerticalLane(descriptor.enemyType, laneIndex, count, speedMul)
+  }
+
+  private spawnSineWaveDescriptor(descriptor: WaveDescriptor) {
+    const params = descriptor.formationParams ?? {}
+    const count = descriptor.count ?? 4
+    const amp = params.amplitude ?? 140
+    const wavelength = params.wavelength ?? 360
+    const speedMul = descriptor.speedMultiplier ?? 1
+    this.spawnSineWave(descriptor.enemyType, count, amp, wavelength, speedMul)
+  }
+
+  private spawnVWaveDescriptor(descriptor: WaveDescriptor) {
+    const params = descriptor.formationParams ?? {}
+    const size = descriptor.count ?? 5
+    const spread = params.spread ?? 65
+    const speedMul = descriptor.speedMultiplier ?? 1
+    this.spawnVFormation(descriptor.enemyType, size, spread, speedMul)
+  }
+
+  private spawnSwirlWave(descriptor: WaveDescriptor, anchor: Phaser.Types.Math.Vector2Like) {
+    const params = descriptor.formationParams ?? {}
+    const count = descriptor.count ?? 6
+    const radius = params.radius ?? 180
+    const turns = params.turns ?? 2
+    const duration = params.durationMs ?? 3600
+    const omega = (Math.PI * 2 * turns) / Math.max(0.001, duration / 1000)
+    const baseSpeed = this.scrollBase * (descriptor.speedMultiplier ?? 1) * 0.6
+    if (descriptor.telegraph) {
+      showTelegraph(this.scene, descriptor.telegraph, anchor, { radius })
+    }
+    for (let i = 0; i < count; i++) {
+      const t = i / Math.max(1, count - 1)
+      const angle = t * Math.PI * 2 * turns
+      const r = radius * t
+      const x = anchor.x + Math.cos(angle) * r
+      const y = anchor.y + Math.sin(angle) * r
+      const tangential = omega * r
+      const vx = -Math.sin(angle) * tangential
+      const vy = Math.cos(angle) * tangential + baseSpeed
+      this.createEnemy({
+        type: descriptor.enemyType,
+        x,
+        y,
+        velocityX: vx,
+        velocityY: vy,
+        pattern: { kind: 'spiral', angularVelocity: omega }
+      })
+    }
+  }
+
+  private spawnCircleWave(descriptor: WaveDescriptor, anchor: Phaser.Types.Math.Vector2Like) {
+    const params = descriptor.formationParams ?? {}
+    const count = descriptor.count ?? 8
+    const radius = params.radius ?? 200
+    const spin = params.spinSpeed ?? 0.6
+    if (descriptor.telegraph) {
+      showTelegraph(this.scene, descriptor.telegraph, anchor, { radius })
+    }
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count
+      const x = anchor.x + Math.cos(angle) * radius
+      const y = anchor.y + Math.sin(angle) * radius
+      const tangential = spin * radius
+      const vx = -Math.sin(angle) * tangential
+      const vy = Math.cos(angle) * tangential + this.scrollBase * (descriptor.speedMultiplier ?? 1) * 0.5
+      this.createEnemy({
+        type: descriptor.enemyType,
+        x,
+        y,
+        velocityX: vx,
+        velocityY: vy,
+        pattern: { kind: 'circle', radius, angularVelocity: spin }
+      })
+    }
+  }
+
+  private spawnSpiralWave(descriptor: WaveDescriptor, anchor: Phaser.Types.Math.Vector2Like) {
+    const params = descriptor.formationParams ?? {}
+    const count = descriptor.count ?? 6
+    const radius = params.radius ?? 220
+    const turns = params.turns ?? 3
+    const duration = params.durationMs ?? 4200
+    const omega = (Math.PI * 2 * turns) / Math.max(0.001, duration / 1000)
+    const baseSpeed = this.scrollBase * (descriptor.speedMultiplier ?? 1) * 0.7
+    if (descriptor.telegraph) {
+      showTelegraph(this.scene, descriptor.telegraph, anchor, { radius })
+    }
+    for (let i = 0; i < count; i++) {
+      const t = i / Math.max(1, count - 1)
+      const angle = t * Math.PI * 2 * turns
+      const r = radius * t
+      const x = anchor.x + Math.cos(angle) * r
+      const y = anchor.y + Math.sin(angle) * r
+      const vx = -Math.sin(angle) * omega * r
+      const vy = Math.cos(angle) * omega * r + baseSpeed
+      this.createEnemy({
+        type: descriptor.enemyType,
+        x,
+        y,
+        velocityX: vx,
+        velocityY: vy,
+        pattern: { kind: 'spiral', angularVelocity: omega }
+      })
+    }
+  }
+
+  private spawnBurstWave(descriptor: WaveDescriptor, anchor: Phaser.Types.Math.Vector2Like) {
+    const params = descriptor.formationParams ?? {}
+    const rings = params.ringCount ?? 1
+    const coneDeg = params.coneDegrees ?? 180
+    const cone = Phaser.Math.DegToRad(coneDeg)
+    const count = descriptor.count ?? 6
+    const baseSpeed = this.scrollBase * (descriptor.speedMultiplier ?? 1) * 0.75
+    if (descriptor.telegraph) {
+      showTelegraph(this.scene, descriptor.telegraph, anchor, { radius: params.radius ?? 120 })
+    }
+    for (let ring = 0; ring < rings; ring++) {
+      const ringSpeed = baseSpeed * (1 + ring * 0.2)
+      for (let i = 0; i < count; i++) {
+        const angle = -cone / 2 + (cone / Math.max(1, count - 1)) * i
+        const vx = Math.sin(angle) * ringSpeed
+        const vy = Math.cos(angle) * ringSpeed
+        this.createEnemy({
+          type: descriptor.enemyType,
+          x: anchor.x,
+          y: anchor.y,
+          velocityX: vx,
+          velocityY: vy,
+          pattern: { kind: 'burst', speedY: vy }
+        })
+      }
     }
   }
 

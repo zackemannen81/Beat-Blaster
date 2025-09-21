@@ -1,0 +1,32 @@
+{
+  "waves": [
+    {
+      "id": "normal_lane_combo",
+      "formation": "lane",
+      "enemyType": "swarm",
+      "count": 6,
+      "speedMultiplier": 1,
+      "formationParams": { "laneIndex": 3 },
+      "telegraph": { "type": "zone", "durationMs": 600 }
+    },
+    {
+      "id": "normal_sine_dash",
+      "formation": "sine",
+      "enemyType": "dasher",
+      "count": 4,
+      "speedMultiplier": 0.95,
+      "formationParams": { "amplitude": 140, "wavelength": 360 },
+      "telegraph": { "type": "line", "durationMs": 650 },
+      "audioCue": "announcer_warning"
+    },
+    {
+      "id": "normal_circle_mix",
+      "formation": "circle",
+      "enemyType": "swarm",
+      "count": 8,
+      "speedMultiplier": 0.9,
+      "formationParams": { "radius": 220, "spinSpeed": 0.7 },
+      "telegraph": { "type": "circle", "durationMs": 750 }
+    }
+  ]
+}

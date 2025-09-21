@@ -1,0 +1,35 @@
+{
+  "waves": [
+    {
+      "id": "hard_spiral_dash",
+      "formation": "spiral",
+      "enemyType": "dasher",
+      "count": 6,
+      "speedMultiplier": 1.1,
+      "hpMultiplier": 1.1,
+      "formationParams": { "radius": 180, "turns": 2.5, "durationMs": 4200 },
+      "telegraph": { "type": "circle", "durationMs": 900 },
+      "audioCue": "announcer_warning"
+    },
+    {
+      "id": "hard_burst_mix",
+      "formation": "burst",
+      "enemyType": "swarm",
+      "count": 10,
+      "speedMultiplier": 1.05,
+      "formationParams": { "coneDegrees": 160, "ringCount": 2 },
+      "telegraph": { "type": "zone", "durationMs": 700 }
+    },
+    {
+      "id": "hard_circle_elite",
+      "formation": "circle",
+      "enemyType": "elite",
+      "count": 6,
+      "speedMultiplier": 0.85,
+      "hpMultiplier": 1.2,
+      "formationParams": { "radius": 260, "spinSpeed": 0.6 },
+      "telegraph": { "type": "circle", "durationMs": 1000 },
+      "audioCue": "announcer_warning"
+    }
+  ]
+}

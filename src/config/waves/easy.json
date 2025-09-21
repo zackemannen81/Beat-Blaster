@@ -1,0 +1,23 @@
+{
+  "waves": [
+    {
+      "id": "easy_lane_intro",
+      "formation": "lane",
+      "enemyType": "swarm",
+      "count": 4,
+      "speedMultiplier": 0.8,
+      "formationParams": { "laneIndex": 2 },
+      "telegraph": { "type": "zone", "durationMs": 700 }
+    },
+    {
+      "id": "easy_swirl_soft",
+      "formation": "swirl",
+      "enemyType": "swarm",
+      "count": 6,
+      "speedMultiplier": 0.85,
+      "formationParams": { "radius": 160, "turns": 1.5, "durationMs": 3200 },
+      "telegraph": { "type": "circle", "durationMs": 800 },
+      "audioCue": "announcer_powerup"
+    }
+  ]
+}

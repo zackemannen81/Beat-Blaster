@@ -61,7 +61,6 @@ export default class GameScene extends Phaser.Scene {
   private comboCount = 0
   private comboTimeoutMs = 2000
   private lastHitAt = 0
-
   private gameplayMode: GameplayMode = resolveGameplayMode(this.opts.gameplayMode)
   private scrollBase = 128
   private backgroundScroller!: BackgroundScroller
@@ -409,8 +408,7 @@ export default class GameScene extends Phaser.Scene {
       maxSimultaneousHeavy: this.currentStageConfig?.maxSimultaneousHeavy ?? this.difficultyProfile.heavyControls.maxSimultaneous,
       categoryCooldowns: this.difficultyProfile.categoryCooldowns,
       logEvents: (import.meta as any)?.env?.DEV ?? false,
-      onWaveSpawn: (_instanceId, enemies) => this.enemyLifecycle?.registerSpawn(enemies),
-      enableFallback: this.opts.allowFallbackWaves
+      onWaveSpawn: (_instanceId, enemies) => this.enemyLifecycle?.registerSpawn(enemies)
     })
     this.enemyLifecycle = new EnemyLifecycle({
       scene: this,
@@ -610,7 +608,6 @@ this.lastHitAt = this.time.now
       this.hud.setCrosshairMode(this.crosshairMode)
       this.hud.setDifficultyLabel(this.difficultyLabel)
       this.hud.setStage(this.currentStage)
-      this.waveDirector?.setFallbackEnabled(this.opts.allowFallbackWaves)
       if (this.activeBoss && this.activeBoss.active) {
         const maxHp = (this.activeBoss.getData('maxHp') as number) ?? 1
         const hp = (this.activeBoss.getData('hp') as number) ?? maxHp

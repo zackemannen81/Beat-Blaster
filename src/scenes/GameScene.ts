@@ -51,7 +51,7 @@ export default class GameScene extends Phaser.Scene {
   private lastHitAt = 0
   private opts = loadOptions()
   private gameplayMode: GameplayMode = resolveGameplayMode(this.opts.gameplayMode)
-  private scrollBase = 220
+  private scrollBase = 128
   private backgroundScroller!: BackgroundScroller
   private movementMinY = 0
   private movementMaxY = 0
@@ -996,6 +996,7 @@ pskin?.setThrust?.(thrustLevel)
   }
 
   private fallbackSpawn(canSpawn: () => boolean, interval: number) {
+    /*
     const sinceBeat = this.time.now - this.lastBeatAt
     if (!canSpawn()) return
     if (sinceBeat <= interval * 4) return
@@ -1024,6 +1025,7 @@ pskin?.setThrust?.(thrustLevel)
 
     this.fallbackCycle++
     this.lastBeatAt = this.time.now
+  */
   }
 
   private pruneEnemies() {
@@ -1115,13 +1117,13 @@ pskin?.setThrust?.(thrustLevel)
           right = (right + 1) % this.verticalLaneCount
         }
         const dashCount = 1
-        const dashSpeed = 0.9
-        this.spawner.spawnVerticalLane('dasher', left, dashCount, dashSpeed)
+        const dashSpeed = 0.1
+        this.spawner.spawnVerticalLane('swarm', left, dashCount, dashSpeed)
         if (this.verticalLaneCount > 1) this.spawner.spawnVerticalLane('dasher', right, dashCount, dashSpeed)
       } else {
         const amplitude = Phaser.Math.Between(60, 110)
         const wavelength = Phaser.Math.Between(240, 360)
-        this.spawner.spawnSineWave('swarm', Math.max(2, Math.min(4, this.adjustSpawnCount(3))), amplitude, wavelength, 0.95)
+        this.spawner.spawnSineWave('dasher', Math.max(2, Math.min(4, this.adjustSpawnCount(3))), amplitude, wavelength, 0.95)
       }
       this.verticalSpawnCycle++
     })

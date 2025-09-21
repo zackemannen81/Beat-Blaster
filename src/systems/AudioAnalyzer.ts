@@ -11,6 +11,7 @@ export default class AudioAnalyzer extends Phaser.Events.EventEmitter {
   private music?: Phaser.Sound.BaseSound
 
   // detections
+  private noBeats = 0
   private historyLow: number[] = []
   private historyMid: number[] = []
   private historyHigh: number[] = []
@@ -153,10 +154,17 @@ export default class AudioAnalyzer extends Phaser.Events.EventEmitter {
       this.emit(`beat:${band}`, level)
       return true
     }
-
+if(this.noBeats++ % 3 === 0){
     tryBeat('low', low)
     tryBeat('mid', mid)
     tryBeat('high', high)
+    this.noBeats = 0
+}
+/*   
+tryBeat('low', low)
+    tryBeat('mid', mid)
+    tryBeat('high', high)
+*/
   }
 
   private updateEstimatedPeriod() {

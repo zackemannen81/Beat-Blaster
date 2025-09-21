@@ -21,6 +21,7 @@ export function showTelegraph(
   const color = TELEGRAPH_COLORS[descriptor.type]
   const duration = descriptor.durationMs
   const alpha = descriptor.intensity ?? 0.35
+  const reducedMotion = scene.registry?.get?.('reducedMotion') === true
 
   graphics.lineStyle(2, color, alpha * 1.5)
   graphics.fillStyle(color, alpha * 0.4)
@@ -52,13 +53,18 @@ export function showTelegraph(
       break
   }
 
-  scene.tweens.add({
-    targets: graphics,
-    alpha: 0,
-    ease: 'Sine.easeInOut',
-    duration,
-    onComplete: () => graphics.destroy()
-  })
+  if (reducedMotion) {
+    graphics.setAlpha(Math.min(1, alpha + 0.15))
+    scene.time.delayedCall(duration, () => graphics.destroy())
+  } else {
+    scene.tweens.add({
+      targets: graphics,
+      alpha: 0,
+      ease: 'Sine.easeInOut',
+      duration,
+      onComplete: () => graphics.destroy()
+    })
+  }
 
   return {
     destroy: () => graphics.destroy()

@@ -96,5 +96,6 @@
 - Crosshair modes validated (desktop, touch, gamepad).
 - Powerup pickup reachable across full screen; magnet, Reduced Motion, telegraphs working.
 - Regression run for omni mode ensures legacy gameplay unaffected.
+- Automated checks cover stage tuning data, wave fallback scheduling, and enemy lifecycle culling.
 
 *Plan owner: Codex. Last updated: 2025-09-20.*

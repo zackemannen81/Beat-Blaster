@@ -7,6 +7,7 @@ export type FormationId =
   | 'swirl'
   | 'circle'
   | 'spiral'
+  | 'spiral_drop'
   | 'burst'
 
 export type TelegraphDescriptor = {
@@ -14,6 +15,10 @@ export type TelegraphDescriptor = {
   durationMs: number
   intensity?: number
 }
+
+export type WaveCategory = 'light' | 'standard' | 'heavy' | 'boss'
+
+export type WaveTag = 'dasher' | 'swarm' | 'brute' | 'powerup' | 'boss' | 'intro'
 
 export type WaveDescriptor = {
   id: string
@@ -24,10 +29,19 @@ export type WaveDescriptor = {
   hpMultiplier?: number
   formationParams?: Record<string, number>
   telegraph?: TelegraphDescriptor
+  telegraphDelayMs?: number
   audioCue?: string
   delayMs?: number
+  category?: WaveCategory
+  tags?: WaveTag[]
+  tier?: number
+  minimumStage?: number
+  maximumStage?: number
+  cooldownMs?: number
+  fallbackEligible?: boolean
 }
 
 export type WavePlaylist = {
+  id: string
   waves: WaveDescriptor[]
 }

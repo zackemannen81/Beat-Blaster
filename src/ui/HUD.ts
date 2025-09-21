@@ -22,6 +22,8 @@ export default class HUD {
   private bombBarBg?: Phaser.GameObjects.Rectangle
   private bombBarFill?: Phaser.GameObjects.Rectangle
   private stageText!: Phaser.GameObjects.Text
+  private upcomingWaveText!: Phaser.GameObjects.Text
+  private telegraphText!: Phaser.GameObjects.Text
   private missText!: Phaser.GameObjects.Text
   private bossContainer!: Phaser.GameObjects.Container
   private bossLabel!: Phaser.GameObjects.Text
@@ -40,6 +42,8 @@ export default class HUD {
   private missResetTimer?: Phaser.Time.TimerEvent
   private stageValue = 1
   private difficultyLabel = ''
+  private crosshairText!: Phaser.GameObjects.Text
+  private upcomingWaveInfo: { label: string; spawnAt: number; fallback: boolean } | null = null
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene
@@ -54,6 +58,11 @@ export default class HUD {
     this.bombBarFill = this.scene.add.rectangle(width - 160, 20, 0, 10, 0x00e5ff).setOrigin(0, 0)
     this.comboText = this.scene.add.text(width / 2, 40, '', { fontFamily: 'UiFont, sans-serif', fontSize: '24px', color: '#ffb300' }).setOrigin(0.5, 0)
     this.stageText = this.scene.add.text(16, 60, 'Stage 1', { fontFamily: 'UiFont, sans-serif', fontSize: '18px', color: '#9ad2ff' })
+    this.crosshairText = this.scene.add.text(16, 84, 'Crosshair: Pointer', { fontFamily: 'UiFont, sans-serif', fontSize: '16px', color: '#9ad2ff' })
+    this.upcomingWaveText = this.scene.add.text(16, 108, '', { fontFamily: 'UiFont, sans-serif', fontSize: '16px', color: '#ffd866' })
+    this.telegraphText = this.scene.add.text(16, 130, '', { fontFamily: 'UiFont, sans-serif', fontSize: '15px', color: '#ff5db1' })
+    this.upcomingWaveText.setVisible(false)
+    this.telegraphText.setVisible(false)
 
     this.bossContainer = this.scene.add.container(width / 2, 80).setVisible(false).setDepth(40)
     const bossBg = this.scene.add.rectangle(0, 0, 240, 18, 0x000000, 0.45).setOrigin(0.5)
@@ -81,6 +90,7 @@ export default class HUD {
     this.multText.setText(`x${multiplier.toFixed(1)}`)
     if (typeof accPct === 'number') this.accText.setText(`Acc: ${accPct.toFixed(0)}%`)
     this.updatePowerupPanel()
+    this.updateUpcoming(this.scene.time.now)
   }
 
   setupHearts(maxHp: number) {
@@ -173,6 +183,40 @@ export default class HUD {
   setDifficultyLabel(label: string) {
     this.difficultyLabel = label
     this.setStage(this.stageValue)
+  }
+
+  setCrosshairMode(mode: 'pointer' | 'fixed' | 'pad-relative') {
+    const label = mode === 'pointer' ? 'Pointer' : mode === 'fixed' ? 'Fixed' : 'Pad-Relative'
+    if (this.crosshairText) this.crosshairText.setText(`Crosshair: ${label}`)
+  }
+
+  setUpcomingWave(info: { label: string; spawnAt: number; fallback: boolean }) {
+    this.upcomingWaveInfo = info
+    const suffix = info.fallback ? ' [fallback]' : ''
+    this.upcomingWaveText.setText(`Next Wave: ${info.label}${suffix}`)
+    this.upcomingWaveText.setVisible(true)
+  }
+
+  clearUpcomingWave() {
+    this.upcomingWaveInfo = null
+    this.upcomingWaveText.setVisible(false)
+  }
+
+  updateUpcoming(now: number) {
+    if (!this.upcomingWaveInfo) return
+    const remaining = Math.max(0, this.upcomingWaveInfo.spawnAt - now)
+    const seconds = (remaining / 1000).toFixed(1)
+    this.upcomingWaveText.setText(`Next Wave: ${this.upcomingWaveInfo.label} (${seconds}s)`)
+    if (remaining <= 0) this.clearUpcomingWave()
+  }
+
+  setTelegraphMessage(text: string) {
+    this.telegraphText.setText(text)
+    this.telegraphText.setVisible(true)
+  }
+
+  clearTelegraphMessage() {
+    this.telegraphText.setVisible(false)
   }
 
   bindPowerups(powerups: Powerups) {
@@ -278,6 +322,9 @@ export default class HUD {
     this.bombBarFill?.setPosition(width - 160, 20)
     this.comboText.setPosition(width / 2, 40)
     this.stageText.setPosition(16, 60)
+    this.crosshairText.setPosition(16, 84)
+    this.upcomingWaveText.setPosition(16, 108)
+    this.telegraphText.setPosition(16, 130)
     this.bossContainer.setPosition(width / 2, 80)
     this.missText.setPosition(width / 2, height * 0.45)
     this.layoutPowerupSlots()

@@ -25,7 +25,7 @@ export default class OptionsScene extends Phaser.Scene {
 
     const baseY = 0.32
     const stepY = 0.055
-    const rowCount = 10
+    const rowCount = 13
     this.entries = Array.from({ length: rowCount }, (_, i) =>
       this.add.text(width / 2, height * (baseY + stepY * i), '', { fontFamily: 'UiFont', fontSize: '18px' }).setOrigin(0.5)
     )
@@ -49,6 +49,13 @@ export default class OptionsScene extends Phaser.Scene {
     const modeLabel = activeMode === 'vertical' ? 'Vertical Scroll' : 'Omni Scroll'
     const overrideSuffix = override ? ' (Override)' : ''
 
+    const crosshairLabel =
+      this.opts.crosshairMode === 'pointer'
+        ? 'Pointer'
+        : this.opts.crosshairMode === 'fixed'
+          ? 'Fixed'
+          : 'Pad-Relative'
+
     const rows = [
       `Music Volume: ${(this.opts.musicVolume * 100) | 0}%`,
       `SFX Volume: ${(this.opts.sfxVolume * 100) | 0}%`,
@@ -58,6 +65,9 @@ export default class OptionsScene extends Phaser.Scene {
       `Input Offset: ${io} ms`,
       `Fire Mode: ${fm === 'click' ? 'Click' : fm === 'hold_quantized' ? 'Hold (Quantized)' : 'Hold (Raw)'}`,
       `Gameplay Mode: ${modeLabel}${overrideSuffix}`,
+      `Crosshair Mode: ${crosshairLabel}`,
+      `Vertical Safety Band: ${this.opts.verticalSafetyBand ? 'On' : 'Off'}`,
+      `Fallback Waves: ${this.opts.allowFallbackWaves ? 'On' : 'Off'}`,
       `Gamepad Deadzone: ${(this.opts.gamepadDeadzone * 100).toFixed(0)}%`,
       `Gamepad Sensitivity: ${this.opts.gamepadSensitivity.toFixed(2)}x`
     ]
@@ -96,10 +106,24 @@ export default class OptionsScene extends Phaser.Scene {
         break
       }
       case 8: {
-        this.opts.gamepadDeadzone = Phaser.Math.Clamp(this.opts.gamepadDeadzone + step * 0.05, 0, 0.6)
+        const order: Options['crosshairMode'][] = ['pointer', 'fixed', 'pad-relative']
+        const idx = order.indexOf(this.opts.crosshairMode)
+        this.opts.crosshairMode = order[(idx + (dir > 0 ? 1 : order.length - 1)) % order.length]
         break
       }
       case 9: {
+        this.opts.verticalSafetyBand = !this.opts.verticalSafetyBand
+        break
+      }
+      case 10: {
+        this.opts.allowFallbackWaves = !this.opts.allowFallbackWaves
+        break
+      }
+      case 11: {
+        this.opts.gamepadDeadzone = Phaser.Math.Clamp(this.opts.gamepadDeadzone + step * 0.05, 0, 0.6)
+        break
+      }
+      case 12: {
         this.opts.gamepadSensitivity = Phaser.Math.Clamp(this.opts.gamepadSensitivity + step * 0.1, 0.5, 2)
         break
       }

@@ -12,11 +12,14 @@ import { loadOptions, resolveGameplayMode, GameplayMode } from '../systems/Optio
 import PlayerSkin from '../systems/PlayerSkin'
 import NeonGrid from '../systems/NeonGrid'
 import CubeSkin from '../systems/CubeSkin'
-import { getDifficultyProfile, DifficultyProfile, DifficultyProfileId } from '../config/difficultyProfiles'
+import { getDifficultyProfile, DifficultyProfile, DifficultyProfileId, StageTuning } from '../config/difficultyProfiles'
 import WaveDirector from '../systems/WaveDirector'
+import EnemyLifecycle from '../systems/EnemyLifecycle'
+import type { WaveDescriptor } from '../types/waves'
 import { getWavePlaylist } from '../systems/WaveLibrary'
 
 type Enemy = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+type PowerupSprite = Phaser.Physics.Arcade.Sprite
 
 export default class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
@@ -45,12 +48,20 @@ export default class GameScene extends Phaser.Scene {
   private nextQuantizedShotAt = 0
   private beatPeriodMs = 2000 // fallback
   private crosshair!: Phaser.GameObjects.Graphics
+  private opts = loadOptions()
+  private crosshairMode: 'pointer' | 'fixed' | 'pad-relative' = this.opts.crosshairMode
+  
+  private verticalSafetyBand = this.opts.verticalSafetyBand
+  private padAimVector = new Phaser.Math.Vector2(0, -1)
   private starfield!: Starfield
-  private enemyCap = 25
+  private difficultyProfile: DifficultyProfile = getDifficultyProfile('normal')
+  private currentStageConfig: StageTuning = this.difficultyProfile.stageTuning[0]
+  private difficultyLabel = this.difficultyProfile.label
+  private enemyCap = this.currentStageConfig?.enemyCap ?? 20
   private comboCount = 0
   private comboTimeoutMs = 2000
   private lastHitAt = 0
-  private opts = loadOptions()
+
   private gameplayMode: GameplayMode = resolveGameplayMode(this.opts.gameplayMode)
   private scrollBase = 128
   private backgroundScroller!: BackgroundScroller
@@ -74,48 +85,60 @@ export default class GameScene extends Phaser.Scene {
     split: 6,
     slowmo: 3
   }
+  private activePowerups = new Set<PowerupSprite>()
+  private enemyLifecycle!: EnemyLifecycle
+  private waveDescriptorIndex = new Map<string, WaveDescriptor>()
+  private nextWaveInfo: { descriptorId: string; spawnAt: number } | null = null
+  private onWaveScheduledHandler = (payload: any) => this.handleWaveScheduled(payload, false)
+  private onWaveFallbackHandler = (payload: any) => this.handleWaveScheduled(payload, true)
   private isPaused = false
   private barsElapsed = 0
   private bossSpawned = false
-  private difficultyProfile: DifficultyProfile = getDifficultyProfile('normal')
-  private difficultyLabel = 'Normal'
-  private baseSpawnRateMultiplier = 1
-  private spawnRateMultiplier = 1
-  private enemyHpMultiplier = 1
-  private bossHpMultiplier = 1
-  private missPenalty = 50
-  private bossMissPenalty = 120
-  private verticalLaneCount = 6
+  private enemyHpMultiplier = this.difficultyProfile.baseEnemyHpMultiplier
+  private bossHpMultiplier = this.difficultyProfile.baseBossHpMultiplier
+  private missPenalty = this.difficultyProfile.missPenalty
+  private bossMissPenalty = this.difficultyProfile.bossMissPenalty
+  private verticalLaneCount = this.difficultyProfile.laneCount
   private currentStage = 1
   private reducedMotion = false
   private activeBoss: Enemy | null = null
   private waveDirector!: WaveDirector
-  // inne i klassen GameScene, efter private-fälten
-private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
-  // städa skin
-  const skin = enemy.getData('skin') as any
-  if (doDeathFx) skin?.onDeath?.()
-  skin?.destroy?.()
 
-  // städa healthbar
-  const hb = enemy.getData('healthBar') as Phaser.GameObjects.Graphics
-  hb?.destroy()
+  private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
+    const enemyId = (enemy.getData('eid') as string) ?? null
+    if (enemyId) this.waveDirector?.notifyEnemyDestroyed(enemyId)
+    this.enemyLifecycle?.notifyRemoved(enemy)
 
-  // disable + hide själva fienden
-  enemy.disableBody(true, true)
-}
+    const skin = enemy.getData('skin') as any
+    if (doDeathFx) skin?.onDeath?.()
+    skin?.destroy?.()
+
+    const hb = enemy.getData('healthBar') as Phaser.GameObjects.Graphics
+    hb?.destroy()
+
+    enemy.disableBody(true, true)
+  }
   //private keys:Phaser.Types.Input.Keyboard;
   constructor() {
     super('GameScene')
   }
 
   create() {
+    this.opts = loadOptions()
+    this.crosshairMode = this.opts.crosshairMode
+    this.verticalSafetyBand = !!this.opts.verticalSafetyBand
+    this.gameplayMode = resolveGameplayMode(this.opts.gameplayMode)
+    this.gamepadDeadzone = this.opts.gamepadDeadzone
+    this.gamepadSensitivity = this.opts.gamepadSensitivity
+
     this.neon = new NeonGrid(this)
     this.neon.create()
     const { width, height } = this.scale
     this.cameras.main.setBackgroundColor('#0a0a0f')
 
     this.reducedMotion = !!this.opts.reducedMotion
+    this.registry.set('options', this.opts)
+    this.registry.set('reducedMotion', this.reducedMotion)
 
     this.backgroundScroller = new BackgroundScroller(this)
     this.backgroundScroller.create()
@@ -283,16 +306,15 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     const track = tracks?.find((t) => t.id === selId)
 
     this.difficultyProfile = getDifficultyProfile(track?.difficultyProfileId)
+    this.currentStage = this.difficultyProfile.stageTuning[0]?.stage ?? 1
+    this.currentStageConfig = this.getStageConfig(this.currentStage)
     this.difficultyLabel = this.difficultyProfile.label
-    this.baseSpawnRateMultiplier = this.difficultyProfile.spawnRateMultiplier
-    this.spawnRateMultiplier = this.baseSpawnRateMultiplier
-    this.enemyHpMultiplier = this.difficultyProfile.enemyHpMultiplier
-    this.bossHpMultiplier = this.difficultyProfile.bossHpMultiplier
+    this.enemyHpMultiplier = this.difficultyProfile.baseEnemyHpMultiplier * (this.currentStageConfig?.enemyHpMultiplier ?? 1)
+    this.bossHpMultiplier = this.difficultyProfile.baseBossHpMultiplier * (this.currentStageConfig?.bossHpMultiplier ?? 1)
     this.missPenalty = this.difficultyProfile.missPenalty
     this.bossMissPenalty = this.difficultyProfile.bossMissPenalty
-    this.verticalLaneCount = this.difficultyProfile.laneCount ?? this.verticalLaneCount
-    this.enemyCap = this.difficultyProfile.enemyCap
-    this.currentStage = this.difficultyProfile.startingStage ?? 1
+    this.verticalLaneCount = this.difficultyProfile.laneCount
+    this.enemyCap = this.currentStageConfig?.enemyCap ?? this.enemyCap
     
     // Initialize analyzer first
     this.analyzer = new AudioAnalyzer(this)
@@ -370,13 +392,49 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     this.spawner = new Spawner(this)
     const playlistId = (this.difficultyProfile.wavePlaylistId ?? this.difficultyProfile.id) as DifficultyProfileId
     const playlist = getWavePlaylist(playlistId)
+    this.waveDescriptorIndex.clear()
+    playlist.waves.forEach((wave) => this.waveDescriptorIndex.set(wave.id, wave))
     this.waveDirector = new WaveDirector(this, this.spawner, {
       profileId: playlistId,
       playlist,
       anchorProvider: () => ({ x: this.scale.width / 2, y: -140 }),
-      defaultDelayMs: 320,
-      fallbackCooldownMs: this.difficultyProfile.fallbackDelayMs ?? 5000,
-      maxQueuedWaves: this.difficultyProfile.maxQueuedWaves ?? 3
+      stageProvider: () => this.currentStage,
+      defaultDelayMs: this.difficultyProfile.waveDelayMs,
+      fallbackCooldownMs: this.difficultyProfile.fallbackCooldownMs,
+      waveRepeatCooldownMs: this.difficultyProfile.waveRepeatCooldownMs,
+      maxQueuedWaves: this.currentStageConfig?.maxQueuedWaves ?? 3,
+      heavyCooldownMs: this.difficultyProfile.heavyControls.cooldownMs,
+      heavyWindowMs: this.difficultyProfile.heavyControls.windowMs,
+      maxHeavyInWindow: this.difficultyProfile.heavyControls.maxInWindow,
+      maxSimultaneousHeavy: this.currentStageConfig?.maxSimultaneousHeavy ?? this.difficultyProfile.heavyControls.maxSimultaneous,
+      categoryCooldowns: this.difficultyProfile.categoryCooldowns,
+      logEvents: (import.meta as any)?.env?.DEV ?? false,
+      onWaveSpawn: (_instanceId, enemies) => this.enemyLifecycle?.registerSpawn(enemies),
+      enableFallback: this.opts.allowFallbackWaves
+    })
+    this.enemyLifecycle = new EnemyLifecycle({
+      scene: this,
+      spawner: this.spawner,
+      waveDirector: this.waveDirector,
+      boundsProvider: () => ({ width: this.scale.width, height: this.scale.height, gameplayMode: this.gameplayMode }),
+      onExpire: (enemy, cause) => {
+        if (!enemy.active) return
+        if (cause === 'miss' || cause === 'timeout') {
+          this.handleEnemyMiss(enemy)
+        } else {
+          this.cleanupEnemy(enemy, false)
+        }
+      }
+    })
+    this.events.on('wave:scheduled', this.onWaveScheduledHandler, this)
+    this.events.on('wave:fallback', this.onWaveFallbackHandler, this)
+    this.events.on('wave:spawned', this.handleWaveSpawned, this)
+    this.events.on('wave:telegraph', this.handleWaveTelegraph, this)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.events.off('wave:scheduled', this.onWaveScheduledHandler, this)
+      this.events.off('wave:fallback', this.onWaveFallbackHandler, this)
+      this.events.off('wave:spawned', this.handleWaveSpawned, this)
+      this.events.off('wave:telegraph', this.handleWaveTelegraph, this)
     })
     this.updateDifficultyForStage()
 
@@ -397,6 +455,7 @@ private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     this.hud.setReducedMotion(this.reducedMotion)
     this.hud.setDifficultyLabel(this.difficultyLabel)
     this.hud.setStage(this.currentStage)
+    this.hud.setCrosshairMode(this.crosshairMode)
     this.hud.setBossHealth(null)
     this.hud.setCombo(0)
 
@@ -538,13 +597,20 @@ this.lastHitAt = this.time.now
       this.metronome = this.opts.metronome
       this.gameplayMode = resolveGameplayMode(this.opts.gameplayMode)
       this.registry.set('gameplayMode', this.gameplayMode)
+      this.registry.set('options', this.opts)
       this.gamepadDeadzone = this.opts.gamepadDeadzone
       this.gamepadSensitivity = this.opts.gamepadSensitivity
       this.reducedMotion = !!this.opts.reducedMotion
+      this.registry.set('reducedMotion', this.reducedMotion)
+      this.crosshairMode = this.opts.crosshairMode
+      this.verticalSafetyBand = !!this.opts.verticalSafetyBand
+      this.padAimVector.set(0, -1)
       this.effects.setReducedMotion(this.reducedMotion)
       this.hud.setReducedMotion(this.reducedMotion)
+      this.hud.setCrosshairMode(this.crosshairMode)
       this.hud.setDifficultyLabel(this.difficultyLabel)
       this.hud.setStage(this.currentStage)
+      this.waveDirector?.setFallbackEnabled(this.opts.allowFallbackWaves)
       if (this.activeBoss && this.activeBoss.active) {
         const maxHp = (this.activeBoss.getData('maxHp') as number) ?? 1
         const hp = (this.activeBoss.getData('hp') as number) ?? maxHp
@@ -578,6 +644,7 @@ this.lastHitAt = this.time.now
       this.starfield.update(delta)
     }
     this.spawner?.setScrollBase(this.scrollBase)
+    this.waveDirector?.update()
 
       if (this.time.now - this.lastBeatAt < 100) { // Visa cirkeln i 100ms efter varje beat
         this.beatIndicator.setAlpha(1);
@@ -600,7 +667,6 @@ this.lastHitAt = this.time.now
       this.lastShotAt = time
     }
 
-    const movementSpeed = this.gameplayMode === 'vertical' ? 280 : 250
     const body = this.player.body as Phaser.Physics.Arcade.Body
     const wasdKeys = this.registry.get('wasd') as any
     let moveX = 0
@@ -615,8 +681,22 @@ this.lastHitAt = this.time.now
       const pad = this.activeGamepad
       const axisX = pad.axes.length > 0 ? pad.axes[0].getValue() : 0
       const axisY = pad.axes.length > 1 ? pad.axes[1].getValue() : 0
-      moveX += this.applyGamepadDeadzone(axisX) * this.gamepadSensitivity
-      moveY += this.applyGamepadDeadzone(axisY) * this.gamepadSensitivity
+      const processedX = this.applyGamepadDeadzone(axisX) * this.gamepadSensitivity
+      const processedY = this.applyGamepadDeadzone(axisY) * this.gamepadSensitivity
+      moveX += processedX
+      moveY += processedY
+
+      const aimAxisX = pad.axes.length > 2 ? pad.axes[2].getValue() : axisX
+      const aimAxisY = pad.axes.length > 3 ? pad.axes[3].getValue() : axisY
+      const aimX = this.applyGamepadDeadzone(aimAxisX)
+      const aimY = this.applyGamepadDeadzone(aimAxisY)
+      if (Math.abs(aimX) > 0 || Math.abs(aimY) > 0) {
+        this.padAimVector.set(aimX, aimY)
+        if (this.padAimVector.lengthSq() > 0) this.padAimVector.normalize()
+      } else if (Math.abs(processedX) > 0 || Math.abs(processedY) > 0) {
+        this.padAimVector.set(processedX, processedY)
+        if (this.padAimVector.lengthSq() > 0) this.padAimVector.normalize()
+      }
 
       const shootPressed = pad.buttons[0]?.pressed || pad.buttons[1]?.pressed
       if (shootPressed && !this.gamepadFireActive) {
@@ -642,9 +722,25 @@ this.lastHitAt = this.time.now
       moveY /= magnitude
     }
 
-    body.setVelocity(moveX * movementSpeed, moveY * movementSpeed)
+    const stageHeight = this.scale.height
+    const maxSpeed = this.gameplayMode === 'vertical'
+      ? stageHeight / 1.4
+      : this.scale.width / 1.1
 
-    if (this.gameplayMode === 'vertical') {
+    const targetVelocity = new Phaser.Math.Vector2(moveX, moveY)
+    if (targetVelocity.lengthSq() > 1) targetVelocity.normalize()
+    targetVelocity.scale(maxSpeed)
+
+    const lerp = 0.22
+    let newVelX = Phaser.Math.Linear(body.velocity.x, targetVelocity.x, lerp)
+    let newVelY = Phaser.Math.Linear(body.velocity.y, targetVelocity.y, lerp)
+    if (targetVelocity.lengthSq() < 0.01) {
+      newVelX *= 0.82
+      newVelY *= 0.82
+    }
+    body.setVelocity(newVelX, newVelY)
+
+    if (this.gameplayMode === 'vertical' && this.verticalSafetyBand) {
       const halfHeight = body.height * 0.5
       const minY = this.movementMinY - halfHeight
       const maxY = this.movementMaxY - halfHeight
@@ -713,6 +809,9 @@ pskin?.setThrust?.(thrustLevel)
         return true
       })
     }
+
+    this.updatePowerupSprites(delta)
+    this.enemyLifecycle?.update(this.time.now)
 
     const aimDirection = this.getAimDirection()
     const reticle = this.getReticlePosition()
@@ -857,29 +956,44 @@ pskin?.setThrust?.(thrustLevel)
     const s = this.physics.add.sprite(x, y, texture)
     if (this.anims.exists(anim)) s.play(anim)
     s.setData('ptype', type)
+    s.setData('spawnAt', this.time.now)
+    s.setData('magnetRange', Math.max(220, this.scale.height * 0.28))
     s.setDepth(4)
+    s.body.setAllowGravity(false)
+    s.body.setVelocity(0, 60)
+    s.body.setDrag(38, 0)
+    this.activePowerups.add(s)
 
     const glow = this.add.image(x, y, 'plasma_glow_disc')
       .setDepth(3)
       .setBlendMode(Phaser.BlendModes.ADD)
-      .setAlpha(0.65)
-      .setScale(0.65)
+      .setAlpha(0.85)
+      .setScale(0.7)
     const glowFollow = () => {
       glow.x = s.x
       glow.y = s.y
     }
     this.events.on(Phaser.Scenes.Events.UPDATE, glowFollow)
-    s.once(Phaser.GameObjects.Events.DESTROY, () => {
+    const cleanupGlow = () => {
       this.events.off(Phaser.Scenes.Events.UPDATE, glowFollow)
       glow.destroy()
-    })
-    this.tweens.add({
+    }
+    const glowTween = this.tweens.add({
       targets: glow,
-      scale: { from: 0.6, to: 0.8 },
-      alpha: { from: 0.65, to: 0.3 },
+      scale: { from: 0.7, to: 1.05 },
+      alpha: { from: 0.85, to: 0.35 },
       yoyo: true,
       repeat: -1,
-      duration: 700,
+      duration: 560,
+      ease: 'Sine.easeInOut'
+    })
+
+    const pulseTween = this.tweens.add({
+      targets: s,
+      alpha: { from: 1, to: 0.6 },
+      yoyo: true,
+      repeat: -1,
+      duration: 640,
       ease: 'Sine.easeInOut'
     })
 
@@ -887,8 +1001,17 @@ pskin?.setThrust?.(thrustLevel)
     const offsetX = s.width * 0.5 - radius
     const offsetY = s.height * 0.5 - radius
     s.body.setCircle(radius, offsetX, offsetY)
-    // Fade after 6s
-    this.tweens.add({ targets: s, alpha: 0.2, duration: 6000, onComplete: () => s.destroy() })
+    // Fade after 8s
+    const fadeTween = this.tweens.add({
+      targets: s,
+      alpha: 0.18,
+      duration: 8000,
+      onComplete: () => {
+        pulseTween.stop()
+        glowTween.stop()
+        s.destroy()
+      }
+    })
     // Overlap with player
     const overlap = this.physics.add.overlap(this.player, s, () => {
       overlap.destroy()
@@ -900,6 +1023,14 @@ pskin?.setThrust?.(thrustLevel)
       this.powerups.apply(ptype, dur)
       this.effects.powerupPickupText(pickupX, pickupY - 10, ptype)
       this.playPowerupSound(ptype)
+    })
+
+    s.once(Phaser.GameObjects.Events.DESTROY, () => {
+      this.activePowerups.delete(s)
+      pulseTween.stop()
+      glowTween.stop()
+      fadeTween.stop()
+      cleanupGlow()
     })
   }
 
@@ -924,7 +1055,7 @@ pskin?.setThrust?.(thrustLevel)
 
   private updateMovementBounds() {
     const { height } = this.scale
-    if (this.gameplayMode === 'vertical') {
+    if (this.gameplayMode === 'vertical' && this.verticalSafetyBand) {
       this.movementMinY = height * 0.65
       this.movementMaxY = height * 0.94
     } else {
@@ -943,25 +1074,71 @@ pskin?.setThrust?.(thrustLevel)
   }
 
   private getAimDirection(): Phaser.Math.Vector2 {
+    const fallbackUp = new Phaser.Math.Vector2(0, -1)
+
     if (this.gameplayMode === 'vertical') {
-      return new Phaser.Math.Vector2(0, -1)
+      if (this.crosshairMode === 'pad-relative') {
+        if (this.padAimVector.lengthSq() > 0.05) {
+          const aim = this.padAimVector.clone()
+          if (aim.y > -0.2) aim.y = -0.2
+          return aim.normalize()
+        }
+      }
+      return fallbackUp.clone()
     }
+
+    if (this.crosshairMode === 'fixed') {
+      return fallbackUp.clone()
+    }
+
+    if (this.crosshairMode === 'pad-relative' && this.padAimVector.lengthSq() > 0.05) {
+      return this.padAimVector.clone()
+    }
+
     const pointer = this.input.activePointer
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
     const dir = new Phaser.Math.Vector2(world.x - this.player.x, world.y - this.player.y)
-    if (dir.lengthSq() < 0.0001) return new Phaser.Math.Vector2(0, -1)
+    if (dir.lengthSq() < 0.0001) return fallbackUp.clone()
     return dir.normalize()
   }
 
   private getReticlePosition(): Phaser.Math.Vector2 {
+    const { width, height } = this.scale
+    const clampPoint = (vec: Phaser.Math.Vector2) => {
+      vec.x = Phaser.Math.Clamp(vec.x, 12, width - 12)
+      vec.y = Phaser.Math.Clamp(vec.y, 12, height - 12)
+      return vec
+    }
+
     if (this.gameplayMode === 'vertical') {
-      const offset = this.scale.height * 0.35
+      if (this.crosshairMode === 'pad-relative') {
+        const dir = this.getAimDirection()
+        const distance = height * 0.28
+        return clampPoint(new Phaser.Math.Vector2(
+          this.player.x + dir.x * distance,
+          this.player.y + dir.y * distance
+        ))
+      }
+      const offset = height * 0.35
       const targetY = this.player.y - offset
       const minY = 60
-      return new Phaser.Math.Vector2(this.player.x, Math.max(minY, targetY))
+      return clampPoint(new Phaser.Math.Vector2(this.player.x, Math.max(minY, targetY)))
     }
+
+    if (this.crosshairMode === 'fixed') {
+      return clampPoint(new Phaser.Math.Vector2(this.player.x, this.player.y - 160))
+    }
+
+    if (this.crosshairMode === 'pad-relative' && this.padAimVector.lengthSq() > 0.05) {
+      const distance = Math.min(220, Math.max(120, height * 0.25))
+      return clampPoint(new Phaser.Math.Vector2(
+        this.player.x + this.padAimVector.x * distance,
+        this.player.y + this.padAimVector.y * distance
+      ))
+    }
+
     const pointer = this.input.activePointer
-    return this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+    return clampPoint(this.cameras.main.getWorldPoint(pointer.x, pointer.y))
   }
 
   private computeBulletLifetime(direction: Phaser.Math.Vector2): number {
@@ -976,62 +1153,48 @@ pskin?.setThrust?.(thrustLevel)
     return clamped
   }
 
-  private updateDifficultyForStage() {
-    const stageIndex = Math.max(0, this.currentStage - 1)
-    const spawnScaleTable = this.difficultyProfile.stageSpawnMultipliers ?? []
-    const hpScaleTable = this.difficultyProfile.stageHpMultipliers ?? []
-    const spawnScale = spawnScaleTable[Math.min(stageIndex, spawnScaleTable.length - 1)] ?? (1 + stageIndex * 0.1)
-    const hpScale = hpScaleTable[Math.min(stageIndex, hpScaleTable.length - 1)] ?? (1 + stageIndex * 0.07)
-
-    this.spawnRateMultiplier = this.baseSpawnRateMultiplier * spawnScale
-    this.enemyCap = Math.max(6, Math.round(this.difficultyProfile.enemyCap * spawnScale))
-
-    this.spawner?.setDifficulty({
-      hpMultiplier: this.enemyHpMultiplier * hpScale,
-      bossHpMultiplier: this.bossHpMultiplier * hpScale,
-      laneCount: this.verticalLaneCount
-    })
+  private getStageConfig(stage: number): StageTuning {
+    const stages = this.difficultyProfile.stageTuning
+    if (!stages || stages.length === 0) {
+      return {
+        stage,
+        scrollMultiplier: 1,
+        spawnMultiplier: 1,
+        enemyHpMultiplier: 1,
+        bossHpMultiplier: 1,
+        enemyCap: 18,
+        maxQueuedWaves: 3
+      }
+    }
+    const exact = stages.find((cfg) => cfg.stage === stage)
+    if (exact) return exact
+    return stage > stages[stages.length - 1].stage ? stages[stages.length - 1] : stages[0]
   }
 
-  private pruneEnemies() {
-    const group = this.spawner?.getGroup()
-    if (!group) return
-    const height = this.scale.height
-    const width = this.scale.width
-    const bottomMargin = 160
-    const sideMargin = 220
+  private updateDifficultyForStage() {
+    this.currentStageConfig = this.getStageConfig(this.currentStage)
+    const cfg = this.currentStageConfig
 
-    group.children.each((obj: Phaser.GameObjects.GameObject) => {
-      const enemy = obj as Enemy
-      if (!enemy.active) return true
-      const body = enemy.body as Phaser.Physics.Arcade.Body | undefined
-      if (!body || !body.enable) {
-        this.cleanupEnemy(enemy, false)
-        return true
-      }
+    this.enemyHpMultiplier = this.difficultyProfile.baseEnemyHpMultiplier * (cfg.enemyHpMultiplier ?? 1)
+    this.bossHpMultiplier = this.difficultyProfile.baseBossHpMultiplier * (cfg.bossHpMultiplier ?? 1)
+    this.enemyCap = cfg.enemyCap ?? this.enemyCap
 
-      if (this.gameplayMode === 'vertical') {
-        if (enemy.y > height + bottomMargin) {
-          this.handleEnemyMiss(enemy)
-          return true
-        }
-        if (enemy.y < -bottomMargin) {
-          this.cleanupEnemy(enemy, false)
-          return true
-        }
-      } else {
-        if (
-          enemy.y > height + bottomMargin ||
-          enemy.y < -bottomMargin ||
-          enemy.x < -sideMargin ||
-          enemy.x > width + sideMargin
-        ) {
-          this.cleanupEnemy(enemy, false)
-          return true
-        }
-      }
+    this.waveDirector?.applyStageSettings({
+      maxQueuedWaves: cfg.maxQueuedWaves,
+      heavyControls: {
+        cooldownMs: cfg.heavyCooldownMs ?? this.difficultyProfile.heavyControls.cooldownMs,
+        maxSimultaneous: cfg.maxSimultaneousHeavy ?? this.difficultyProfile.heavyControls.maxSimultaneous,
+        windowMs: this.difficultyProfile.heavyControls.windowMs,
+        maxInWindow: this.difficultyProfile.heavyControls.maxInWindow
+      },
+      categoryCooldowns: this.difficultyProfile.categoryCooldowns,
+      waveRepeatCooldownMs: this.difficultyProfile.waveRepeatCooldownMs / Math.max(0.6, cfg.spawnMultiplier ?? 1)
+    })
 
-      return true
+    this.spawner?.setDifficulty({
+      hpMultiplier: this.enemyHpMultiplier,
+      bossHpMultiplier: this.bossHpMultiplier,
+      laneCount: this.verticalLaneCount
     })
   }
 
@@ -1111,6 +1274,87 @@ pskin?.setThrust?.(thrustLevel)
     })
   }
 
+  private updatePowerupSprites(_delta: number) {
+    if (this.activePowerups.size === 0) return
+    const playerPos = new Phaser.Math.Vector2(this.player.x, this.player.y)
+    const baseMagnet = Math.max(220, this.scale.height * 0.28)
+    for (const sprite of Array.from(this.activePowerups)) {
+      if (!sprite.active) continue
+      const body = sprite.body as Phaser.Physics.Arcade.Body | null
+      if (!body) continue
+
+      const toPlayer = new Phaser.Math.Vector2(playerPos.x - sprite.x, playerPos.y - sprite.y)
+      const distance = toPlayer.length()
+      const magnetRange = sprite.getData('magnetRange') as number | undefined
+      const range = magnetRange ?? baseMagnet
+
+      if (distance < range) {
+        const pull = 1 - distance / range
+        if (pull > 0) {
+          toPlayer.normalize()
+          const strength = 280 * pull
+          const newVelX = Phaser.Math.Linear(body.velocity.x, toPlayer.x * strength, 0.2)
+          const newVelY = Phaser.Math.Linear(body.velocity.y, toPlayer.y * strength, 0.2)
+          body.setVelocity(newVelX, newVelY)
+        }
+      } else {
+        const driftSpeed = 60
+        const newVelY = Phaser.Math.Linear(body.velocity.y, driftSpeed, 0.06)
+        body.setVelocity(body.velocity.x * 0.9, newVelY)
+      }
+
+      if (sprite.y > this.scale.height + 80) {
+        sprite.destroy()
+      }
+    }
+  }
+
+  private resolveWaveDescriptor(id: string): WaveDescriptor {
+    if (this.waveDescriptorIndex.has(id)) {
+      return this.waveDescriptorIndex.get(id)!
+    }
+    const fallback: WaveDescriptor = {
+      id,
+      formation: 'lane',
+      enemyType: 'swarm'
+    }
+    this.waveDescriptorIndex.set(id, fallback)
+    return fallback
+  }
+
+  private handleWaveScheduled(payload: any, fallback: boolean) {
+    if (!this.hud) return
+    const descriptor = this.resolveWaveDescriptor(payload.descriptorId)
+    const spawnAt = typeof payload.spawnAt === 'number' ? payload.spawnAt : this.time.now
+    if (this.nextWaveInfo && this.nextWaveInfo.spawnAt <= spawnAt) return
+    const label = `${descriptor.enemyType} · ${descriptor.formation}`
+    this.nextWaveInfo = { descriptorId: descriptor.id, spawnAt }
+    this.hud.setUpcomingWave({ label, spawnAt, fallback })
+  }
+
+  private handleWaveSpawned = (payload: any) => {
+    if (this.nextWaveInfo && payload.descriptorId === this.nextWaveInfo.descriptorId) {
+      this.hud?.clearUpcomingWave()
+      this.nextWaveInfo = null
+    }
+    this.hud?.clearTelegraphMessage()
+  }
+
+  private handleWaveTelegraph = (payload: any) => {
+    if (!this.hud) return
+    const descriptor = this.resolveWaveDescriptor(payload.descriptorId)
+    if (descriptor.telegraph) {
+      const typeLabel = descriptor.telegraph.type === 'circle'
+        ? 'Circular Telegraph'
+        : descriptor.telegraph.type === 'line'
+          ? 'Line Telegraph'
+          : 'Zone Telegraph'
+      this.hud.setTelegraphMessage(`${typeLabel}: ${descriptor.enemyType.toUpperCase()}`)
+    } else {
+      this.hud.setTelegraphMessage(`Incoming: ${descriptor.enemyType.toUpperCase()}`)
+    }
+  }
+
   private handleEnemyMiss(enemy: Enemy) {
     const isBoss = enemy.getData('isBoss') === true
     this.cleanupEnemy(enemy, false)
@@ -1183,15 +1427,13 @@ pskin?.setThrust?.(thrustLevel)
 
   private computeScrollBase(bpm: number): number {
     const referenceBpm = 120
-    const baseAtReference = 130
-    const minSpeed = 70
-    const maxSpeed = 220
     const ratio = bpm > 0 ? bpm / referenceBpm : 1
-    const clampedRatio = Math.min(Math.max(ratio, 0.5), 1.8)
-    const base = baseAtReference * clampedRatio
-    const scaled = base * this.difficultyProfile.scrollMultiplier
-    const min = minSpeed * this.difficultyProfile.scrollMultiplier
-    const max = maxSpeed * this.difficultyProfile.scrollMultiplier
+    const clampedRatio = Phaser.Math.Clamp(ratio, 0.5, 1.8)
+    const stageMultiplier = this.currentStageConfig?.scrollMultiplier ?? 1
+    const baseAtReference = this.difficultyProfile.baseScrollSpeed * stageMultiplier
+    const scaled = baseAtReference * clampedRatio
+    const min = 70 * stageMultiplier
+    const max = 240 * stageMultiplier
     return Phaser.Math.Clamp(scaled, min, max)
   }
 

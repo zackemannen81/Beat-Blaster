@@ -12,6 +12,9 @@ export type Options = {
   gameplayMode: GameplayMode
   gamepadDeadzone: number
   gamepadSensitivity: number
+  crosshairMode: 'pointer' | 'fixed' | 'pad-relative'
+  verticalSafetyBand: boolean
+  allowFallbackWaves: boolean
 }
 
 const KEY = 'bb_options_v1'
@@ -27,10 +30,14 @@ export const DEFAULT_OPTIONS: Options = {
   fireMode: 'click',
   gameplayMode: 'omni',
   gamepadDeadzone: 0.25,
-  gamepadSensitivity: 1
+  gamepadSensitivity: 1,
+  crosshairMode: 'pointer',
+  verticalSafetyBand: false,
+  allowFallbackWaves: true
 }
 
 const VALID_FIRE_MODES: Options['fireMode'][] = ['click', 'hold_raw', 'hold_quantized']
+const VALID_CROSSHAIR_MODES: Options['crosshairMode'][] = ['pointer', 'fixed', 'pad-relative']
 
 function normalizeGameplayMode(value: unknown): GameplayMode | null {
   if (typeof value === 'string') {
@@ -78,6 +85,14 @@ function withDefaults(raw: Partial<Options> | null | undefined): Options {
 
   const sensitivity = typeof raw?.gamepadSensitivity === 'number' ? raw.gamepadSensitivity : DEFAULT_OPTIONS.gamepadSensitivity
   merged.gamepadSensitivity = Math.min(Math.max(sensitivity, 0.5), 2)
+
+  const crosshair = typeof raw?.crosshairMode === 'string' ? raw.crosshairMode : DEFAULT_OPTIONS.crosshairMode
+  merged.crosshairMode = VALID_CROSSHAIR_MODES.includes(crosshair as Options['crosshairMode'])
+    ? (crosshair as Options['crosshairMode'])
+    : DEFAULT_OPTIONS.crosshairMode
+
+  merged.verticalSafetyBand = Boolean(raw?.verticalSafetyBand)
+  merged.allowFallbackWaves = raw?.allowFallbackWaves !== false
 
   return merged
 }

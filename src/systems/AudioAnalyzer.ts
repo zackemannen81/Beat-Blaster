@@ -154,11 +154,11 @@ export default class AudioAnalyzer extends Phaser.Events.EventEmitter {
       this.emit(`beat:${band}`, level)
       return true
     }
-if(this.noBeats++ % 3 === 0){
+if(++this.noBeats % 3 === 0){
     tryBeat('low', low)
     tryBeat('mid', mid)
     tryBeat('high', high)
-    this.noBeats = 0
+    
 }
 /*   
 tryBeat('low', low)

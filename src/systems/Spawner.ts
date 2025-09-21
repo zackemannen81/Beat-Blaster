@@ -10,8 +10,8 @@ export type PatternData =
   | { kind: 'lane'; anchorX: number; speedY: number }
   | { kind: 'sine'; anchorX: number; amplitude: number; angularVelocity: number; spawnTime: number; speedY: number }
   | { kind: 'drift'; velocityX: number; speedY: number }
-  | { kind: 'circle'; radius: number; angularVelocity: number }
-  | { kind: 'spiral'; angularVelocity: number }
+  | { kind: 'circle'; anchorX: number; anchorY: number; radius: number; angularVelocity: number }
+  | { kind: 'spiral'; anchorX: number; anchorY: number; angularVelocity: number }
   | { kind: 'burst'; speedY: number }
   | { kind: 'boss'; speedY: number }
 
@@ -205,7 +205,7 @@ export default class Spawner {
         y,
         velocityX: vx,
         velocityY: vy,
-        pattern: { kind: 'spiral', angularVelocity: omega }
+        pattern: { kind: 'spiral', anchorX: anchor.x, anchorY: anchor.y, angularVelocity: omega }
       })
     }
   }
@@ -231,7 +231,7 @@ export default class Spawner {
         y,
         velocityX: vx,
         velocityY: vy,
-        pattern: { kind: 'circle', radius, angularVelocity: spin }
+        pattern: { kind: 'circle', anchorX: anchor.x, anchorY: anchor.y, radius, angularVelocity: spin }
       })
     }
   }
@@ -261,7 +261,7 @@ export default class Spawner {
         y,
         velocityX: vx,
         velocityY: vy,
-        pattern: { kind: 'spiral', angularVelocity: omega }
+        pattern: { kind: 'spiral', anchorX: anchor.x, anchorY: anchor.y, angularVelocity: omega }
       })
     }
   }

@@ -100,8 +100,7 @@ export default class PlayerSkin {
     const texKey = hasPink ? 'thruster_pink' : 'particles'
     const frame: string | undefined = hasPink ? undefined : 'particle_glow_small'
 
-    // I Phaser 3.90: add.particles(x, y, texture, particleEmitterConfig)
-    // Skapa tre emitters direkt med densamma config
+    // Base configuration for all emitters
     const baseCfg: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig = {
       frame: frame,
       lifespan: { min: 220, max: 760 },
@@ -110,15 +109,28 @@ export default class PlayerSkin {
       alpha: { start: 1, end: 0 },
       quantity: 1,
       frequency: 16,
-      angle: { min: 85, max: 95 },
       blendMode: Phaser.BlendModes.ADD,
       follow: this.gfx,
-      followOffset: { x: 0, y: 0 }
+      followOffset: { x: 0, y: 0 },
+      emitZone: { 
+        type: 'edge',
+        source: new Phaser.Geom.Circle(0, 0, 2),
+        quantity: 1
+      },
+      radial: true,
+      angle: { min: 85, max: 95 }
     }
 
-    this.emMain  = this.scene.add.particles(0, 0, texKey, baseCfg)
+    // Create particle emitters directly
+    this.emMain = this.scene.add.particles(0, 0, texKey, baseCfg)
     this.emWingL = this.scene.add.particles(0, 0, texKey, baseCfg)
     this.emWingR = this.scene.add.particles(0, 0, texKey, baseCfg)
+    
+    // Set depth for all particle emitters
+    const depth = this.gfx.depth - 1
+    this.emMain.setDepth(depth)
+    this.emWingL.setDepth(depth)
+    this.emWingR.setDepth(depth)
   }
 
   private localToWorld(offset: {x: number, y: number}, rot: number) {
@@ -150,9 +162,10 @@ export default class PlayerSkin {
     const wingLW = this.localToWorld(this.wingLOffset, rot)
     const wingRW = this.localToWorld(this.wingROffset, rot)
 
-    this.emMain.followOffset.set(tailW.x, tailW.y)
-    this.emWingL.followOffset.set(wingLW.x, wingLW.y)
-    this.emWingR.followOffset.set(wingRW.x, wingRW.y)
+    // Update emitter positions
+    this.emMain.setPosition(tailW.x, tailW.y)
+    this.emWingL.setPosition(wingLW.x, wingLW.y)
+    this.emWingR.setPosition(wingRW.x, wingRW.y)
 
     // Intensitet baserat på Y-hastighet
     const upNorm   = Phaser.Math.Clamp((-vy) / this.expectMaxVY, 0, 1)
@@ -190,6 +203,7 @@ export default class PlayerSkin {
     const bump = (em: Phaser.GameObjects.Particles.ParticleEmitter) => {
       const s = Phaser.Math.Clamp(0.30 + extra, 0.18, 0.9)
       em.setScale(s)
+      // @ts-ignore - frequency property exists but isn't in the type definitions
       em.setFrequency(Math.max(6, (em.frequency ?? 16) + freqB))
     }
     bump(this.emMain); bump(this.emWingL); bump(this.emWingR)
@@ -200,9 +214,22 @@ export default class PlayerSkin {
 
   destroy() {
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.follow, this)
-    this.emMain.destroy()
-    this.emWingL.destroy()
-    this.emWingR.destroy()
-    this.gfx.destroy()
+    
+    // Stop and destroy emitters
+    if (this.emMain) {
+      this.emMain.stop()
+      this.emMain.destroy()
+    }
+    if (this.emWingL) {
+      this.emWingL.stop()
+      this.emWingL.destroy()
+    }
+    if (this.emWingR) {
+      this.emWingR.stop()
+      this.emWingR.destroy()
+    }
+    
+    // Clean up graphics
+    if (this.gfx) this.gfx.destroy()
   }
 }

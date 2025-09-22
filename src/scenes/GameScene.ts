@@ -509,7 +509,7 @@ if (this.lastHitEnemyId !== enemyId) {
   if (this.comboCount > 0) {
     // Bara från andra fienden och uppåt
     this.comboCount++
-    console.log('New combo count:', this.comboCount)
+    //console.log('New combo count:', this.comboCount)
 
     // Visa text när multiplikatorn ökar
     this.effects.showComboText(enemy.x, enemy.y, this.comboCount)

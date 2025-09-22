@@ -85,7 +85,7 @@ export default class Effects {
 
   showComboText(x: number, y: number, count: number) {
     if (this.reducedMotion) return
-    console.log('Creating combo text:', count, 'at', x, y)
+    //console.log('Creating combo text:', count, 'at', x, y)
     const text = this.scene.add.text(x, y - 30, `COMBO x${count}`, {
       fontFamily: 'AnnouncerFont, UiFont, sans-serif',
       fontSize: '26px',
@@ -93,7 +93,7 @@ export default class Effects {
       stroke: '#000',
       strokeThickness: 2
     }).setOrigin(0.5, 0.5)
-    console.log('Text created:', text.text, 'at', text.x, text.y)
+    //console.log('Text created:', text.text, 'at', text.x, text.y)
 
     // Animate the text floating up and fading out
     this.scene.tweens.add({

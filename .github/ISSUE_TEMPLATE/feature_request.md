@@ -7,14 +7,26 @@ assignees: ''
 
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+---
+name: "Feature: beskrivning"
+about: "För nya funktioner / förbättringar"
+title: "feature: "
+labels: ["feature", "priority: medium"]
+assignees: [""]  # fyll i dig själv eller teammedlem
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+---
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+### Beskrivning
+Kortfattat: vad gör funktionen?
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+### Varför / Motiv
+Hur förbättrar det spelet? Hur relaterar det till rytm / lanes / spelkänsla?
+
+### Acceptanskriterier
+- [ ] Funktion fungerar i Vertical-läget
+- [ ] Känns rytmiskt korrekt
+- [ ] Ingen tydlig bugg
+- [ ] Prestanda är okej på vanliga maskiner
+
+### Relaterat
+Eventuella relaterade issues, referenser (vårt utkastdesign-doc)

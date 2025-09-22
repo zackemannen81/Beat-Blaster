@@ -1,0 +1,112 @@
+From 0001 Add README Mon Sep 17 00:00:00 2001
+From: Your Name <your.email@example.com>
+Date: YYYY-MM-DD HH:MM:SS +0000
+Subject: [PATCH] Add README
+
+---
+ README.md | 106 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 106 insertions(+)
+ create mode 100644 README.md
+
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..abcd123
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,106 @@
++# Beat Blaster
++
++*Rhythm-powered vertical shooter* på steroider 🎶🚀
++
++---
++
++## 🔥 Vad är Beat Blaster?
++
++Beat Blaster är ett rytmspel där musiken **styr hela spelet**:
++
++- Spelaren rör sig mellan lanes (3 → 5 → 7 lanes) som expanderar/kollapsar i takt med musiken.  
++- Skott sker med *release-to-shoot* och klassificeras som **perfect** eller **normal** beroende på beat-fönster.  
++- Fiender spawnas enligt beat-mönster: hoppar mellan lanes, slingrar, teleporteras, dansar etc.  
++- Svårighetsgrad anpassas via BPM, HP-skalning & antal lanes.  
++- Två spellägen: *Vertical* (huvudsakliga fokuset) och *Omni*.  
++
++---
++
++## 💾 Kom igång
++
++### Requirements
++
++- Node.js (≥ 14)  
++- npm eller yarn  
++- Phaser 3  
++- En utvecklarmiljö som klarar TypeScript + bundler (t.ex. Vite, Webpack etc)
++
++### Installation
++
++```bash
++git clone https://github.com/zackemannen81/Beat-Blaster.git
++cd Beat-Blaster
++git checkout feat/spawn-movement-rework
++npm install
++```
++
++### Utveckling
++
++- `npm run dev` — kör spelet lokalt i dev-läge  
++- `npm run build` — skapa produktion/build  
++- `npm run test` — kör testsvit om sådan finns
++
++---
++
++## 🎮 Funktioner & idéer
++
++| Funktion | Status / Verksamhet |
++|---|---|
++| Lane-hantering (3/5/7) | Under ombyggnad / roadmap planerad |
++| Release-to-shoot & beatWindow | Planerad / delvis implementerad |
++| LaneHopper / fiendemönster | Vissa finns, fler på väg |
++| Dynamiska lanes vid bar-slut | Roadmap sprint 2 |
++| HP-skalning med beats / svårighetsprofiler | Planerad |
++
++---
++
++## 🛠 Arkitektur
++
++Projektet innehåller filer och system som:
++
++- `Spawner.ts`, `WaveDirector.ts`, `WaveLibrary.ts` — för generering av fiendewaves och olika spawnbeteenden  
++- `EnemyLifecycle` — hanterar fiender över tid, deras patterns och rörelser  
++- `AudioAnalyzer` / `Conductor` — beat- och BPM-analys  
++- `HUD`, `Starfield`, `NeonGrid` etc — visualiseringar och feedback
++
++---
++
++## 📅 Roadmap & utvecklingsplan
++
++Se filen [`ROADMAP.md`](./ROADMAP.md) för detaljerade planerade sprintar, issue-rubriker och milstolpar.
++
++---
++
++## 📂 Bidragsstruktur
++
++Om du vill hjälpa till:
++
++1. Kolla roadmap och öppna issue enligt mallarna under `.github/ISSUE_TEMPLATE/`  
++2. Arbeta i feature-branch, skriv tydliga commit messages  
++3. När en funktion är klar → testa i vertical-läge + minst en BPM (90/120/160) och verifiera att rytm och flow känns rätt
++
++---
++
++## 💡 Vision
++
++- En bana som löper genom musik, där världen **andas** med beat, där lanes expanderar/kollapsar, fiender hoppar och dansar.  
++- Visualer: neon-grid, pulserande lanes, perfekta skott fångade med ljud & ljus.  
++- Känsla: kontroll, rytm, flyt — och ibland kaos.
++
++---
++
++## 📝 Licens
++
++(MIT eller valfri licens — fyll i enligt dina önskemål)
++
++---

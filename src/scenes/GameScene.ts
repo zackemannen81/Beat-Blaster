@@ -2,18 +2,15 @@ import Phaser from 'phaser'
 import LaneManager from '../systems/LaneManager'
 import StickyLaneController from '../systems/StickyLaneController'
 import PlayerSkin from '../systems/PlayerSkin'
+
 /**
- * GameScene (drop‑in version)
+ * GameScene – integrerad lane demo
  *
- * Denna minimala GameScene visar hur du integrerar LaneManager och
- * StickyLaneController i ett vertikalt läge.  Den skapar tre lanes,
- * placerar en enkel spelarkaraktär på närmaste lane, och låter dig flytta
- * spelaren mellan lanes med vänster/höger‑tangenterna.  När fönstret
- * ändras byggs lanes om och spelaren snappas om till närmaste lane.
- *
- * För användning i ditt projekt: Lägg denna fil i `src/scenes/GameScene.ts`
- * och justera importvägarna (`./LaneManager` och `./StickyLaneController`)
- * om du placerar filerna i en annan mappstruktur (t.ex. `../systems/`).
+ * Denna scen visar hur du integrerar LaneManager och
+ * StickyLaneController i ett vertikalt läge.  Den bygger tre lanes,
+ * placerar en spelare på närmaste lane och låter dig flytta den med
+ * vänster/höger‑tangenter och WASD.  När fönstret ändras byggs lanes
+ * om och spelaren/fiender resnappas automatiskt via `onLanesChanged()`.
  */
 export default class GameScene extends Phaser.Scene {
   private player!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
@@ -30,46 +27,40 @@ export default class GameScene extends Phaser.Scene {
   }
 
   create() {
-    const { width, height } = this.scale
-    const laneCount = 3 // antal lanes i detta läge
-
+    const laneCount = 3
     // Skapa LaneManager och bygg lanes över hela bredden
     this.laneManager = new LaneManager(this)
     this.laneManager.build(laneCount, 0, this.scale.width)
-    // Visa debug overlay så att lanes syns (kan tas bort i release)
+    // Debug overlay (ta bort eller kommentera i release)
     this.laneManager.enableDebug(0x00ff99)
 
-    // Skapa en enkel spelare som en rektangel längst ned på skärmen
+    // Skapa spelare som Arcade-sprite längst ned i mitten
     const startLane = this.laneManager.nearest(this.scale.width / 2)
-    // Player sprite (behåll som fysik-host)
-    this.player = this.physics.add.sprite( startLane.centerX, this.scale.height - 80, 'gameplay', 'player_idle')
+    this.player = this.physics.add.sprite(startLane.centerX, this.scale.height - 80, 'gameplay', 'player_idle')
     this.player.setCollideWorldBounds(true)
-
-  // vi ritar spelaren via PlayerSkin → göm atlas-grafiken
     this.player.setVisible(false)
-
-// sätt en rimlig hitbox (matcha din PlayerSkin-storlek, t.ex. triangel ~18px)
+    
+    this.physics.world.gravity.y = 0;  // Se till att gravitationen är avstängd
+    this.player.body.setAllowGravity(false);
+    // Sätt mindre rund hitbox som matchar PlayerSkin
     const r = 14
-    this.player.body.setCircle(r, -r + this.player.width/2, -r + this.player.height/2)
+    this.player.body.setCircle(r, -r + this.player.width / 2, -r + this.player.height / 2)
+    // Rotation (skins ligger på sidan)
+    this.player.setRotation(Math.PI / 2)
+    // Koppla skinet (ritar skeppet och thrusters)
+    const skin = new PlayerSkin(this, this.player)
+    this.player.setData('skin', skin)
 
-// rotationen behövs fortfarande – PlayerSkin följer host.rotation
-    this.player.setRotation(Math.PI/2)
-
-// koppla på skinet
-    const pskin = new PlayerSkin(this, this.player)
-    this.player.setData('skin', pskin)
-
-    // Resnappa spelaren om lane-layout ändras (t.ex. vid resize)
-    this.events.on('lanes:changed', () => {
-      this.player.x = this.laneManager.snap(this.player.x)
-    })
+    // Lyssna på lane-layout-ändringar och resnappa spelaren/fiender
+    this.events.on('lanes:changed', this.onLanesChanged, this)
 
     // Bygg om lanes när fönstret ändras
     this.scale.on(Phaser.Scale.Events.RESIZE, (gameSize: any) => {
       const { width } = gameSize
       this.laneManager.build(laneCount, 0, width)
     })
-        // Tangentbord (vänster/höger) för lane movement
+
+    // Tangentbord: cursors och WASD
     this.cursors = this.input.keyboard!.createCursorKeys()
     const wasd = this.input.keyboard!.addKeys({
       W: Phaser.Input.Keyboard.KeyCodes.W,
@@ -79,15 +70,37 @@ export default class GameScene extends Phaser.Scene {
     }) as any
     this.registry.set('wasd', wasd)
 
-
-  // Instansiera StickyLaneController med 10 % deadzone av lane spacing
+    // Skapa StickyLaneController (dynamiskt deadzone)
     this.stickyLane = new StickyLaneController(this, this.laneManager, this.player)
   }
 
+  /**
+   * Händelsehanterare för lane-layout.  Snäppa om spelare och fiender när
+   * antalet lanes eller positionerna ändras.  Använder body.reset() för
+   * Arcade-sprites så att fysikkroppen uppdateras korrekt.
+   */
+  private onLanesChanged() {
+    const snapped = this.laneManager.snap(this.player.x)
+    const body = this.player.body as Phaser.Physics.Arcade.Body
+    if (body && typeof body.reset === 'function') {
+      body.reset(snapped, body.y)
+    } else {
+      this.player.x = snapped
+    }
+    // Återställ eventuell pågående lerp i StickyLaneController
+    ;(this.stickyLane as any).targetX = null
+  }
+
   update(time: number, delta: number) {
+    this.cameras.main.startFollow(this.player, false, 0.1, 0.1);
+    this.cameras.main.setDeadzone(0, 0);
     
-    // Uppdatera lane‑rörelse varje frame
+    console.log('Player position:', this.player.x.toFixed(1), this.player.y.toFixed(1));
+    console.log('Velocity:', this.player.body.velocity.x.toFixed(1), this.player.body.velocity.y.toFixed(1));
+    this.player.body.setVelocity(0, 0);
+    // Kombinera piltangenter och WASD
     const wasd = this.registry.get('wasd')
     this.stickyLane.update(this.cursors, wasd, delta)
+  
   }
 }

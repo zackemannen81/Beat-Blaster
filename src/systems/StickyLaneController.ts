@@ -71,8 +71,7 @@ export default class StickyLaneController {
     const rightDown = !!(cursors.right?.isDown || keys?.D?.isDown || keys?.RIGHT?.isDown)
     if (leftDown) dir -= 1
     if (rightDown) dir += 1
-    const body = this.player.body as Phaser.Physics.Arcade.Body;
-    body.setVelocityX(0); // stoppa glid
+
     if (dir !== 0) {
       const deltaX = dir * this.moveSpeed * (delta / 1000)
       const newX = this.player.x + deltaX

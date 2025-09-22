@@ -12,17 +12,14 @@ export default class Conductor extends Phaser.Events.EventEmitter {
   private barBeats = 4
   private lastBarStartMs = 0
   private startedAtMs = 0
-//for beat detection
-  private lastBarTime = 0
-  private beatCount = 0
+
   // Valfri tidsgivare – låt den returnera ms sedan "start".
   private timeProvider?: () => number
 
-  constructor(scene: Phaser.Scene, barBeats: number = 4) {
+  constructor(scene: Phaser.Scene) {
     super()
     this.scene = scene
     this.startedAtMs = this.scene.time.now
-    this.barBeats = barBeats
   }
 
   /** Ange extern klok källa (t.ex. WebAudio currentTime*1000). */
@@ -68,12 +65,4 @@ export default class Conductor extends Phaser.Events.EventEmitter {
     this.lastBarStartMs = this.nowMs()
     this.emit('bar:start')
   }
-  onBeat() {
-    //console.log('Beat detected, calculating BPM...')
-     this.beatCount++
-     if (this.beatCount % this.barBeats === 1) {
-       this.lastBarTime = this.scene.time.now
-       this.emit('bar:start', { barIndex: Math.floor(this.beatCount / this.barBeats) })
-     }
-   }
 }

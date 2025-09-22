@@ -104,13 +104,14 @@ export default class PlayerSkin {
     const hasPink = this.scene.textures.exists('thruster_pink')
     const texKey = hasPink ? 'thruster_pink' : 'particles'
     const frame: string | undefined = hasPink ? undefined : 'particle_glow_small'
+//this.particleManager.createEmitter()
 
     this.emMain = this.scene.add.particles(0, 0, texKey, {
       frame: frame,
-      lifespan: { min: 220, max: 760 },
+      lifespan: { min: 220, max: 1024 },
       speed: { min: 40, max: 110 },
-      scale: { start: 0.35, end: 0 },
-      alpha: { start: 1, end: 0 },
+      scale: { start: 0.45, end: 0.1 },
+      alpha: { start: 1, end: 0.2 },
       quantity: 1,
       frequency: 16,
       blendMode: 'ADD',
@@ -120,8 +121,8 @@ export default class PlayerSkin {
       frame: frame,
       lifespan: { min: 220, max: 760 },
       speed: { min: 40, max: 110 },
-      scale: { start: 0.35, end: 0 },
-      alpha: { start: 1, end: 0 },
+      scale: { start: 0.35, end: 0.1 },
+      alpha: { start: 1, end: 0.2 },
       quantity: 1,
       frequency: 16,
       blendMode: 'ADD',
@@ -131,8 +132,8 @@ export default class PlayerSkin {
       frame: frame,
       lifespan: { min: 220, max: 760 },
       speed: { min: 40, max: 110 },
-      scale: { start: 0.35, end: 0 },
-      alpha: { start: 1, end: 0 },
+      scale: { start: 0.35, end: 0.1 },
+      alpha: { start: 1, end: 0.2 },
       quantity: 1,
       frequency: 16,
       blendMode: 'ADD',
@@ -140,10 +141,10 @@ export default class PlayerSkin {
     })
     // Gemensam konfiguration för alla emitters
     const baseEmitterConfig: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig = {
-      lifespan: { min: 220, max: 760 },
+      lifespan: { min: 220, max: 1024 },
       speed: { min: 40, max: 110 },
-      scale: { start: 0.35, end: 0 },
-      alpha: { start: 1, end: 0 },
+      scale: { start: 0.45, end: 0.1 },
+      alpha: { start: 1, end: 0.2 },
       quantity: 1,
       frequency: 16, // Styrs ändå manuellt i follow-loopen
       blendMode: 'ADD',
@@ -191,22 +192,24 @@ export default class PlayerSkin {
     const wingRPos = this.wingROffset.clone().rotate(currentRotation).add(this.host)
 
     // *** KORREKT POSITIONERING AV EMITTERS ***
-    if (this.emMain) this.emMain.setPosition(tailPos.x, tailPos.y)
-    if (this.emWingL) this.emWingL.setPosition(wingLPos.x, wingLPos.y)
-    if (this.emWingR) this.emWingR.setPosition(wingRPos.x, wingRPos.y)
+    if (this.emMain) this.emMain.setPosition(tailPos.x, tailPos.y+5)
+    if (this.emWingL) this.emWingL.setPosition(wingLPos.x, wingLPos.y+15)
+    if (this.emWingR) this.emWingR.setPosition(wingRPos.x, wingRPos.y+15)
 
     // Rotera partiklarnas vinkel med skeppet
     const angle = Phaser.Math.RadToDeg(currentRotation) + 90
- //   this.emMain!.updateConfig('angle: {  min: angle - 5, max: angle + 5 }')
-//    this.emWingL.setAngle({  angle: min: angle - 5, max: angle + 5 })
-//    this.emWingR.setAngle({  angle: min: angle - 5, max: angle + 5 })
+    this.emMain!.updateConfig({angle: {  min: angle - 5, max: angle + 5 }})
+    this.emWingL!.updateConfig({angle: {  min: angle - 5, max: angle + 5 }})
+    this.emWingR!.updateConfig({angle: {  min: angle - 5, max: angle + 5 }})
+
+    //    this.emWingR.setAngle({  angle: min: angle - 5, max: angle + 5 })
     
     // All din logik för intensitet är oförändrad
     const upNorm = Phaser.Math.Clamp(-vy / this.expectMaxVY, 0, 1)
     const backNorm = Phaser.Math.Clamp(vy / this.expectMaxVY, 0, 1)
 
     const baseScale = 0.30
-    const upBoost = 0.32
+    const upBoost = 0.40
     const backCut = 0.20
 
     const startScale = Phaser.Math.Clamp(baseScale + upBoost * upNorm - backCut * backNorm, 0.18, 0.72)

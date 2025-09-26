@@ -24,8 +24,8 @@
 ---
 
 ## 2) Sticky lanes (spelarrörelse)
-- [ ] Input (PC: A/D/pilar, Mobil: svep vänster/höger).
-- [ ] Snapping: lerpa mot `nearest().centerX` med easing (Sine.inOut) + deadzone (~6 px).
+- [ ] Input (PC: W/A/D/S/pilar, Mobil: styr mot Touchpoint
+- [ ] Snapping: lerpa mot `nearest().centerX` med easing (Sine.inOut) + deadzone (~6 px). Påbörja lerping när man inte styr höger eller vänster med tangenterna , Mobil: påbörja lerping när man släpper touchpoint.
 - [ ] **Kriterium:** Ingen fladder/jitter nära gränser; snappy men mjukt.
 
 ---

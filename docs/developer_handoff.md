@@ -65,6 +65,10 @@ Useful docs
 - Mirrorers track the player’s X-position and lunge forward on high beats; boost window signalled through beat hooks (`GameScene.updateMirrorersOnBeat`).
 - Integrated lane-aware spawn helper plus wave entries for all difficulties.
 
+### Teleporters & Lane Flooders
+- Teleporters blink between lanes on hi-hats with dedicated spawn helper and telegraph glow.
+- Lane Flooders spawn as wide barriers that occupy a lane and push players into movement checks.
+
 ## QA Snapshot (Sprint 1)
 - Build: `npm run build` (success, chunk size warning only).
 - Manual passes outstanding per checklist (BPM variants, mobile touch vs desktop, performance soak, latency tuning).

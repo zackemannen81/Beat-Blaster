@@ -68,13 +68,16 @@ export default class CubeSkin {
     const rotateTargets: Phaser.GameObjects.GameObject[] = [this.gfx]
     if (this.glowSprite) rotateTargets.push(this.glowSprite)
 
-    this.rotateTween = this.scene.tweens.add({
-      targets: rotateTargets,
-      angle: { from: 0, to: 360 },
-      duration: options.rotationDuration ?? 4000,
-      repeat: -1,
-      ease: 'Linear'
-    })
+    const rotationDuration = options.rotationDuration ?? 4000
+    if (rotationDuration > 0) {
+      this.rotateTween = this.scene.tweens.add({
+        targets: rotateTargets,
+        angle: { from: 0, to: 360 },
+        duration: rotationDuration,
+        repeat: -1,
+        ease: 'Linear'
+      })
+    }
 
     if (this.variant === 'solid') {
       this.addAura()

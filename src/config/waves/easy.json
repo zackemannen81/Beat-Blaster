@@ -72,6 +72,21 @@
       "minimumStage": 1
     },
     {
+      "id": "easy_teleporter_duo",
+      "formation": "teleporter",
+      "enemyType": "teleporter",
+      "count": 2,
+      "speedMultiplier": 0.82,
+      "hpMultiplier": 0.9,
+      "formationParams": { "laneIndex": 1 },
+      "telegraph": { "type": "circle", "durationMs": 620 },
+      "telegraphDelayMs": 420,
+      "category": "standard",
+      "tags": ["teleporter"],
+      "cooldownMs": 5200,
+      "minimumStage": 2
+    },
+    {
       "id": "easy_swirl_soft",
       "formation": "swirl",
       "enemyType": "swarm",
@@ -100,6 +115,20 @@
       "tags": ["formation"],
       "cooldownMs": 5600,
       "minimumStage": 2
+    },
+    {
+      "id": "easy_lane_flood",
+      "formation": "lane_flood",
+      "enemyType": "flooder",
+      "speedMultiplier": 0.5,
+      "hpMultiplier": 1,
+      "formationParams": { "laneIndex": 2, "width": 200, "height": 140 },
+      "telegraph": { "type": "zone", "durationMs": 820, "intensity": 0.9 },
+      "telegraphDelayMs": 560,
+      "category": "heavy",
+      "tags": ["flooder"],
+      "cooldownMs": 6400,
+      "minimumStage": 3
     },
     {
       "id": "easy_circle_slow",

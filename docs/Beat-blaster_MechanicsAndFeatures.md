@@ -68,10 +68,12 @@
 
 6. **Teleporters**  
    - Försvinner från lane och dyker upp i annan lane på beat.  
+   - Implementerat: blinkar på `beat:high` med laneswap + teleporterglow.  
 
 7. **Lane Flooders**  
    - Fyller en hel lane som en vägg.  
    - Tvingar spelaren byta lane.  
+   - Implementerat: flood-wall spawn med telegraph och brett hitbox.  
 
 8. **Bosses**  
    - Stora skepp med beat-baserade attackfaser.  

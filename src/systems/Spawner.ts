@@ -19,6 +19,8 @@ export type PatternData =
   | { kind: 'lane_hopper'; laneA: number; laneB: number; hopEveryBeats?: number; speedY: number }
   | { kind: 'formation_dancer'; centerX: number; offsets: number[]; speedY: number }
   | { kind: 'mirrorer'; speedY: number }
+  | { kind: 'teleporter'; laneIndex: number; speedY: number }
+  | { kind: 'lane_flood'; laneIndex: number; width: number; height: number; speedY: number }
   | { kind: 'boss'; speedY: number }
 
 type SpawnConfig = {
@@ -96,7 +98,11 @@ export default class Spawner {
                 ? 75
                 : type === 'formation'
                   ? 70
-                  : 65
+                  : type === 'teleporter'
+                    ? 100
+                    : type === 'flooder'
+                      ? 45
+                      : 65
       const speed = speedBase * 0.25
       const enemy = this.createEnemy({
         type,
@@ -253,6 +259,9 @@ export default class Spawner {
       case 'weaver':
         enemies = this.spawnWeaverWave(descriptor, waveId, options.skipTelegraph === true)
         break
+      case 'teleporter':
+        enemies = this.spawnTeleporterWave(descriptor, waveId, options.skipTelegraph === true)
+        break
       case 'v':
         enemies = this.spawnVWaveDescriptor(descriptor, waveId, options.skipTelegraph === true)
         break
@@ -276,6 +285,9 @@ export default class Spawner {
         break
       case 'mirrorer':
         enemies = this.spawnMirrorerWave(descriptor, waveId, options.skipTelegraph === true)
+        break
+      case 'lane_flood':
+        enemies = this.spawnLaneFloodWave(descriptor, waveId, options.skipTelegraph === true)
         break
       default:
         enemies = this.spawn(descriptor.enemyType, descriptor.count ?? 3, {
@@ -315,7 +327,105 @@ export default class Spawner {
         enemy.setData('exploderRadius', radius)
       })
     }
+    if (descriptor.enemyType === 'teleporter') {
+      spawned.forEach((enemy) => {
+        enemy.setData('teleporterLane', laneIndex)
+      })
+    }
     return spawned
+  }
+
+  private spawnTeleporterWave(
+    descriptor: WaveDescriptor,
+    waveId: string,
+    skipTelegraph: boolean
+  ): Enemy[] {
+    const params = descriptor.formationParams ?? {}
+    const laneIndex = typeof params.laneIndex === 'number' ? params.laneIndex : Math.floor(this.laneCount / 2)
+    const count = descriptor.count ?? 2
+    const speedMul = descriptor.speedMultiplier ?? 0.78
+    const speedY = this.scrollBase * speedMul
+    const margin = 80
+    const enemies: Enemy[] = []
+    for (let i = 0; i < count; i++) {
+      const lane = Phaser.Math.Clamp(laneIndex + i - Math.floor((count - 1) / 2), 0, Math.max(0, this.laneCount - 1))
+      const x = this.getLaneCenterX(lane)
+      const enemy = this.createEnemy({
+        type: descriptor.enemyType,
+        x,
+        y: -margin - i * 42,
+        velocityY: speedY,
+        hpMultiplier: descriptor.hpMultiplier,
+        waveId,
+        pattern: { kind: 'teleporter', laneIndex: lane, speedY }
+      })
+      enemy.setData('teleporterLane', lane)
+      enemies.push(enemy)
+    }
+    if (!skipTelegraph && descriptor.telegraph) {
+      const first = enemies[0]
+      if (first) {
+        showTelegraph(this.scene, descriptor.telegraph, { x: first.x, y: first.y }, { radius: 120 })
+      }
+    }
+    return enemies
+  }
+
+  private getLaneWidth(index: number): number {
+    if (this.laneManager) {
+      const lanes = this.laneManager.getAll()
+      if (lanes.length <= 1) return this.scene.scale.width
+      const current = Phaser.Math.Clamp(index, 0, lanes.length - 1)
+      const left = current === 0 ? lanes[current].centerX : lanes[current - 1].centerX
+      const right = current === lanes.length - 1 ? lanes[current].centerX : lanes[current + 1].centerX
+      return Math.abs(right - left) || this.scene.scale.width / lanes.length
+    }
+    return this.scene.scale.width / Math.max(1, this.laneCount)
+  }
+
+  private spawnLaneFloodWave(
+    descriptor: WaveDescriptor,
+    waveId: string,
+    skipTelegraph: boolean
+  ): Enemy[] {
+    const params = descriptor.formationParams ?? {}
+    const laneIndex = typeof params.laneIndex === 'number' ? Phaser.Math.Clamp(params.laneIndex, 0, Math.max(0, this.laneCount - 1)) : Math.floor(this.laneCount / 2)
+    const width = params.width ?? this.getLaneWidth(laneIndex) * 0.85
+    const height = params.height ?? 140
+    const speedMul = descriptor.speedMultiplier ?? 0.5
+    const speedY = this.scrollBase * speedMul
+    const centerX = this.getLaneCenterX(laneIndex)
+    const enemy = this.createEnemy({
+      type: descriptor.enemyType,
+      x: centerX,
+      y: -height,
+      velocityY: speedY,
+      hpMultiplier: descriptor.hpMultiplier,
+      waveId,
+      pattern: { kind: 'lane_flood', laneIndex, width, height, speedY },
+      scale: 1.6
+    })
+    const body = enemy.body as Phaser.Physics.Arcade.Body
+    body.setSize(width, height, true)
+    body.setOffset(enemy.width * 0.5 - width * 0.5, enemy.height * 0.5 - height * 0.5)
+    body.updateFromGameObject()
+    enemy.setData('flooderWidth', width)
+    const floodRect = this.scene.add.rectangle(enemy.x, enemy.y, width, height, 0xff5d7a, 0.68)
+      .setStrokeStyle(2, 0xff9fb2, 0.9)
+      .setDepth(enemy.depth - 1)
+    enemy.setData('flooderRect', floodRect)
+    this.scene.tweens.add({
+      targets: floodRect,
+      alpha: { from: 0.68, to: 0.4 },
+      duration: 600,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    })
+    if (!skipTelegraph && descriptor.telegraph) {
+      showTelegraph(this.scene, descriptor.telegraph, { x: centerX, y: -height }, { radius: width * 0.6 })
+    }
+    return [enemy]
   }
 
   private spawnLaneHopperDescriptor(
@@ -766,7 +876,11 @@ export default class Spawner {
                 ? 4
                 : config.type === 'formation'
                   ? 5
-                  : 1
+                  : config.type === 'teleporter'
+                    ? 3
+                    : config.type === 'flooder'
+                      ? 6
+                      : 1
     }
     let rawHp = config.hpOverride ?? baseHp
     if (config.type === 'dasher' && !config.isBoss) rawHp = Math.max(1, Math.round(rawHp * 0.85))
@@ -793,7 +907,11 @@ export default class Spawner {
           ? 0.6
           : config.type === 'formation'
             ? 0.5
-            : 0.75
+            : config.type === 'teleporter'
+              ? 0.75
+              : config.type === 'flooder'
+                ? 0.35
+                : 0.75
     const defaultVy = config.velocityY ?? this.scrollBase * baseVyMul
     body.setVelocity(config.velocityX ?? 0, defaultVy)
     if (config.type === 'exploder') {
@@ -815,6 +933,14 @@ export default class Spawner {
       sprite.setData('exploderCountdownBeats', 3)
       sprite.setData('exploderRadius', 150)
       sprite.setData('exploderArmed', true)
+    }
+    if (config.type === 'teleporter') {
+      sprite.setData('teleporterLane', 0)
+      sprite.setData('teleporterBlinking', false)
+    }
+    if (config.type === 'flooder') {
+      sprite.setScale(1.2, 1.6)
+      sprite.setData('flooderWidth', 120)
     }
     const skin = new CubeSkin(this.scene, sprite, style)
     sprite.setData('skin', skin)

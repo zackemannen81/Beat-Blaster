@@ -126,6 +126,31 @@ export default class Effects {
     })
   }
 
+  teleporterBlink(x: number, y: number) {
+    if (this.reducedMotion) return
+    const core = this.scene.add.circle(x, y, 12, 0x7a8bff, 0.8)
+      .setBlendMode(Phaser.BlendModes.ADD)
+    const ring = this.scene.add.circle(x, y, 18)
+      .setStrokeStyle(2, 0xc7d2ff, 0.95)
+      .setBlendMode(Phaser.BlendModes.ADD)
+    this.scene.tweens.add({
+      targets: core,
+      alpha: { from: 0.8, to: 0 },
+      scale: { from: 1, to: 0.4 },
+      duration: 100,
+      ease: 'Cubic.easeIn',
+      onComplete: () => core.destroy()
+    })
+    this.scene.tweens.add({
+      targets: ring,
+      radius: { from: 18, to: 48 },
+      alpha: { from: 1, to: 0 },
+      duration: 160,
+      ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy()
+    })
+  }
+
   showComboText(x: number, y: number, count: number) {
     if (this.reducedMotion) return
     //console.log('Creating combo text:', count, 'at', x, y)

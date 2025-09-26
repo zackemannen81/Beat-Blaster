@@ -63,6 +63,22 @@
       "minimumStage": 3
     },
     {
+      "id": "hard_teleporter_squad",
+      "formation": "teleporter",
+      "enemyType": "teleporter",
+      "count": 4,
+      "speedMultiplier": 1.05,
+      "hpMultiplier": 1.05,
+      "formationParams": { "laneIndex": 1 },
+      "telegraph": { "type": "circle", "durationMs": 600, "intensity": 1.1 },
+      "telegraphDelayMs": 360,
+      "audioCue": "announcer_warning",
+      "category": "heavy",
+      "tags": ["teleporter"],
+      "cooldownMs": 6200,
+      "minimumStage": 3
+    },
+    {
       "id": "hard_v_brute",
       "formation": "v",
       "enemyType": "brute",
@@ -140,6 +156,21 @@
       "tags": ["formation"],
       "cooldownMs": 7000,
       "minimumStage": 3
+    },
+    {
+      "id": "hard_lane_flood",
+      "formation": "lane_flood",
+      "enemyType": "flooder",
+      "speedMultiplier": 0.6,
+      "hpMultiplier": 1.4,
+      "formationParams": { "laneIndex": 2, "width": 260, "height": 180 },
+      "telegraph": { "type": "zone", "durationMs": 680, "intensity": 1.1 },
+      "telegraphDelayMs": 420,
+      "audioCue": "announcer_warning",
+      "category": "heavy",
+      "tags": ["flooder"],
+      "cooldownMs": 7600,
+      "minimumStage": 4
     },
     {
       "id": "hard_spiral_drop_brute",

@@ -77,6 +77,22 @@
       "minimumStage": 2
     },
     {
+      "id": "normal_teleporter_triplet",
+      "formation": "teleporter",
+      "enemyType": "teleporter",
+      "count": 3,
+      "speedMultiplier": 0.9,
+      "hpMultiplier": 1,
+      "formationParams": { "laneIndex": 1 },
+      "telegraph": { "type": "circle", "durationMs": 640, "intensity": 1 },
+      "telegraphDelayMs": 420,
+      "audioCue": "announcer_warning",
+      "category": "standard",
+      "tags": ["teleporter"],
+      "cooldownMs": 5600,
+      "minimumStage": 2
+    },
+    {
       "id": "normal_sine_dash",
       "formation": "sine",
       "enemyType": "dasher",
@@ -151,6 +167,21 @@
       "category": "standard",
       "tags": ["mirrorer"],
       "cooldownMs": 6200,
+      "minimumStage": 3
+    },
+    {
+      "id": "normal_lane_flood",
+      "formation": "lane_flood",
+      "enemyType": "flooder",
+      "speedMultiplier": 0.55,
+      "hpMultiplier": 1.15,
+      "formationParams": { "laneIndex": 3, "width": 220, "height": 160 },
+      "telegraph": { "type": "zone", "durationMs": 780, "intensity": 1 },
+      "telegraphDelayMs": 520,
+      "audioCue": "announcer_warning",
+      "category": "heavy",
+      "tags": ["flooder"],
+      "cooldownMs": 7000,
       "minimumStage": 3
     },
     {

@@ -147,6 +147,10 @@ export default class GameScene extends Phaser.Scene {
     hopTween?.remove()
     enemy.setData('laneHopTween', null)
 
+    const floodRect = enemy.getData('flooderRect') as Phaser.GameObjects.Rectangle | undefined
+    floodRect?.destroy()
+    enemy.setData('flooderRect', null)
+
     enemy.disableBody(true, true)
   }
   //private keys:Phaser.Types.Input.Keyboard;
@@ -392,6 +396,7 @@ export default class GameScene extends Phaser.Scene {
         if (this.gameplayMode === 'vertical') this.triggerLaneHopperHop()
       }
       this.updateExplodersOnBeat(band)
+      this.updateTeleportersOnBeat(band)
       this.updateWeaversOnBeat(band)
       this.updateFormationDancersOnBeat(band)
       this.updateMirrorersOnBeat(band)
@@ -1581,6 +1586,30 @@ pskin?.setThrust?.(thrustLevel)
             body.setVelocity(0, pattern.speedY)
             break
           }
+          case 'teleporter': {
+            if (this.lanes) {
+              const lane = Phaser.Math.Clamp(pattern.laneIndex, 0, this.lanes.getCount() - 1)
+              enemy.x = this.lanes.centerX(lane)
+            }
+            body.setVelocity(0, pattern.speedY)
+            if (enemy.getData('teleporterBlinking') === true) {
+              body.setVelocity(0, pattern.speedY)
+            }
+            break
+          }
+          case 'lane_flood': {
+            if (this.lanes) {
+              const lane = Phaser.Math.Clamp(pattern.laneIndex, 0, this.lanes.getCount() - 1)
+              enemy.x = this.lanes.centerX(lane)
+            }
+            body.setVelocity(0, pattern.speedY)
+            const rect = enemy.getData('flooderRect') as Phaser.GameObjects.Rectangle | undefined
+            if (rect) {
+              rect.x = enemy.x
+              rect.y = enemy.y
+            }
+            break
+          }
           case 'mirrorer': {
             const clampMargin = 24
             const targetX = Phaser.Math.Clamp(this.player.x, clampMargin, this.scale.width - clampMargin)
@@ -1663,6 +1692,42 @@ pskin?.setThrust?.(thrustLevel)
       if (!enemy.active) return true
       if ((enemy.getData('etype') as string) !== 'weaver') return true
       enemy.setData('weaverBoostUntil', boostUntil)
+      return true
+    })
+  }
+
+  private updateTeleportersOnBeat(band: 'low' | 'mid' | 'high') {
+    if (!this.spawner || !this.lanes || band !== 'high') return
+    const group = this.spawner.getGroup()
+    const laneCount = this.lanes.getCount()
+    group.children.each((obj: Phaser.GameObjects.GameObject) => {
+      const enemy = obj as Enemy
+      if (!enemy.active) return true
+      if ((enemy.getData('etype') as string) !== 'teleporter') return true
+      const pattern = enemy.getData('pattern') as PatternData | null
+      if (!pattern || pattern.kind !== 'teleporter') return true
+      const currentLane = (enemy.getData('teleporterLane') as number) ?? pattern.laneIndex ?? 0
+      let nextLane = currentLane
+      let guard = 0
+      while (nextLane === currentLane && guard < 5) {
+        nextLane = Phaser.Math.Between(0, Math.max(0, laneCount - 1))
+        guard++
+      }
+      this.effects.teleporterBlink(enemy.x, enemy.y)
+      enemy.setData('teleporterBlinking', true)
+      enemy.setData('teleporterTargetLane', nextLane)
+      enemy.setAlpha(0.08)
+      this.time.delayedCall(120, () => {
+        if (!enemy.active) return
+        const targetLane = (enemy.getData('teleporterTargetLane') as number) ?? nextLane
+        pattern.laneIndex = targetLane
+        enemy.setData('teleporterLane', targetLane)
+        if (this.lanes) {
+          enemy.x = this.lanes.centerX(targetLane)
+        }
+        enemy.setAlpha(1)
+        enemy.setData('teleporterBlinking', false)
+      })
       return true
     })
   }

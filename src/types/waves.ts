@@ -13,6 +13,8 @@ export type FormationId =
   | 'burst'
   | 'formation_dancer'
   | 'mirrorer'
+  | 'teleporter'
+  | 'lane_flood'
 
 export type TelegraphDescriptor = {
   type: 'zone' | 'line' | 'circle'

@@ -86,6 +86,8 @@
 - [ ] **Weavers**: Bekräfta att hi-hat-beat boostar amplitud/scroll och att banor känns läsbara på 90/160 BPM.
 - [ ] **Formation Dancers**: Se att gruppen roterar positioner på snare utan att korsa lanes oförutsett.
 - [ ] **Mirrorers**: Testa att de speglar spelarens X och dundrar fram på `beat:high`, både med och utan shield.
+- [ ] **Teleporters**: Säkerställ att blink + laneswap sker på hi-hats och att telegraph/alpha fade fungerar.
+- [ ] **Lane Flooders**: Kontrollera att hela lane blockeras, att telegraph visas, och att spelaren tar skada vid kollision.
 
 ### 8.2 Mini code‑review (egen)
 - [ ] Struktur: LaneManager/BeatWindow isolerade (återanvändbara).

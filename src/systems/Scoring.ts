@@ -39,7 +39,18 @@ export default class Scoring {
     return acc
   }
 
-  addKill(type: 'brute' | 'dasher' | 'swarm' | 'exploder' | 'weaver' | 'formation' | 'mirrorer') {
+  addKill(
+    type:
+      | 'brute'
+      | 'dasher'
+      | 'swarm'
+      | 'exploder'
+      | 'weaver'
+      | 'formation'
+      | 'mirrorer'
+      | 'teleporter'
+      | 'flooder'
+  ) {
     const base = type === 'brute'
       ? 100
       : type === 'dasher'
@@ -52,7 +63,11 @@ export default class Scoring {
               ? 140
               : type === 'mirrorer'
                 ? 110
-                : 25
+                : type === 'teleporter'
+                  ? 95
+                  : type === 'flooder'
+                    ? 130
+                    : 25
     this.score += Math.round(base * this.multiplier)
   }
 

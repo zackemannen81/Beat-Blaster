@@ -841,7 +841,7 @@ this.lastHitAt = this.time.now
     }
 
     if (this.gameplayMode === 'vertical') {
-      this.updateLaneSnap(delta)
+      this.updateLaneSnap(delta, body.velocity.y)
     }
 
 /*
@@ -1295,7 +1295,7 @@ pskin?.setThrust?.(thrustLevel)
     this.laneSnapActive = true
   }
 
-  private updateLaneSnap(delta: number) {
+  private updateLaneSnap(delta: number, preservedVy: number) {
     if (!this.lanes) return
     if (this.horizontalInputActive) {
       this.laneSnapActive = false
@@ -1303,7 +1303,6 @@ pskin?.setThrust?.(thrustLevel)
     }
 
     const body = this.player.body as Phaser.Physics.Arcade.Body
-    const preservedVy = body.velocity.y
     if (!this.laneSnapActive) {
       const nearest = this.lanes.nearest(this.player.x)
       if (!nearest) return
@@ -1315,9 +1314,13 @@ pskin?.setThrust?.(thrustLevel)
         this.laneSnapElapsed = 0
         this.laneSnapActive = true
       } else {
+        const prevX = this.player.x
         this.player.setX(nearest.centerX)
-        body.updateFromGameObject()
-        body.velocity.y = preservedVy
+        const dx = this.player.x - prevX
+        body.position.x += dx
+        body.prev.x += dx
+        body.updateCenter()
+        body.setVelocity(0, preservedVy)
       }
       return
     }
@@ -1326,14 +1329,22 @@ pskin?.setThrust?.(thrustLevel)
     const t = Phaser.Math.Clamp(this.laneSnapElapsed / this.laneSnapDurationMs, 0, 1)
     const eased = Phaser.Math.Easing.Sine.InOut(t)
     const newX = Phaser.Math.Linear(this.laneSnapFromX, this.laneSnapTargetX, eased)
+    const prevX = this.player.x
     this.player.setX(newX)
-    body.updateFromGameObject()
-    body.velocity.y = preservedVy
+    const dx = this.player.x - prevX
+    body.position.x += dx
+    body.prev.x += dx
+    body.updateCenter()
+    body.setVelocity(0, preservedVy)
 
     if (t >= 1) {
+      const prev = this.player.x
       this.player.setX(this.laneSnapTargetX)
-      body.updateFromGameObject()
-      body.velocity.y = preservedVy
+      const dx = this.player.x - prev
+      body.position.x += dx
+      body.prev.x += dx
+      body.updateCenter()
+      body.setVelocity(0, preservedVy)
       this.laneSnapActive = false
     }
   }

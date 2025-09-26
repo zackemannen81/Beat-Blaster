@@ -2,6 +2,8 @@ import Phaser from 'phaser'
 
 export type CubeVariant = 'solid' | 'wire' | 'plasma'
 
+export type CubeDesign = 'cube' | 'diamond' | 'triangle' | 'ring' | 'bar' | 'hex'
+
 export interface CubeSkinOptions {
   variant?: CubeVariant
   size?: number
@@ -11,6 +13,7 @@ export interface CubeSkinOptions {
   rotationDuration?: number
   pulseScale?: number
   pulseDuration?: number
+  design?: CubeDesign
 }
 
 export default class CubeSkin {
@@ -22,9 +25,12 @@ export default class CubeSkin {
   private zapTimer?: Phaser.Time.TimerEvent
   private rotateTween?: Phaser.Tweens.Tween
   private pulseTween?: Phaser.Tweens.Tween
+  private ringPulse?: Phaser.Time.TimerEvent
+  private ringGlow?: Phaser.GameObjects.Arc
   private baselineScale = 1
   private glowBaseScale = 1
   private variant: CubeVariant
+  private design: CubeDesign = 'cube'
   private size: number
   private primaryColor: number
   private secondaryColor: number
@@ -40,6 +46,7 @@ export default class CubeSkin {
     this.scene = scene
     this.host = host
     this.variant = options.variant ?? 'solid'
+    this.design = options.design ?? 'cube'
     this.size = options.size ?? 28
     this.primaryColor = options.primaryColor ?? 0x00e5ff
     this.secondaryColor = options.secondaryColor ?? 0x001a33
@@ -51,7 +58,7 @@ export default class CubeSkin {
 
     this.gfx = scene.add.graphics({ x: host.x, y: host.y }).setDepth(host.depth + 1)
     this.gfx.setScale(this.baselineScale)
-    this.drawCube()
+    this.drawShape()
 
     if (this.glowColor !== undefined && this.scene.textures.exists('plasma_glow_disc')) {
       this.glowSprite = this.scene.add.image(host.x, host.y, 'plasma_glow_disc')
@@ -79,10 +86,14 @@ export default class CubeSkin {
       })
     }
 
-    if (this.variant === 'solid') {
+    if (this.variant === 'solid' && this.design !== 'bar') {
       this.addAura()
     } else if (this.variant === 'wire') {
       this.startElectricZaps()
+    }
+
+    if (this.design === 'ring') {
+      this.startRingPulse()
     }
   }
 
@@ -95,27 +106,137 @@ export default class CubeSkin {
     }
   }
 
-  private drawCube() {
+  private drawShape() {
     const s = this.size
     const g = this.gfx
     g.clear()
 
+    switch (this.design) {
+      case 'diamond':
+        this.drawDiamond(g, s)
+        break
+      case 'triangle':
+        this.drawTriangle(g, s)
+        break
+      case 'ring':
+        this.drawRing(g, s)
+        break
+      case 'bar':
+        this.drawBar(g, s)
+        break
+      case 'hex':
+        this.drawHex(g, s)
+        break
+      default:
+        this.drawCubeShape(g, s)
+        break
+    }
+  }
+
+  private drawCubeShape(g: Phaser.GameObjects.Graphics, s: number) {
     if (this.variant === 'solid' || this.variant === 'plasma') {
       g.fillStyle(this.primaryColor, 0.92)
-      g.fillRect(-s/2, -s/2, s, s)
+      g.fillRect(-s / 2, -s / 2, s, s)
       g.lineStyle(2, this.secondaryColor, 0.9)
-      g.strokeRect(-s/2, -s/2, s, s)
-      // liten highlight
+      g.strokeRect(-s / 2, -s / 2, s, s)
       g.lineStyle(1, 0xffffff, 0.25)
-      g.beginPath(); g.moveTo(-s/2+3, -s/2+6); g.lineTo(s/2-6, -s/2+6); g.strokePath()
+      g.beginPath()
+      g.moveTo(-s / 2 + 3, -s / 2 + 6)
+      g.lineTo(s / 2 - 6, -s / 2 + 6)
+      g.strokePath()
     } else {
-      // wireframe
       g.lineStyle(2, this.primaryColor, 1)
-      g.strokeRect(-s/2, -s/2, s, s)
+      g.strokeRect(-s / 2, -s / 2, s, s)
       g.lineStyle(1, this.primaryColor, 0.7)
-      g.beginPath(); g.moveTo(-s/2, -s/2); g.lineTo(s/2, s/2); g.strokePath()
-      g.beginPath(); g.moveTo(s/2, -s/2); g.lineTo(-s/2, s/2); g.strokePath()
+      g.beginPath()
+      g.moveTo(-s / 2, -s / 2)
+      g.lineTo(s / 2, s / 2)
+      g.strokePath()
+      g.beginPath()
+      g.moveTo(s / 2, -s / 2)
+      g.lineTo(-s / 2, s / 2)
+      g.strokePath()
     }
+  }
+
+  private drawDiamond(g: Phaser.GameObjects.Graphics, s: number) {
+    const half = s / 2
+    g.fillStyle(this.primaryColor, 0.9)
+    g.lineStyle(2, this.secondaryColor, 0.9)
+    g.beginPath()
+    g.moveTo(0, -half)
+    g.lineTo(half, 0)
+    g.lineTo(0, half)
+    g.lineTo(-half, 0)
+    g.closePath()
+    g.fillPath()
+    g.strokePath()
+  }
+
+  private drawTriangle(g: Phaser.GameObjects.Graphics, s: number) {
+    const half = s / 2
+    g.fillStyle(this.primaryColor, 0.85)
+    g.lineStyle(2, this.secondaryColor, 0.9)
+    g.beginPath()
+    g.moveTo(0, -half)
+    g.lineTo(half, half)
+    g.lineTo(-half, half)
+    g.closePath()
+    g.fillPath()
+    g.strokePath()
+    g.lineStyle(1, 0xffffff, 0.25)
+    g.beginPath()
+    g.moveTo(0, -half * 0.4)
+    g.lineTo(half * 0.5, half * 0.6)
+    g.moveTo(0, -half * 0.4)
+    g.lineTo(-half * 0.5, half * 0.6)
+    g.strokePath()
+  }
+
+  private drawRing(g: Phaser.GameObjects.Graphics, s: number) {
+    const outer = s * 0.55
+    const inner = s * 0.28
+    g.fillStyle(this.secondaryColor, 0.3)
+    g.beginPath()
+    g.arc(0, 0, outer, 0, Math.PI * 2)
+    g.fillPath()
+    g.lineStyle(3, this.primaryColor, 0.85)
+    g.strokeCircle(0, 0, outer)
+    g.fillStyle(0x000000, 1)
+    g.beginPath()
+    g.arc(0, 0, inner, 0, Math.PI * 2)
+    g.fillPath()
+  }
+
+  private drawBar(g: Phaser.GameObjects.Graphics, s: number) {
+    const width = s * 1.8
+    const height = s * 1.1
+    g.fillStyle(this.primaryColor, 0.85)
+    g.fillRoundedRect(-width / 2, -height / 2, width, height, 12)
+    g.lineStyle(2, this.secondaryColor, 0.9)
+    g.strokeRoundedRect(-width / 2, -height / 2, width, height, 12)
+    g.lineStyle(1, 0xffffff, 0.2)
+    g.beginPath()
+    g.moveTo(-width / 2 + 6, 0)
+    g.lineTo(width / 2 - 6, 0)
+    g.strokePath()
+  }
+
+  private drawHex(g: Phaser.GameObjects.Graphics, s: number) {
+    const r = s / 2
+    g.fillStyle(this.primaryColor, 0.9)
+    g.lineStyle(2, this.secondaryColor, 0.9)
+    g.beginPath()
+    for (let i = 0; i < 6; i++) {
+      const angle = Phaser.Math.DegToRad(60 * i - 30)
+      const x = Math.cos(angle) * r
+      const y = Math.sin(angle) * r
+      if (i === 0) g.moveTo(x, y)
+      else g.lineTo(x, y)
+    }
+    g.closePath()
+    g.fillPath()
+    g.strokePath()
   }
 
   private addAura() {
@@ -131,6 +252,31 @@ export default class CubeSkin {
     })
     this.aura.setDepth(this.gfx.depth - 1)
     this.aura.startFollow(this.gfx)
+  }
+
+  private startRingPulse() {
+    this.ringGlow = this.scene.add.circle(this.gfx.x, this.gfx.y, this.size * 0.5, this.primaryColor, 0.3)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(this.gfx.depth - 1)
+    this.scene.events.on(Phaser.Scenes.Events.UPDATE, () => {
+      if (!this.ringGlow) return
+      this.ringGlow.x = this.gfx.x
+      this.ringGlow.y = this.gfx.y
+    })
+    this.ringPulse = this.scene.time.addEvent({
+      delay: 240,
+      loop: true,
+      callback: () => {
+        if (!this.ringGlow) return
+        this.scene.tweens.add({
+          targets: this.ringGlow,
+          radius: { from: this.size * 0.4, to: this.size * 0.65 },
+          alpha: { from: 0.35, to: 0 },
+          duration: 260,
+          ease: 'Cubic.easeOut'
+        })
+      }
+    })
   }
 
   private startElectricZaps() {
@@ -218,6 +364,8 @@ export default class CubeSkin {
     this.zapTimer?.remove(false)
     this.aura?.destroy()
     this.pulseTween?.stop()
+    this.ringPulse?.remove(false)
+    this.ringGlow?.destroy()
     this.glowSprite?.destroy()
     this.gfx.destroy()
   }

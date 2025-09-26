@@ -69,6 +69,9 @@ Useful docs
 - Teleporters blink between lanes on hi-hats with dedicated spawn helper and telegraph glow.
 - Lane Flooders spawn as wide barriers that occupy a lane and push players into movement checks.
 
+### Visual Polish
+- CubeSkin now supports per-enemy silhouettes (diamond dashers, ringed teleporters, flooder bars, etc.) with bespoke pulses/auras so each archetype reads immediately (`src/systems/CubeSkin.ts`).
+
 ## QA Snapshot (Sprint 1)
 - Build: `npm run build` (success, chunk size warning only).
 - Manual passes outstanding per checklist (BPM variants, mobile touch vs desktop, performance soak, latency tuning).

@@ -28,7 +28,8 @@ export const enemyStyles: Record<EnemyType, EnemyStyle> = {
     glowColor: 0xff80ea,
     pulseScale: 0.14,
     pulseDuration: 200,
-    rotationDuration: 5200
+    rotationDuration: 5200,
+    design: 'cube'
   },
   dasher: {
     variant: 'wire',
@@ -39,7 +40,8 @@ export const enemyStyles: Record<EnemyType, EnemyStyle> = {
     glowColor: 0x1ac8ff,
     pulseScale: 0.1,
     pulseDuration: 160,
-    rotationDuration: 3200
+    rotationDuration: 3200,
+    design: 'diamond'
   },
   swarm: {
     variant: 'plasma',
@@ -50,7 +52,8 @@ export const enemyStyles: Record<EnemyType, EnemyStyle> = {
     glowColor: 0xb57aff,
     pulseScale: 0.08,
     pulseDuration: 140,
-    rotationDuration: 4000
+    rotationDuration: 4000,
+    design: 'triangle'
   },
   exploder: {
     variant: 'solid',
@@ -61,7 +64,8 @@ export const enemyStyles: Record<EnemyType, EnemyStyle> = {
     glowColor: 0xff9248,
     pulseScale: 0.18,
     pulseDuration: 320,
-    rotationDuration: 2800
+    rotationDuration: 2800,
+    design: 'hex'
   },
   weaver: {
     variant: 'wire',
@@ -72,7 +76,8 @@ export const enemyStyles: Record<EnemyType, EnemyStyle> = {
     glowColor: 0xb4f0ff,
     pulseScale: 0.12,
     pulseDuration: 220,
-    rotationDuration: 3600
+    rotationDuration: 3600,
+    design: 'triangle'
   },
   formation: {
     variant: 'solid',
@@ -83,7 +88,8 @@ export const enemyStyles: Record<EnemyType, EnemyStyle> = {
     glowColor: 0xffb0e9,
     pulseScale: 0.1,
     pulseDuration: 260,
-    rotationDuration: 3000
+    rotationDuration: 3000,
+    design: 'hex'
   },
   mirrorer: {
     variant: 'wire',
@@ -94,7 +100,8 @@ export const enemyStyles: Record<EnemyType, EnemyStyle> = {
     glowColor: 0xccff8f,
     pulseScale: 0.14,
     pulseDuration: 200,
-    rotationDuration: 3400
+    rotationDuration: 3400,
+    design: 'diamond'
   },
   teleporter: {
     variant: 'plasma',
@@ -105,7 +112,8 @@ export const enemyStyles: Record<EnemyType, EnemyStyle> = {
     glowColor: 0xc7d2ff,
     pulseScale: 0.2,
     pulseDuration: 180,
-    rotationDuration: 2600
+    rotationDuration: 2600,
+    design: 'ring'
   },
   flooder: {
     variant: 'solid',
@@ -116,6 +124,7 @@ export const enemyStyles: Record<EnemyType, EnemyStyle> = {
     glowColor: 0xff9fb2,
     pulseScale: 0.12,
     pulseDuration: 300,
-    rotationDuration: 0
+    rotationDuration: 0,
+    design: 'bar'
   }
 }

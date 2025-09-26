@@ -1,5 +1,7 @@
 import Phaser from 'phaser'
 import Powerups, { PowerupEvent, PowerupType } from '../systems/Powerups'
+import { BeatJudgement } from '../systems/BeatWindow'
+import { AccuracyLevel } from '../systems/Scoring'
 
 type PowerupSlot = {
   container: Phaser.GameObjects.Container
@@ -44,6 +46,9 @@ export default class HUD {
   private difficultyLabel = ''
   private crosshairText!: Phaser.GameObjects.Text
   private upcomingWaveInfo: { label: string; spawnAt: number; fallback: boolean } | null = null
+  private shotFeedback!: Phaser.GameObjects.Text
+  private bpmText!: Phaser.GameObjects.Text
+  private laneText!: Phaser.GameObjects.Text
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene
@@ -64,6 +69,9 @@ export default class HUD {
     this.upcomingWaveText.setVisible(false)
     this.telegraphText.setVisible(false)
 
+    this.bpmText = this.scene.add.text(width - 160, 34, 'BPM: 0', { fontFamily: 'UiFont, sans-serif', fontSize: '14px', color: '#9ad2ff' })
+    this.laneText = this.scene.add.text(width - 160, 52, 'Lanes: 0', { fontFamily: 'UiFont, sans-serif', fontSize: '14px', color: '#9ad2ff' })
+
     this.bossContainer = this.scene.add.container(width / 2, 80).setVisible(false).setDepth(40)
     const bossBg = this.scene.add.rectangle(0, 0, 240, 18, 0x000000, 0.45).setOrigin(0.5)
     this.bossBarBg = this.scene.add.rectangle(0, 0, 220, 10, 0xffffff, 0.18).setOrigin(0.5)
@@ -78,6 +86,14 @@ export default class HUD {
       stroke: '#000',
       strokeThickness: 4
     }).setOrigin(0.5).setDepth(60).setVisible(false)
+
+    this.shotFeedback = this.scene.add.text(width / 2, height * 0.78, '', {
+      fontFamily: 'UiFont, sans-serif',
+      fontSize: '30px',
+      color: '#66ffda',
+      stroke: '#000',
+      strokeThickness: 3
+    }).setOrigin(0.5).setDepth(55).setAlpha(0)
 
     this.scene.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this)
     this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -130,6 +146,45 @@ export default class HUD {
       yoyo: true,
       duration: 180,
       repeat: 1
+    })
+  }
+
+  setBpm(bpm: number) {
+    if (!this.bpmText) return
+    const rounded = Math.max(0, Math.round(bpm))
+    this.bpmText.setText(`BPM: ${rounded}`)
+  }
+
+  setLaneCount(count: number) {
+    if (!this.laneText) return
+    const clamped = Math.max(0, Math.floor(count))
+    this.laneText.setText(`Lanes: ${clamped}`)
+  }
+
+  showShotFeedback(quality: BeatJudgement, accuracy: AccuracyLevel) {
+    if (!this.shotFeedback) return
+    let text = 'On Beat'
+    let color = '#9ad2ff'
+    if (quality === 'perfect') {
+      text = 'Perfect!'
+      color = '#66ffda'
+    } else if (accuracy === 'Good') {
+      text = 'Good'
+      color = '#ffd866'
+    }
+    this.shotFeedback.setText(text)
+    this.shotFeedback.setColor(color)
+    this.shotFeedback.setAlpha(1)
+    this.shotFeedback.setScale(1)
+    this.scene.tweens.killTweensOf(this.shotFeedback)
+    const targetScale = quality === 'perfect' ? 1.25 : 1.1
+    const duration = quality === 'perfect' ? 260 : 200
+    this.scene.tweens.add({
+      targets: this.shotFeedback,
+      alpha: 0,
+      scale: targetScale,
+      duration,
+      ease: 'Sine.easeOut'
     })
   }
 
@@ -327,6 +382,9 @@ export default class HUD {
     this.telegraphText.setPosition(16, 130)
     this.bossContainer.setPosition(width / 2, 80)
     this.missText.setPosition(width / 2, height * 0.45)
+    this.bpmText?.setPosition(width - 160, 34)
+    this.laneText?.setPosition(width - 160, 52)
+    this.shotFeedback?.setPosition(width / 2, height * 0.78)
     this.layoutPowerupSlots()
   }
 }

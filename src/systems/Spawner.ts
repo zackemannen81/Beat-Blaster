@@ -3,6 +3,7 @@ import CubeSkin from '../systems/CubeSkin'
 import { enemyStyles, EnemyType } from '../config/enemyStyles'
 import { WaveDescriptor, FormationId } from '../types/waves'
 import { showTelegraph } from './Telegraph'
+import LaneManager from './LaneManager'
 
 export type Enemy = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
 
@@ -14,6 +15,7 @@ export type PatternData =
   | { kind: 'spiral'; anchorX: number; anchorY: number; angularVelocity: number }
   | { kind: 'spiral_drop'; anchorX: number; anchorY: number; angularVelocity: number }
   | { kind: 'burst'; speedY: number }
+  | { kind: 'lane_hopper'; laneA: number; laneB: number; hopEveryBeats?: number; speedY: number }
   | { kind: 'boss'; speedY: number }
 
 type SpawnConfig = {
@@ -38,6 +40,8 @@ export default class Spawner {
   private laneCount = 6
   private hpMultiplier = 1
   private bossHpMultiplier = 1
+  private laneManager?: LaneManager
+  private laneChangedHandler?: (snapshot: ReturnType<LaneManager['getSnapshot']>) => void
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene
@@ -51,7 +55,25 @@ export default class Spawner {
   setDifficulty(config: { hpMultiplier?: number; bossHpMultiplier?: number; laneCount?: number }) {
     if (typeof config.hpMultiplier === 'number' && config.hpMultiplier > 0) this.hpMultiplier = config.hpMultiplier
     if (typeof config.bossHpMultiplier === 'number' && config.bossHpMultiplier > 0) this.bossHpMultiplier = config.bossHpMultiplier
-    if (typeof config.laneCount === 'number' && config.laneCount >= 3) this.laneCount = Math.floor(config.laneCount)
+    if (!this.laneManager && typeof config.laneCount === 'number' && config.laneCount >= 3) {
+      this.laneCount = Math.floor(config.laneCount)
+    }
+  }
+
+  setLaneManager(manager: LaneManager | null) {
+    if (this.laneManager && this.laneChangedHandler) {
+      this.laneManager.off(LaneManager.EVT_CHANGED, this.laneChangedHandler, this)
+    }
+    this.laneManager = manager ?? undefined
+    if (this.laneManager) {
+      this.laneCount = this.laneManager.getCount()
+      this.laneChangedHandler = (snapshot) => {
+        this.laneCount = snapshot.count
+      }
+      this.laneManager.on(LaneManager.EVT_CHANGED, this.laneChangedHandler, this)
+    } else {
+      this.laneChangedHandler = undefined
+    }
   }
 
   spawn(type: EnemyType, count = 1, options: { waveId?: string; hpMultiplier?: number } = {}): Enemy[] {
@@ -84,9 +106,7 @@ export default class Spawner {
     waveId?: string
   ): Enemy[] {
     const spawned: Enemy[] = []
-    const { width } = this.scene.scale
-    const spacing = width / (this.laneCount + 1)
-    const anchorX = spacing * (laneIndex + 1)
+    const anchorX = this.getLaneCenterX(laneIndex)
     const margin = 60
     const speedY = this.scrollBase * speedMultiplier
     for (let i = 0; i < count; i++) {
@@ -102,6 +122,36 @@ export default class Spawner {
       spawned.push(enemy)
     }
     return spawned
+  }
+
+  spawnLaneHopper(
+    type: EnemyType,
+    laneA: number,
+    laneB: number,
+    speedMultiplier = 1,
+    hopEveryBeats = 1,
+    hpMultiplier?: number,
+    waveId?: string
+  ): Enemy[] {
+    if (this.laneCount <= 0) return []
+    const startLane = Phaser.Math.Clamp(laneA, 0, Math.max(0, this.laneCount - 1))
+    const altLane = Phaser.Math.Clamp(laneB, 0, Math.max(0, this.laneCount - 1))
+    const anchorX = this.getLaneCenterX(startLane)
+    const margin = 60
+    const speedY = this.scrollBase * speedMultiplier
+    const enemy = this.createEnemy({
+      type,
+      x: anchorX,
+      y: -margin,
+      velocityY: speedY,
+      hpMultiplier,
+      waveId,
+      pattern: { kind: 'lane_hopper', laneA: startLane, laneB: altLane, hopEveryBeats, speedY }
+    })
+    enemy.setData('laneHopCurrent', startLane)
+    enemy.setData('laneHopBeatCount', 0)
+    enemy.setData('laneHopTween', null)
+    return [enemy]
   }
 
   spawnSineWave(
@@ -179,6 +229,9 @@ export default class Spawner {
       case 'lane':
         enemies = this.spawnLaneWave(descriptor, anchor, waveId, options.skipTelegraph === true)
         break
+      case 'lane_hopper':
+        enemies = this.spawnLaneHopperDescriptor(descriptor, waveId, options.skipTelegraph === true)
+        break
       case 'sine':
         enemies = this.spawnSineWaveDescriptor(descriptor, waveId, options.skipTelegraph === true)
         break
@@ -227,6 +280,31 @@ export default class Spawner {
       laneIndex,
       count,
       speedMul,
+      descriptor.hpMultiplier,
+      waveId
+    )
+  }
+
+  private spawnLaneHopperDescriptor(
+    descriptor: WaveDescriptor,
+    waveId: string,
+    skipTelegraph: boolean
+  ): Enemy[] {
+    const params = descriptor.formationParams ?? {}
+    const laneA = typeof params.laneA === 'number' ? params.laneA : Math.floor(this.laneCount / 2)
+    const laneB = typeof params.laneB === 'number' ? params.laneB : laneA + 1
+    const hopEvery = params.hopEveryBeats ?? 1
+    const speedMul = descriptor.speedMultiplier ?? 1
+    if (!skipTelegraph && descriptor.telegraph) {
+      const telegraphX = this.getLaneCenterX(Math.min(laneA, laneB))
+      showTelegraph(this.scene, descriptor.telegraph, { x: telegraphX, y: -60 })
+    }
+    return this.spawnLaneHopper(
+      descriptor.enemyType,
+      laneA,
+      laneB,
+      speedMul,
+      hopEvery,
       descriptor.hpMultiplier,
       waveId
     )
@@ -500,6 +578,17 @@ export default class Spawner {
     return this.group
   }
 
+  getLaneCenterX(index: number): number {
+    if (this.laneManager) {
+      const clamped = Phaser.Math.Clamp(index, 0, this.laneManager.getCount() - 1)
+      return this.laneManager.centerX(clamped)
+    }
+    const { width } = this.scene.scale
+    const spacing = width / (this.laneCount + 1)
+    const clamped = Phaser.Math.Clamp(index, 0, this.laneCount - 1)
+    return spacing * (clamped + 1)
+  }
+
   private createEnemy(config: SpawnConfig): Enemy {
     const placeholderFrame = this.getFrameForType(config.type)
     const sprite = this.group.get(config.x, config.y, 'gameplay', placeholderFrame) as Enemy
@@ -533,9 +622,15 @@ export default class Spawner {
 
     const uid = Phaser.Utils.String.UUID()
     sprite.setData('eid', uid)
-    sprite.setData('pattern', config.pattern ?? null)
+    const pattern = config.pattern ?? null
+    sprite.setData('pattern', pattern)
     sprite.setData('isBoss', config.isBoss ?? false)
     sprite.setData('waveId', config.waveId ?? null)
+    if (pattern && pattern.kind === 'lane_hopper') {
+      sprite.setData('laneHopCurrent', pattern.laneA)
+      sprite.setData('laneHopBeatCount', 0)
+      sprite.setData('laneHopTween', null)
+    }
     const skin = new CubeSkin(this.scene, sprite, style)
     sprite.setData('skin', skin)
     sprite.setData('pulseScale', style.pulseScale)

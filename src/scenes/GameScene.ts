@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import AudioAnalyzer from '../systems/AudioAnalyzer'
 import Conductor from '../systems/Conductor'
 import Spawner, { PatternData } from '../systems/Spawner'
-import Scoring from '../systems/Scoring'
+import Scoring, { AccuracyLevel } from '../systems/Scoring'
 import HUD from '../ui/HUD'
 import Effects from '../systems/Effects'
 import Powerups, { PowerupType } from '../systems/Powerups'
@@ -12,6 +12,8 @@ import { loadOptions, resolveGameplayMode, GameplayMode } from '../systems/Optio
 import PlayerSkin from '../systems/PlayerSkin'
 import NeonGrid from '../systems/NeonGrid'
 import CubeSkin from '../systems/CubeSkin'
+import LaneManager from '../systems/LaneManager'
+import BeatWindow, { BeatJudgement } from '../systems/BeatWindow'
 import { getDifficultyProfile, DifficultyProfile, DifficultyProfileId, StageTuning } from '../config/difficultyProfiles'
 import WaveDirector from '../systems/WaveDirector'
 import EnemyLifecycle from '../systems/EnemyLifecycle'
@@ -30,6 +32,7 @@ export default class GameScene extends Phaser.Scene {
   private spawner!: Spawner
   private hud!: HUD
   private scoring = new Scoring()
+  private beatWindow = new BeatWindow()
   private music?: Phaser.Sound.BaseSound
   private bullets!: Phaser.Physics.Arcade.Group
   private isShooting = false
@@ -48,6 +51,7 @@ export default class GameScene extends Phaser.Scene {
   private announcer!: Announcer
   private lastDashToggle = 0
   private lastBeatAt = 0
+  private beatCount = 0
   private nextQuantizedShotAt = 0
   private beatPeriodMs = 2000 // fallback
   private crosshair!: Phaser.GameObjects.Graphics
@@ -74,7 +78,6 @@ export default class GameScene extends Phaser.Scene {
   private gamepadFireActive = false
   private touchMovePointerId?: number
   private touchMoveBaselineX = 0
-  private touchMoveBaselinePlayerX = 0
   private touchFirePointers = new Set<number>()
   private touchTapTimes: number[] = []
   private beatIndicator!: Phaser.GameObjects.Graphics;
@@ -104,6 +107,22 @@ export default class GameScene extends Phaser.Scene {
   private reducedMotion = false
   private activeBoss: Enemy | null = null
   private waveDirector!: WaveDirector
+  private lanes?: LaneManager
+  private targetLaneIndex = 0
+  private laneSnapFromX = 0
+  private laneSnapTargetX = 0
+  private laneSnapElapsed = 0
+  private laneSnapDurationMs = 160
+  private laneSnapActive = false
+  private laneAxisLatchMs = 0
+  private laneDeadzonePx = 6
+  private touchLaneIndexBaseline = 0
+  private touchLaneAccum = 0
+  private releaseFireMode = false
+  private releaseFireArmed = false
+  private onLaneSnapshot = (snapshot: ReturnType<LaneManager['getSnapshot']>) => {
+    this.hud?.setLaneCount(snapshot.count)
+  }
 
   private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     const enemyId = (enemy.getData('eid') as string) ?? null
@@ -117,6 +136,10 @@ export default class GameScene extends Phaser.Scene {
     const hb = enemy.getData('healthBar') as Phaser.GameObjects.Graphics
     hb?.destroy()
 
+    const hopTween = enemy.getData('laneHopTween') as Phaser.Tweens.Tween | null
+    hopTween?.remove()
+    enemy.setData('laneHopTween', null)
+
     enemy.disableBody(true, true)
   }
   //private keys:Phaser.Types.Input.Keyboard;
@@ -129,6 +152,7 @@ export default class GameScene extends Phaser.Scene {
     this.crosshairMode = this.opts.crosshairMode
     this.verticalSafetyBand = !!this.opts.verticalSafetyBand
     this.gameplayMode = resolveGameplayMode(this.opts.gameplayMode)
+    this.releaseFireMode = this.gameplayMode === 'vertical'
     this.gamepadDeadzone = this.opts.gamepadDeadzone
     this.gamepadSensitivity = this.opts.gamepadSensitivity
 
@@ -180,6 +204,10 @@ export default class GameScene extends Phaser.Scene {
     this.beatIndicator = this.add.graphics();
     this.beatIndicator.fillStyle(0xff0000, 1);
     this.beatIndicator.fillCircle(50, 50, 20); // Placera den där det passar i ditt UI
+
+    if (this.gameplayMode === 'vertical') {
+      this.setupVerticalLaneSystem()
+    }
 
   /*
     // aktivera WASD
@@ -246,6 +274,10 @@ export default class GameScene extends Phaser.Scene {
       this.analyzer?.removeAllListeners?.()
       this.backgroundScroller?.destroy()
       this.starfield?.destroy()
+      this.spawner?.setLaneManager(null)
+      this.lanes?.off(LaneManager.EVT_CHANGED, this.onLaneSnapshot, this)
+      this.lanes?.destroy()
+      this.lanes = undefined
       this.scale.off(Phaser.Scale.Events.RESIZE, this.updateMovementBounds, this)
       this.input.gamepad?.off('connected', this.onGamepadConnected, this)
       this.input.gamepad?.off('disconnected', this.onGamepadDisconnected, this)
@@ -259,7 +291,8 @@ export default class GameScene extends Phaser.Scene {
           if (this.touchMovePointerId === undefined) {
             this.touchMovePointerId = pointer.id
             this.touchMoveBaselineX = pointer.x
-            this.touchMoveBaselinePlayerX = this.player.x
+            this.touchLaneIndexBaseline = this.targetLaneIndex
+            this.touchLaneAccum = 0
           }
         } else {
           this.touchFirePointers.add(pointer.id)
@@ -275,6 +308,7 @@ export default class GameScene extends Phaser.Scene {
       if (this.gameplayMode === 'vertical' && pointerType !== 'mouse') {
         if (pointer.id === this.touchMovePointerId) {
           this.touchMovePointerId = undefined
+          this.touchLaneAccum = 0
         }
         if (this.touchFirePointers.delete(pointer.id) && this.touchFirePointers.size === 0) {
           this.handleFireInputUp()
@@ -287,15 +321,20 @@ export default class GameScene extends Phaser.Scene {
       const pointerType = (pointer as any)?.pointerType ?? 'mouse'
       if (this.gameplayMode !== 'vertical' || pointerType === 'mouse') return
       if (pointer.id !== this.touchMovePointerId) return
+      if (!this.lanes) return
       const deltaX = pointer.x - this.touchMoveBaselineX
-      const targetX = this.touchMoveBaselinePlayerX + deltaX
-      const body = this.player.body as Phaser.Physics.Arcade.Body
-      const halfWidth = body.width * 0.5
-      const minX = halfWidth
-      const maxX = this.scale.width - halfWidth
-      const clamped = Phaser.Math.Clamp(targetX, minX, maxX)
-      this.player.setX(clamped)
-      body.setVelocityX(0)
+      this.touchMoveBaselineX = pointer.x
+      this.touchLaneAccum += deltaX
+      const threshold = Math.max(this.getLaneSpacing() * 0.35, 18)
+      while (Math.abs(this.touchLaneAccum) >= threshold) {
+        const dir = this.touchLaneAccum > 0 ? 1 : -1
+        const moved = this.shiftLane(dir)
+        if (!moved) {
+          this.touchLaneAccum = 0
+          break
+        }
+        this.touchLaneAccum -= threshold * dir
+      }
     })
 
     if (this.input.gamepad) {
@@ -330,6 +369,10 @@ export default class GameScene extends Phaser.Scene {
     const handleBeat = (band: 'low' | 'mid' | 'high', pulse = false) => {
       this.conductor.onBeat()
       this.lastBeatAt = this.time.now
+      if (band === 'low') {
+        this.beatCount += 1
+        if (this.gameplayMode === 'vertical') this.triggerLaneHopperHop()
+      }
       this.waveDirector.enqueueBeat(band)
       if (pulse) this.pulseEnemies()
     }
@@ -395,6 +438,11 @@ export default class GameScene extends Phaser.Scene {
 
     // Spawner & wave director
     this.spawner = new Spawner(this)
+    if (this.gameplayMode === 'vertical') {
+      this.spawner.setLaneManager(this.lanes ?? null)
+    } else {
+      this.spawner.setLaneManager(null)
+    }
     const playlistId = (this.difficultyProfile.wavePlaylistId ?? this.difficultyProfile.id) as DifficultyProfileId
     const playlist = getWavePlaylist(playlistId)
     this.waveDescriptorIndex.clear()
@@ -449,6 +497,7 @@ export default class GameScene extends Phaser.Scene {
     const interval = 60000 / bpm
     this.beatPeriodMs = interval
     this.scrollBase = this.computeScrollBase(bpm)
+    this.beatWindow.setBpm(bpm)
     this.starfield.setBaseScroll(this.scrollBase)
     this.backgroundScroller.setBaseScroll(this.scrollBase)
     this.spawner.setScrollBase(this.scrollBase)
@@ -465,6 +514,8 @@ export default class GameScene extends Phaser.Scene {
     this.hud.setCrosshairMode(this.crosshairMode)
     this.hud.setBossHealth(null)
     this.hud.setCombo(0)
+    this.hud.setBpm(bpm)
+    this.hud.setLaneCount(this.lanes?.getCount() ?? this.resolveLaneCount())
 
     this.announcer.playEvent('new_game')
 
@@ -644,6 +695,8 @@ this.lastHitAt = this.time.now
         const targetScroll = this.computeScrollBase(estBpm)
         this.scrollBase = Phaser.Math.Linear(this.scrollBase, targetScroll, 0.05)
         this.beatPeriodMs = Phaser.Math.Linear(this.beatPeriodMs, estPeriod, 0.1)
+        this.beatWindow.setBpm(estBpm)
+        this.hud?.setBpm(estBpm)
       }
     }
     this.registry.set('scrollBase', this.scrollBase)
@@ -698,6 +751,10 @@ this.lastHitAt = this.time.now
       moveX += processedX
       moveY += processedY
 
+      if (this.gameplayMode === 'vertical') {
+        this.handleLaneAxis(processedX, delta)
+      }
+
       const aimAxisX = pad.axes.length > 2 ? pad.axes[2].getValue() : axisX
       const aimAxisY = pad.axes.length > 3 ? pad.axes[3].getValue() : axisY
       const aimX = this.applyGamepadDeadzone(aimAxisX)
@@ -726,7 +783,13 @@ this.lastHitAt = this.time.now
       this.handleFireInputUp()
     }
 
+    if (this.gameplayMode === 'vertical') {
+      this.handleLaneKeyboardInput(wasdKeys)
+    }
+
     if (this.touchMovePointerId !== undefined) moveX = 0
+
+    if (this.gameplayMode === 'vertical') moveX = 0
 
     const magnitude = Math.hypot(moveX, moveY)
     if (magnitude > 1) {
@@ -743,6 +806,8 @@ this.lastHitAt = this.time.now
     if (targetVelocity.lengthSq() > 1) targetVelocity.normalize()
     targetVelocity.scale(maxSpeed)
 
+    if (this.gameplayMode === 'vertical') targetVelocity.x = 0
+
     const lerp = 0.22
     let newVelX = Phaser.Math.Linear(body.velocity.x, targetVelocity.x, lerp)
     let newVelY = Phaser.Math.Linear(body.velocity.y, targetVelocity.y, lerp)
@@ -750,6 +815,7 @@ this.lastHitAt = this.time.now
       newVelX *= 0.82
       newVelY *= 0.82
     }
+    if (this.gameplayMode === 'vertical') newVelX = 0
     body.setVelocity(newVelX, newVelY)
 
     if (this.gameplayMode === 'vertical' && this.verticalSafetyBand) {
@@ -758,6 +824,10 @@ this.lastHitAt = this.time.now
       const maxY = this.movementMaxY - halfHeight
       body.y = Phaser.Math.Clamp(body.y, minY, maxY)
       this.player.y = body.y + halfHeight
+    }
+
+    if (this.gameplayMode === 'vertical') {
+      this.updateLaneSnap(delta)
     }
 
 /*
@@ -865,7 +935,7 @@ pskin?.setThrust?.(thrustLevel)
     })
   }
 
-  private fireBullet() {
+  private fireBullet(judgementOverride?: BeatJudgement, deltaOverride?: number) {
     const direction = this.getAimDirection()
     if (direction.lengthSq() === 0) return
 
@@ -888,13 +958,22 @@ pskin?.setThrust?.(thrustLevel)
       this.spawnPlasmaBullet(rightDir, ttl)
     }
 
-    const deltaMs = this.analyzer.nearestBeatDeltaMs()
-    this.scoring.registerShot(deltaMs)
+    const deltaMs = typeof deltaOverride === 'number'
+      ? deltaOverride
+      : this.analyzer?.nearestBeatDeltaMs?.() ?? 999
+    const accuracy = this.scoring.registerShot(deltaMs)
+    this.showShotFeedback(accuracy, judgementOverride)
 
     const g = this.add.graphics({ x: this.player.x, y: this.player.y })
     g.lineStyle(2, 0x00e5ff, 0.8)
     g.strokeCircle(0, 0, 18)
     this.tweens.add({ targets: g, alpha: 0, scale: 1.6, duration: 180, onComplete: () => g.destroy() })
+  }
+
+  private showShotFeedback(accuracy: AccuracyLevel, judgementOverride?: BeatJudgement) {
+    if (!this.hud) return
+    const quality: BeatJudgement = judgementOverride ?? (accuracy === 'Perfect' ? 'perfect' : 'normal')
+    this.hud.showShotFeedback(quality, accuracy)
   }
 
   private spawnPlasmaBullet(direction: Phaser.Math.Vector2, lifetimeMs?: number) {
@@ -1074,6 +1153,150 @@ pskin?.setThrust?.(thrustLevel)
     } else {
       this.movementMinY = 0
       this.movementMaxY = height
+    }
+  }
+
+  private setupVerticalLaneSystem() {
+    const laneCount = this.resolveLaneCount()
+    this.lanes?.off(LaneManager.EVT_CHANGED, this.onLaneSnapshot, this)
+    this.lanes?.destroy()
+    this.lanes = new LaneManager({
+      scene: this,
+      count: laneCount,
+      width: this.scale.width,
+      left: 0,
+      debug: false
+    })
+    this.lanes.on(LaneManager.EVT_CHANGED, this.onLaneSnapshot, this)
+
+    const lanes = this.lanes.getAll()
+    const middle = this.lanes.middle() ?? lanes[Math.floor(lanes.length / 2)] ?? lanes[0]
+    const targetIndex = middle?.index ?? 0
+    const targetX = middle?.centerX ?? this.scale.width / 2
+
+    this.targetLaneIndex = targetIndex
+    this.laneSnapFromX = targetX
+    this.laneSnapTargetX = targetX
+    this.laneSnapElapsed = this.laneSnapDurationMs
+    this.laneSnapActive = false
+    this.touchLaneIndexBaseline = targetIndex
+    this.touchLaneAccum = 0
+    this.laneAxisLatchMs = 0
+    this.releaseFireArmed = false
+
+    this.player.setX(targetX)
+    const body = this.player.body as Phaser.Physics.Arcade.Body
+    body.reset(targetX, this.player.y)
+    body.setVelocityX(0)
+
+    this.spawner?.setLaneManager(this.lanes)
+    this.hud?.setLaneCount(laneCount)
+  }
+
+  private resolveLaneCount(): 3 | 5 | 7 {
+    if (this.verticalLaneCount >= 7) return 7
+    if (this.verticalLaneCount >= 5) return 5
+    return 3
+  }
+
+  private getLaneSpacing(): number {
+    if (!this.lanes) return this.scale.width / 3
+    const all = this.lanes.getAll()
+    if (all.length <= 1) return this.scale.width
+    let sum = 0
+    let samples = 0
+    for (let i = 1; i < all.length; i++) {
+      sum += Math.abs(all[i].centerX - all[i - 1].centerX)
+      samples++
+    }
+    return samples > 0 ? sum / samples : this.scale.width / 3
+  }
+
+  private handleLaneKeyboardInput(wasdKeys: any) {
+    if (!this.lanes) return
+    const leftPressed = (this.cursors.left && Phaser.Input.Keyboard.JustDown(this.cursors.left))
+      || (wasdKeys?.A && Phaser.Input.Keyboard.JustDown(wasdKeys.A))
+    const rightPressed = (this.cursors.right && Phaser.Input.Keyboard.JustDown(this.cursors.right))
+      || (wasdKeys?.D && Phaser.Input.Keyboard.JustDown(wasdKeys.D))
+    if (leftPressed) this.shiftLane(-1)
+    else if (rightPressed) this.shiftLane(1)
+  }
+
+  private handleLaneAxis(value: number, delta: number) {
+    if (!this.lanes) return
+    const threshold = 0.4
+    if (Math.abs(value) < threshold) {
+      this.laneAxisLatchMs = 0
+      return
+    }
+    if (this.laneAxisLatchMs > 0) {
+      this.laneAxisLatchMs = Math.max(0, this.laneAxisLatchMs - delta)
+      return
+    }
+    this.shiftLane(value > 0 ? 1 : -1)
+    this.laneAxisLatchMs = 180
+  }
+
+  private shiftLane(direction: number): boolean {
+    if (!this.lanes) return false
+    const normalizedDir = direction < 0 ? -1 : direction > 0 ? 1 : 0
+    if (normalizedDir === 0) return false
+    const count = this.lanes.getCount()
+    const next = Phaser.Math.Clamp(this.targetLaneIndex + normalizedDir, 0, count - 1)
+    if (next === this.targetLaneIndex) return false
+    this.startLaneSnap(next)
+    return true
+  }
+
+  private startLaneSnap(index: number) {
+    if (!this.lanes) return
+    const count = this.lanes.getCount()
+    const clamped = Phaser.Math.Clamp(index, 0, count - 1)
+    const targetX = this.lanes.centerX(clamped)
+    this.targetLaneIndex = clamped
+    const currentX = this.player.x
+    if (Math.abs(targetX - currentX) <= this.laneDeadzonePx) {
+      this.player.setX(targetX)
+      const body = this.player.body as Phaser.Physics.Arcade.Body
+      body.updateFromGameObject()
+      this.laneSnapActive = false
+      this.laneSnapElapsed = this.laneSnapDurationMs
+      return
+    }
+    this.laneSnapFromX = currentX
+    this.laneSnapTargetX = targetX
+    this.laneSnapElapsed = 0
+    this.laneSnapActive = true
+  }
+
+  private updateLaneSnap(delta: number) {
+    if (!this.lanes) return
+    const body = this.player.body as Phaser.Physics.Arcade.Body
+    const targetX = this.lanes.centerX(this.targetLaneIndex)
+    if (!this.laneSnapActive) {
+      if (Math.abs(targetX - this.player.x) > this.laneDeadzonePx) {
+        this.laneSnapFromX = this.player.x
+        this.laneSnapTargetX = targetX
+        this.laneSnapElapsed = 0
+        this.laneSnapActive = true
+      } else {
+        this.player.setX(targetX)
+        body.updateFromGameObject()
+      }
+      return
+    }
+
+    this.laneSnapElapsed = Math.min(this.laneSnapElapsed + delta, this.laneSnapDurationMs)
+    const t = Phaser.Math.Clamp(this.laneSnapElapsed / this.laneSnapDurationMs, 0, 1)
+    const eased = Phaser.Math.Easing.Sine.InOut(t)
+    const newX = Phaser.Math.Linear(this.laneSnapFromX, this.laneSnapTargetX, eased)
+    this.player.setX(newX)
+    body.updateFromGameObject()
+
+    if (t >= 1) {
+      this.player.setX(this.laneSnapTargetX)
+      body.updateFromGameObject()
+      this.laneSnapActive = false
     }
   }
 
@@ -1272,6 +1495,10 @@ pskin?.setThrust?.(thrustLevel)
             body.setVelocity(0, targetSpeed)
             break
           }
+          case 'lane_hopper': {
+            body.setVelocity(0, pattern.speedY)
+            break
+          }
         }
       } else {
         body.setVelocity(body.velocity.x, this.scrollBase)
@@ -1283,6 +1510,46 @@ pskin?.setThrust?.(thrustLevel)
         this.handleEnemyMiss(enemy)
         return false
       }
+      return true
+    })
+  }
+
+  private triggerLaneHopperHop() {
+    if (!this.lanes || !this.spawner) return
+    const group = this.spawner.getGroup()
+    group.children.each((obj: Phaser.GameObjects.GameObject) => {
+      const enemy = obj as Enemy
+      if (!enemy.active) return true
+      const pattern = enemy.getData('pattern') as PatternData | null
+      if (!pattern || pattern.kind !== 'lane_hopper') return true
+
+      const hopEvery = pattern.hopEveryBeats && pattern.hopEveryBeats > 0 ? pattern.hopEveryBeats : 1
+      const beatCount = ((enemy.getData('laneHopBeatCount') as number) ?? 0) + 1
+      enemy.setData('laneHopBeatCount', beatCount)
+      if (beatCount % hopEvery !== 0) return true
+
+      const currentLane = (enemy.getData('laneHopCurrent') as number | undefined) ?? pattern.laneA
+      const nextLane = currentLane === pattern.laneA ? pattern.laneB : pattern.laneA
+      const clampedLane = Phaser.Math.Clamp(nextLane, 0, this.lanes.getCount() - 1)
+      enemy.setData('laneHopCurrent', clampedLane)
+
+      const targetX = this.lanes.centerX(clampedLane)
+      const body = enemy.body as Phaser.Physics.Arcade.Body
+      const existingTween = enemy.getData('laneHopTween') as Phaser.Tweens.Tween | null
+      existingTween?.remove()
+
+      const tween = this.tweens.add({
+        targets: enemy,
+        x: targetX,
+        duration: 140,
+        ease: 'Sine.easeInOut',
+        onUpdate: () => body.updateFromGameObject(),
+        onComplete: () => {
+          body.setVelocity(0, pattern.speedY)
+          enemy.setData('laneHopTween', null)
+        }
+      })
+      enemy.setData('laneHopTween', tween)
       return true
     })
   }
@@ -1413,6 +1680,10 @@ pskin?.setThrust?.(thrustLevel)
   }
 
   private handleFireInputDown() {
+    if (this.releaseFireMode) {
+      this.releaseFireArmed = true
+      return
+    }
     if (this.opts.fireMode === 'click') {
       const t = this.time.now
       if (t - this.lastShotAt >= this.fireCooldownMs) {
@@ -1428,8 +1699,24 @@ pskin?.setThrust?.(thrustLevel)
   }
 
   private handleFireInputUp() {
+    if (this.releaseFireMode) {
+      if (this.releaseFireArmed) {
+        this.releaseFireArmed = false
+        this.executeReleaseShot()
+      }
+      return
+    }
     this.isShooting = false
     this.nextQuantizedShotAt = 0
+  }
+
+  private executeReleaseShot() {
+    const now = this.time.now
+    if (now - this.lastShotAt < this.fireCooldownMs) return
+    const deltaMs = this.analyzer?.nearestBeatDeltaMs?.() ?? null
+    const judgement = this.beatWindow.classify(deltaMs)
+    this.fireBullet(judgement, typeof deltaMs === 'number' ? deltaMs : undefined)
+    this.lastShotAt = now
   }
 
   private onGamepadConnected(pad: Phaser.Input.Gamepad.Gamepad) {

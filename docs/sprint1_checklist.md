@@ -80,8 +80,9 @@
 ### 8.1 Testmatris (manuellt)
 - [ ] **BPM**: testa 90 / 120 / 160 BPM (snapping och beat‑window fortfarande intuitivt).
 - [ ] **Input**: PC (tangent + musuppsläpp) / Mobil (svep + finger‑release).
-- [ ] **Perf**: CPU/GPU stabil; inga spikes vid beat eller hop‑burst.
-- [ ] **Audio‑latens**: upplevs inte störa beat‑window (vid behov öka till 18‑20% på mobil).
+- [ ] **Perf**: CPU/GPU stabil; inga spikes vid beat eller hop-burst.
+- [ ] **Audio-latens**: upplevs inte störa beat-window (vid behov öka till 18-20% på mobil).
+- [ ] **Exploders**: Låt en exploder överleva 3 beats och verifiera varningstelegram + radial explosion (spelaren tar DMG inom ~150 px, shield blockerar korrekt).
 
 ### 8.2 Mini code‑review (egen)
 - [ ] Struktur: LaneManager/BeatWindow isolerade (återanvändbara).

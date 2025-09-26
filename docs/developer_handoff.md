@@ -48,6 +48,11 @@ Useful docs
 - New HUD fields: BPM, lane count, shot feedback. Layout auto-adjusts on resize (`src/ui/HUD.ts:147`).
 - Combo indicator unchanged but still resets on miss or lane hopper escape.
 
+### Exploders
+- New `exploder` enemy type added to `enemyStyles` with slow drift lanes and armour tuned to 3 HP (`src/config/enemyStyles.ts`, `src/systems/Spawner.ts`).
+- Countdown-driven detonation tied to `beat:low`; survivors burst in a radial blast that penalises the player and drains HP if they are within range (`src/scenes/GameScene.ts`).
+- Warning telegraph + announcer cue before final beat, with initial wave available in `normal_exploder_pair` (`src/config/waves/normal.json`).
+
 ## QA Snapshot (Sprint 1)
 - Build: `npm run build` (success, chunk size warning only).
 - Manual passes outstanding per checklist (BPM variants, mobile touch vs desktop, performance soak, latency tuning).
@@ -59,7 +64,7 @@ Useful docs
 3. **HUD polish** – Shot feedback should fade faster on mobile (verify with actual touch devices).
 4. **Wave coverage** – Add lane hopper patterns to `easy.json` and `hard.json`; ensure enemy counts respect lane availability.
 5. **Options UI** – Surface BeatWindow window ratio & lane debug toggle for testers (new mouse aim toggle is in place).
-6. **Docs** – Update `docs/vertical-mode.md` to detail free-aim toggle and lane snap behaviour.
+6. **Exploder progression** – Add exploder encounters to Easy/Hard playlists and extend detonation telegraphing for higher difficulties.
 
 ## Hand-off Checklist
 - [ ] Review `docs/sprint1_checklist.md` and tick completed items; add notes for outstanding QA rows.

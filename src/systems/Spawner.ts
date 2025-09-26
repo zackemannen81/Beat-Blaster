@@ -81,7 +81,7 @@ export default class Spawner {
     for (let i = 0; i < count; i++) {
       const { x, y } = this.randomOffscreen()
       const angle = Phaser.Math.Angle.Between(x, y, this.scene.scale.width / 2, this.scene.scale.height / 2)
-      const speedBase = type === 'swarm' ? 85 : type === 'dasher' ? 110 : 65
+      const speedBase = type === 'swarm' ? 85 : type === 'dasher' ? 110 : type === 'exploder' ? 55 : 65
       const speed = speedBase * 0.25
       const enemy = this.createEnemy({
         type,
@@ -275,7 +275,7 @@ export default class Spawner {
     if (!skipTelegraph && descriptor.telegraph) {
       showTelegraph(this.scene, descriptor.telegraph, { x: anchor.x, y: anchor.y }, { radius: params.radius ?? 140 })
     }
-    return this.spawnVerticalLane(
+    const spawned = this.spawnVerticalLane(
       descriptor.enemyType,
       laneIndex,
       count,
@@ -283,6 +283,15 @@ export default class Spawner {
       descriptor.hpMultiplier,
       waveId
     )
+    if (descriptor.enemyType === 'exploder') {
+      const beats = typeof params.explodeBeats === 'number' ? Math.max(1, Math.round(params.explodeBeats)) : 3
+      const radius = typeof params.radius === 'number' ? params.radius : 150
+      spawned.forEach((enemy) => {
+        enemy.setData('exploderCountdownBeats', beats)
+        enemy.setData('exploderRadius', radius)
+      })
+    }
+    return spawned
   }
 
   private spawnLaneHopperDescriptor(
@@ -600,7 +609,10 @@ export default class Spawner {
     sprite.setData('healthBar', healthBar)
 
     const balance = this.scene.registry.get('balance') as any
-    const baseHp = balance?.enemies?.[config.type]?.hp ?? (config.type === 'brute' ? 6 : config.type === 'dasher' ? 3 : 1)
+    let baseHp = balance?.enemies?.[config.type]?.hp as number | undefined
+    if (!Number.isFinite(baseHp)) {
+      baseHp = config.type === 'brute' ? 6 : config.type === 'dasher' ? 3 : config.type === 'exploder' ? 3 : 1
+    }
     let rawHp = config.hpOverride ?? baseHp
     if (config.type === 'dasher' && !config.isBoss) rawHp = Math.max(1, Math.round(rawHp * 0.85))
     const perWaveMul = typeof config.hpMultiplier === 'number' && Number.isFinite(config.hpMultiplier) ? config.hpMultiplier : 1
@@ -618,7 +630,11 @@ export default class Spawner {
 
     const body = sprite.body as Phaser.Physics.Arcade.Body
     body.setAllowGravity(false)
-    body.setVelocity(config.velocityX ?? 0, config.velocityY ?? this.scrollBase * 0.75)
+    const defaultVy = config.velocityY ?? this.scrollBase * (config.type === 'exploder' ? 0.45 : 0.75)
+    body.setVelocity(config.velocityX ?? 0, defaultVy)
+    if (config.type === 'exploder') {
+      body.setDrag(36, 0)
+    }
 
     const uid = Phaser.Utils.String.UUID()
     sprite.setData('eid', uid)
@@ -631,6 +647,11 @@ export default class Spawner {
       sprite.setData('laneHopBeatCount', 0)
       sprite.setData('laneHopTween', null)
     }
+    if (config.type === 'exploder') {
+      sprite.setData('exploderCountdownBeats', 3)
+      sprite.setData('exploderRadius', 150)
+      sprite.setData('exploderArmed', true)
+    }
     const skin = new CubeSkin(this.scene, sprite, style)
     sprite.setData('skin', skin)
     sprite.setData('pulseScale', style.pulseScale)
@@ -641,6 +662,7 @@ export default class Spawner {
   private getFrameForType(type: EnemyType) {
     if (type === 'brute') return 'enemy_brute_0'
     if (type === 'dasher') return 'enemy_dasher_0'
+    if (type === 'exploder') return 'enemy_brute_0'
     return 'enemy_swarm_0'
   }
 

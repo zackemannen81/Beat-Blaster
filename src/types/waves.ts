@@ -19,7 +19,7 @@ export type TelegraphDescriptor = {
 
 export type WaveCategory = 'light' | 'standard' | 'heavy' | 'boss'
 
-export type WaveTag = 'dasher' | 'swarm' | 'brute' | 'powerup' | 'boss' | 'intro'
+export type WaveTag = 'dasher' | 'swarm' | 'brute' | 'exploder' | 'powerup' | 'boss' | 'intro'
 
 export type WaveDescriptor = {
   id: string

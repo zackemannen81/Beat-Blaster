@@ -391,6 +391,7 @@ export default class GameScene extends Phaser.Scene {
         this.beatCount += 1
         if (this.gameplayMode === 'vertical') this.triggerLaneHopperHop()
       }
+      this.updateExplodersOnBeat(band)
       this.waveDirector.enqueueBeat(band)
       if (pulse) this.pulseEnemies()
     }
@@ -547,7 +548,7 @@ export default class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.bullets, this.spawner.getGroup(), (_b, _e) => {
       const bullet = _b as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
       const enemy = _e as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
-      const etype = (enemy.getData('etype') as 'brute' | 'dasher' | 'swarm') || 'swarm'
+      const etype = (enemy.getData('etype') as 'brute' | 'dasher' | 'swarm' | 'exploder') || 'swarm'
 
       const { damage, isPerfect } = this.readBulletMetadata(bullet)
       if (damage <= 0) {
@@ -631,30 +632,21 @@ this.lastHitAt = this.time.now
 
     // Collisions: player <- enemies
     this.physics.add.overlap(this.player, this.spawner.getGroup(), (_p, _e) => {
-      const now = this.time.now
-      if (now < this.iframesUntil) return
       const enemy = _e as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
       const isBoss = enemy.getData('isBoss') === true
-      if (this.powerups.hasShield) {
-        // shield blocks one hit
-        this.effects.hitSpark(this.player.x, this.player.y)
-        //this.effects.hitSpark(20, 20)
-      
+      const tookDamage = this.damagePlayer(1, {
+        feedback: isBoss ? 'Boss Crash!' : undefined,
+        missPenalty: isBoss ? this.bossMissPenalty : undefined,
+        showFeedback: isBoss
+      })
+      if (!tookDamage) return
+
+      if (!isBoss) {
+        this.cleanupEnemy(enemy, false)
       } else {
-        if (!isBoss) this.cleanupEnemy(enemy, false)
-        this.playerHp = Math.max(0, this.playerHp - 1)
-        this.comboCount = 0
-        this.hud.setCombo(this.comboCount)
-        this.iframesUntil = now + 800
-      }
-      this.hud.setHp(this.playerHp)
-      if (!this.reducedMotion) this.cameras.main.shake(150, 0.01)
-      if (isBoss && !this.powerups.hasShield) {
-        this.scoring.registerMiss(this.bossMissPenalty)
-        this.hud.showMissFeedback('Boss Crash!')
-      }
-      if (this.playerHp <= 0) {
-        this.endRun()
+        this.hud.setBossHealth(null)
+        this.bossSpawned = false
+        this.activeBoss = null
       }
     })
 
@@ -896,7 +888,7 @@ pskin?.setThrust?.(thrustLevel)
           healthBar?.destroy()
           return false
         }
-        const etype = (s.getData('etype') as 'brute' | 'dasher' | 'swarm') || 'swarm'
+        const etype = (s.getData('etype') as 'brute' | 'dasher' | 'swarm' | 'exploder') || 'swarm'
         const ang = Phaser.Math.Angle.Between(s.x, s.y, px, py)
         let speed = (etype === 'swarm' ? 110 : etype === 'dasher' ? 160 : 80) * 0.5
         if (etype === 'dasher' && dashPhase % 2 === 0) speed *= dashBoost
@@ -1617,6 +1609,59 @@ pskin?.setThrust?.(thrustLevel)
     })
   }
 
+  private updateExplodersOnBeat(band: 'low' | 'mid' | 'high') {
+    if (!this.spawner) return
+    if (band !== 'low') return
+    const group = this.spawner.getGroup()
+    group.children.each((obj: Phaser.GameObjects.GameObject) => {
+      const enemy = obj as Enemy
+      if (!enemy.active) return true
+      if ((enemy.getData('etype') as string) !== 'exploder') return true
+      if (enemy.getData('exploderArmed') === false) return true
+      let remaining = (enemy.getData('exploderCountdownBeats') as number) ?? 0
+      remaining -= 1
+      if (remaining <= 0) {
+        enemy.setData('exploderArmed', false)
+        this.detonateExploder(enemy)
+        return true
+      }
+      enemy.setData('exploderCountdownBeats', remaining)
+      if (remaining === 1) {
+        this.effects.exploderWarning(enemy.x, enemy.y)
+      }
+      return true
+    })
+  }
+
+  private detonateExploder(enemy: Enemy) {
+    if (!enemy.active) return
+    const radius = (enemy.getData('exploderRadius') as number) ?? 150
+    this.effects.enemyExplodeFx(enemy.x, enemy.y)
+    this.sound.play('explode_big', { volume: this.opts.sfxVolume })
+
+    const distance = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y)
+    if (distance <= radius) {
+      const tookDamage = this.damagePlayer(1, {
+        feedback: 'Exploder Burst!',
+        missPenalty: this.missPenalty,
+        showFeedback: true
+      })
+      if (!tookDamage) {
+        // Shield absorbed; still register a miss to discourage stalling
+        this.scoring.registerMiss(this.missPenalty)
+        this.hud.showMissFeedback('Exploder Burst!')
+      }
+    } else {
+      this.scoring.registerMiss(this.missPenalty)
+      this.hud.showMissFeedback('Exploder Burst!')
+    }
+
+    this.comboCount = 0
+    this.hud.setCombo(0)
+    this.bumpBomb(-20)
+    this.cleanupEnemy(enemy, false)
+  }
+
   private updatePowerupSprites(_delta: number) {
     if (this.activePowerups.size === 0) return
     const playerPos = new Phaser.Math.Vector2(this.player.x, this.player.y)
@@ -1716,6 +1761,36 @@ pskin?.setThrust?.(thrustLevel)
       this.bossSpawned = false
       this.activeBoss = null
     }
+  }
+
+  private damagePlayer(amount: number, opts: { feedback?: string; missPenalty?: number; showFeedback?: boolean } = {}): boolean {
+    const now = this.time.now
+    if (now < this.iframesUntil) return false
+    if (this.powerups.hasShield) {
+      this.effects.hitSpark(this.player.x, this.player.y)
+      return false
+    }
+
+    this.playerHp = Math.max(0, this.playerHp - amount)
+    this.comboCount = 0
+    this.hud.setCombo(0)
+    this.iframesUntil = now + 800
+    this.hud.setHp(this.playerHp)
+    if (!this.reducedMotion) this.cameras.main.shake(150, 0.01)
+
+    if (typeof opts.missPenalty === 'number') {
+      this.scoring.registerMiss(opts.missPenalty)
+    }
+
+    const shouldShowFeedback = opts.showFeedback ?? Boolean(opts.feedback)
+    if (shouldShowFeedback && opts.feedback) {
+      this.hud.showMissFeedback(opts.feedback)
+    }
+
+    if (this.playerHp <= 0) {
+      this.endRun()
+    }
+    return true
   }
 
   private onBossDown() {

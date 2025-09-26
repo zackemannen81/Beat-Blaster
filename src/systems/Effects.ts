@@ -111,6 +111,21 @@ export default class Effects {
     this.scene.time.delayedCall(260, () => emitter.destroy())
   }
 
+  exploderWarning(x: number, y: number) {
+    if (this.reducedMotion) return
+    const ring = this.scene.add.circle(x, y, 18, 0xff8c42, 0)
+    ring.setStrokeStyle(3, 0xffd27f, 0.9)
+    ring.setBlendMode(Phaser.BlendModes.ADD)
+    this.scene.tweens.add({
+      targets: ring,
+      radius: { from: 18, to: 64 },
+      alpha: { from: 0.9, to: 0 },
+      duration: 260,
+      ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy()
+    })
+  }
+
   showComboText(x: number, y: number, count: number) {
     if (this.reducedMotion) return
     //console.log('Creating combo text:', count, 'at', x, y)

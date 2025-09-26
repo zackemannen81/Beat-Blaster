@@ -31,6 +31,22 @@
       "fallbackEligible": true
     },
     {
+      "id": "normal_exploder_pair",
+      "formation": "lane",
+      "enemyType": "exploder",
+      "count": 2,
+      "speedMultiplier": 0.58,
+      "hpMultiplier": 1,
+      "formationParams": { "laneIndex": 2 },
+      "telegraph": { "type": "circle", "durationMs": 820, "intensity": 0.8 },
+      "telegraphDelayMs": 520,
+      "audioCue": "announcer_warning",
+      "category": "standard",
+      "tags": ["exploder"],
+      "cooldownMs": 5400,
+      "minimumStage": 2
+    },
+    {
       "id": "normal_lane_dashers",
       "formation": "lane",
       "enemyType": "dasher",

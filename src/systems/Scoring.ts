@@ -39,8 +39,8 @@ export default class Scoring {
     return acc
   }
 
-  addKill(type: 'brute' | 'dasher' | 'swarm') {
-    const base = type === 'brute' ? 100 : type === 'dasher' ? 75 : 25
+  addKill(type: 'brute' | 'dasher' | 'swarm' | 'exploder') {
+    const base = type === 'brute' ? 100 : type === 'dasher' ? 75 : type === 'exploder' ? 120 : 25
     this.score += Math.round(base * this.multiplier)
   }
 

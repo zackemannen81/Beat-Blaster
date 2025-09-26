@@ -57,6 +57,7 @@
 4. **Exploders**  
    - Långsamma.  
    - Exploderar i kulmönster om inte dödade inom 3 beats.  
+   - Implementerat: vertikal build 2025-09-27 – lane-spawnade exploders får varningstelegram och radial explosion som gör skada vid träff.  
 
 5. **Mirrorers**  
    - Speglar spelarens X-position.  
@@ -210,4 +211,3 @@ Mitt-lane (vid 7 lanes): får egen glow (ljusare/starkare) för att kännas som 
 
 👉 Det här gör att banan aldrig känns statisk. Den andas med musiken och fienderna dansar i samma koreografi.
 ---
-

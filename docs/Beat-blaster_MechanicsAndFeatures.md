@@ -49,10 +49,12 @@
 2. **Weavers**  
    - Rör sig i sinuskurvor över flera lanes.  
    - Synkas med hi-hats (beat 3).  
+   - Implementerat: vertikal build 2025-09-27 – amplitude-boost och scrollburst på `beat:high`.  
 
 3. **Formation Dancers**  
    - 3–5 fiender i en formation.  
    - Roterar eller byter plats på snare (beat 2).  
+   - Implementerat: formtåget roterar offsets per `beat:mid`, lane-parametrar styr center och spacing.  
 
 4. **Exploders**  
    - Långsamma.  
@@ -62,6 +64,7 @@
 5. **Mirrorers**  
    - Speglar spelarens X-position.  
    - Rushar fram på high-beat (beat 3).  
+   - Implementerat: följer spelarens X med boostfönster på hi-hat.  
 
 6. **Teleporters**  
    - Försvinner från lane och dyker upp i annan lane på beat.  

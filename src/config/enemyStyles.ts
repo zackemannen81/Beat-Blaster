@@ -1,6 +1,6 @@
 import { CubeSkinOptions } from '../systems/CubeSkin'
 
-export type EnemyType = 'brute' | 'dasher' | 'swarm' | 'exploder'
+export type EnemyType = 'brute' | 'dasher' | 'swarm' | 'exploder' | 'weaver' | 'formation' | 'mirrorer'
 
 export interface EnemyStyle extends CubeSkinOptions {
   /** Collision radius for physics body */
@@ -53,5 +53,38 @@ export const enemyStyles: Record<EnemyType, EnemyStyle> = {
     pulseScale: 0.18,
     pulseDuration: 320,
     rotationDuration: 2800
+  },
+  weaver: {
+    variant: 'wire',
+    size: 34,
+    bodyRadius: 24,
+    primaryColor: 0x5ad1ff,
+    secondaryColor: 0x07233c,
+    glowColor: 0xb4f0ff,
+    pulseScale: 0.12,
+    pulseDuration: 220,
+    rotationDuration: 3600
+  },
+  formation: {
+    variant: 'solid',
+    size: 36,
+    bodyRadius: 24,
+    primaryColor: 0xff7cbb,
+    secondaryColor: 0x2a0d36,
+    glowColor: 0xffb0e9,
+    pulseScale: 0.1,
+    pulseDuration: 260,
+    rotationDuration: 3000
+  },
+  mirrorer: {
+    variant: 'wire',
+    size: 30,
+    bodyRadius: 22,
+    primaryColor: 0x9bf855,
+    secondaryColor: 0x14310a,
+    glowColor: 0xccff8f,
+    pulseScale: 0.14,
+    pulseDuration: 200,
+    rotationDuration: 3400
   }
 }

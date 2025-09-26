@@ -61,6 +61,22 @@
       "cooldownMs": 5000
     },
     {
+      "id": "normal_weaver_sweep",
+      "formation": "weaver",
+      "enemyType": "weaver",
+      "count": 4,
+      "speedMultiplier": 0.86,
+      "hpMultiplier": 0.95,
+      "formationParams": { "amplitude": 180, "wavelength": 420 },
+      "telegraph": { "type": "line", "durationMs": 760, "intensity": 0.8 },
+      "telegraphDelayMs": 540,
+      "audioCue": "announcer_warning",
+      "category": "standard",
+      "tags": ["weaver"],
+      "cooldownMs": 5800,
+      "minimumStage": 2
+    },
+    {
       "id": "normal_sine_dash",
       "formation": "sine",
       "enemyType": "dasher",
@@ -75,6 +91,21 @@
       "tags": ["dasher"],
       "cooldownMs": 6200,
       "minimumStage": 2
+    },
+    {
+      "id": "normal_formation_spin",
+      "formation": "formation_dancer",
+      "enemyType": "formation",
+      "count": 4,
+      "speedMultiplier": 0.62,
+      "hpMultiplier": 1.1,
+      "formationParams": { "laneIndex": 2, "spacing": 90, "direction": 1 },
+      "telegraph": { "type": "zone", "durationMs": 820, "intensity": 0.9 },
+      "telegraphDelayMs": 560,
+      "category": "standard",
+      "tags": ["formation"],
+      "cooldownMs": 6600,
+      "minimumStage": 3
     },
     {
       "id": "normal_v_swarm",
@@ -105,6 +136,22 @@
       "tags": ["swarm"],
       "cooldownMs": 7200,
       "minimumStage": 2
+    },
+    {
+      "id": "normal_mirrorer_hunt",
+      "formation": "mirrorer",
+      "enemyType": "mirrorer",
+      "count": 3,
+      "speedMultiplier": 0.78,
+      "hpMultiplier": 1.1,
+      "formationParams": { "laneIndex": 2, "spread": 110 },
+      "telegraph": { "type": "line", "durationMs": 780 },
+      "telegraphDelayMs": 560,
+      "audioCue": "announcer_warning",
+      "category": "standard",
+      "tags": ["mirrorer"],
+      "cooldownMs": 6200,
+      "minimumStage": 3
     },
     {
       "id": "normal_circle_mix",

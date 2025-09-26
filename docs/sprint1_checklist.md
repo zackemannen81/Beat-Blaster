@@ -83,6 +83,9 @@
 - [ ] **Perf**: CPU/GPU stabil; inga spikes vid beat eller hop-burst.
 - [ ] **Audio-latens**: upplevs inte störa beat-window (vid behov öka till 18-20% på mobil).
 - [ ] **Exploders**: Låt en exploder överleva 3 beats och verifiera varningstelegram + radial explosion (spelaren tar DMG inom ~150 px, shield blockerar korrekt).
+- [ ] **Weavers**: Bekräfta att hi-hat-beat boostar amplitud/scroll och att banor känns läsbara på 90/160 BPM.
+- [ ] **Formation Dancers**: Se att gruppen roterar positioner på snare utan att korsa lanes oförutsett.
+- [ ] **Mirrorers**: Testa att de speglar spelarens X och dundrar fram på `beat:high`, både med och utan shield.
 
 ### 8.2 Mini code‑review (egen)
 - [ ] Struktur: LaneManager/BeatWindow isolerade (återanvändbara).

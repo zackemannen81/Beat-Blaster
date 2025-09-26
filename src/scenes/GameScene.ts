@@ -392,6 +392,9 @@ export default class GameScene extends Phaser.Scene {
         if (this.gameplayMode === 'vertical') this.triggerLaneHopperHop()
       }
       this.updateExplodersOnBeat(band)
+      this.updateWeaversOnBeat(band)
+      this.updateFormationDancersOnBeat(band)
+      this.updateMirrorersOnBeat(band)
       this.waveDirector.enqueueBeat(band)
       if (pulse) this.pulseEnemies()
     }
@@ -548,7 +551,7 @@ export default class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.bullets, this.spawner.getGroup(), (_b, _e) => {
       const bullet = _b as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
       const enemy = _e as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
-      const etype = (enemy.getData('etype') as 'brute' | 'dasher' | 'swarm' | 'exploder') || 'swarm'
+      const etype = (enemy.getData('etype') as 'brute' | 'dasher' | 'swarm' | 'exploder' | 'weaver' | 'formation' | 'mirrorer') || 'swarm'
 
       const { damage, isPerfect } = this.readBulletMetadata(bullet)
       if (damage <= 0) {
@@ -888,7 +891,7 @@ pskin?.setThrust?.(thrustLevel)
           healthBar?.destroy()
           return false
         }
-        const etype = (s.getData('etype') as 'brute' | 'dasher' | 'swarm' | 'exploder') || 'swarm'
+        const etype = (s.getData('etype') as 'brute' | 'dasher' | 'swarm' | 'exploder' | 'weaver' | 'formation' | 'mirrorer') || 'swarm'
         const ang = Phaser.Math.Angle.Between(s.x, s.y, px, py)
         let speed = (etype === 'swarm' ? 110 : etype === 'dasher' ? 160 : 80) * 0.5
         if (etype === 'dasher' && dashPhase % 2 === 0) speed *= dashBoost
@@ -1508,11 +1511,24 @@ pskin?.setThrust?.(thrustLevel)
             body.setVelocity(0, pattern.speedY)
             break
           }
-          case 'sine': {
+          case 'sine':
+          case 'weaver': {
             const elapsed = (now - pattern.spawnTime) / 1000
-            const offset = Math.sin(elapsed * pattern.angularVelocity) * pattern.amplitude
+            const baseAmplitude = pattern.kind === 'weaver'
+              ? (enemy.getData('weaverBaseAmplitude') as number) ?? pattern.amplitude
+              : pattern.amplitude
+            let amplitude = baseAmplitude
+            let vy = pattern.speedY
+            if (pattern.kind === 'weaver') {
+              const boostUntil = enemy.getData('weaverBoostUntil') as number | undefined
+              if (boostUntil && boostUntil > this.time.now) {
+                amplitude *= 1.4
+                vy *= 1.3
+              }
+            }
+            const offset = Math.sin(elapsed * pattern.angularVelocity) * amplitude
             enemy.x = pattern.anchorX + offset
-            body.setVelocity(0, pattern.speedY)
+            body.setVelocity(0, vy)
             break
           }
           case 'drift': {
@@ -1542,6 +1558,19 @@ pskin?.setThrust?.(thrustLevel)
             body.setVelocity(body.velocity.x, body.velocity.y)
             break
           }
+          case 'formation_dancer': {
+            const offsets = pattern.offsets
+            if (offsets && offsets.length > 0) {
+              const indexRaw = (enemy.getData('formationIndex') as number) ?? 0
+              const index = Phaser.Math.Wrap(indexRaw, 0, offsets.length)
+              enemy.setData('formationIndex', index)
+              const targetX = pattern.centerX + (offsets[index] ?? 0)
+              const lerp = 0.2
+              enemy.x = Phaser.Math.Linear(enemy.x, targetX, lerp)
+            }
+            body.setVelocity(0, pattern.speedY)
+            break
+          }
           case 'boss': {
             const settleLine = height * 0.25
             const targetSpeed = enemy.y < settleLine ? pattern.speedY : pattern.speedY * 0.08
@@ -1550,6 +1579,22 @@ pskin?.setThrust?.(thrustLevel)
           }
           case 'lane_hopper': {
             body.setVelocity(0, pattern.speedY)
+            break
+          }
+          case 'mirrorer': {
+            const clampMargin = 24
+            const targetX = Phaser.Math.Clamp(this.player.x, clampMargin, this.scale.width - clampMargin)
+            const lerp = 0.18
+            const newX = Phaser.Math.Linear(enemy.x, targetX, lerp)
+            enemy.x = newX
+            const baseSpeed = pattern.speedY
+            let vy = baseSpeed
+            const boostUntil = enemy.getData('mirrorerBoostUntil') as number | undefined
+            if (boostUntil && boostUntil > this.time.now) {
+              vy *= 1.4
+            }
+            const vx = Phaser.Math.Clamp((targetX - newX) * 6.5, -260, 260)
+            body.setVelocity(vx, vy)
             break
           }
         }
@@ -1605,6 +1650,51 @@ pskin?.setThrust?.(thrustLevel)
         }
       })
       enemy.setData('laneHopTween', tween)
+      return true
+    })
+  }
+
+  private updateWeaversOnBeat(band: 'low' | 'mid' | 'high') {
+    if (!this.spawner || band !== 'high') return
+    const boostUntil = this.time.now + 280
+    const group = this.spawner.getGroup()
+    group.children.each((obj: Phaser.GameObjects.GameObject) => {
+      const enemy = obj as Enemy
+      if (!enemy.active) return true
+      if ((enemy.getData('etype') as string) !== 'weaver') return true
+      enemy.setData('weaverBoostUntil', boostUntil)
+      return true
+    })
+  }
+
+  private updateFormationDancersOnBeat(band: 'low' | 'mid' | 'high') {
+    if (!this.spawner || band !== 'mid') return
+    const group = this.spawner.getGroup()
+    group.children.each((obj: Phaser.GameObjects.GameObject) => {
+      const enemy = obj as Enemy
+      if (!enemy.active) return true
+      if ((enemy.getData('etype') as string) !== 'formation') return true
+      const pattern = enemy.getData('pattern') as PatternData | null
+      if (!pattern || pattern.kind !== 'formation_dancer') return true
+      const offsets = pattern.offsets
+      if (!offsets || offsets.length === 0) return true
+      const direction = (enemy.getData('formationDirection') as number) ?? 1
+      const indexRaw = (enemy.getData('formationIndex') as number) ?? 0
+      const nextIndex = Phaser.Math.Wrap(indexRaw + direction, 0, offsets.length)
+      enemy.setData('formationIndex', nextIndex)
+      return true
+    })
+  }
+
+  private updateMirrorersOnBeat(band: 'low' | 'mid' | 'high') {
+    if (!this.spawner || band !== 'high') return
+    const boostUntil = this.time.now + 320
+    const group = this.spawner.getGroup()
+    group.children.each((obj: Phaser.GameObjects.GameObject) => {
+      const enemy = obj as Enemy
+      if (!enemy.active) return true
+      if ((enemy.getData('etype') as string) !== 'mirrorer') return true
+      enemy.setData('mirrorerBoostUntil', boostUntil)
       return true
     })
   }

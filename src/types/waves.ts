@@ -4,12 +4,15 @@ export type FormationId =
   | 'lane'
   | 'lane_hopper'
   | 'sine'
+  | 'weaver'
   | 'v'
   | 'swirl'
   | 'circle'
   | 'spiral'
   | 'spiral_drop'
   | 'burst'
+  | 'formation_dancer'
+  | 'mirrorer'
 
 export type TelegraphDescriptor = {
   type: 'zone' | 'line' | 'circle'
@@ -19,7 +22,7 @@ export type TelegraphDescriptor = {
 
 export type WaveCategory = 'light' | 'standard' | 'heavy' | 'boss'
 
-export type WaveTag = 'dasher' | 'swarm' | 'brute' | 'exploder' | 'powerup' | 'boss' | 'intro'
+export type WaveTag = 'dasher' | 'swarm' | 'brute' | 'exploder' | 'weaver' | 'formation' | 'mirrorer' | 'powerup' | 'boss' | 'intro'
 
 export type WaveDescriptor = {
   id: string

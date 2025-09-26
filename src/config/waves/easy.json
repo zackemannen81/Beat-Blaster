@@ -57,6 +57,21 @@
       "cooldownMs": 5000
     },
     {
+      "id": "easy_weaver_intro",
+      "formation": "weaver",
+      "enemyType": "weaver",
+      "count": 3,
+      "speedMultiplier": 0.74,
+      "hpMultiplier": 0.85,
+      "formationParams": { "amplitude": 140, "wavelength": 360 },
+      "telegraph": { "type": "line", "durationMs": 760 },
+      "telegraphDelayMs": 520,
+      "category": "standard",
+      "tags": ["weaver"],
+      "cooldownMs": 5200,
+      "minimumStage": 1
+    },
+    {
       "id": "easy_swirl_soft",
       "formation": "swirl",
       "enemyType": "swarm",
@@ -70,6 +85,21 @@
       "category": "standard",
       "tags": ["swarm"],
       "cooldownMs": 6200
+    },
+    {
+      "id": "easy_formation_swap",
+      "formation": "formation_dancer",
+      "enemyType": "formation",
+      "count": 3,
+      "speedMultiplier": 0.55,
+      "hpMultiplier": 0.9,
+      "formationParams": { "laneIndex": 2, "spacing": 70, "direction": 1 },
+      "telegraph": { "type": "zone", "durationMs": 820 },
+      "telegraphDelayMs": 540,
+      "category": "standard",
+      "tags": ["formation"],
+      "cooldownMs": 5600,
+      "minimumStage": 2
     },
     {
       "id": "easy_circle_slow",
@@ -102,6 +132,21 @@
       "tags": ["dasher"],
       "cooldownMs": 9000,
       "minimumStage": 3
+    },
+    {
+      "id": "easy_mirrorer_duo",
+      "formation": "mirrorer",
+      "enemyType": "mirrorer",
+      "count": 2,
+      "speedMultiplier": 0.68,
+      "hpMultiplier": 0.95,
+      "formationParams": { "laneIndex": 2, "spread": 80 },
+      "telegraph": { "type": "line", "durationMs": 720 },
+      "telegraphDelayMs": 520,
+      "category": "standard",
+      "tags": ["mirrorer"],
+      "cooldownMs": 5400,
+      "minimumStage": 2
     },
     {
       "id": "easy_burst_cleanup",

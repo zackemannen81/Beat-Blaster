@@ -47,6 +47,22 @@
       "minimumStage": 2
     },
     {
+      "id": "hard_weaver_overload",
+      "formation": "weaver",
+      "enemyType": "weaver",
+      "count": 5,
+      "speedMultiplier": 0.98,
+      "hpMultiplier": 1.05,
+      "formationParams": { "amplitude": 220, "wavelength": 340 },
+      "telegraph": { "type": "line", "durationMs": 680, "intensity": 1 },
+      "telegraphDelayMs": 440,
+      "audioCue": "announcer_warning",
+      "category": "heavy",
+      "tags": ["weaver"],
+      "cooldownMs": 6600,
+      "minimumStage": 3
+    },
+    {
       "id": "hard_v_brute",
       "formation": "v",
       "enemyType": "brute",
@@ -110,6 +126,22 @@
       "minimumStage": 4
     },
     {
+      "id": "hard_formation_shuffle",
+      "formation": "formation_dancer",
+      "enemyType": "formation",
+      "count": 5,
+      "speedMultiplier": 0.78,
+      "hpMultiplier": 1.2,
+      "formationParams": { "laneIndex": 3, "spacing": 95, "direction": -1 },
+      "telegraph": { "type": "zone", "durationMs": 720 },
+      "telegraphDelayMs": 460,
+      "audioCue": "announcer_warning",
+      "category": "heavy",
+      "tags": ["formation"],
+      "cooldownMs": 7000,
+      "minimumStage": 3
+    },
+    {
       "id": "hard_spiral_drop_brute",
       "formation": "spiral_drop",
       "enemyType": "brute",
@@ -123,6 +155,22 @@
       "category": "boss",
       "tags": ["brute"],
       "cooldownMs": 12000,
+      "minimumStage": 4
+    },
+    {
+      "id": "hard_mirrorer_assault",
+      "formation": "mirrorer",
+      "enemyType": "mirrorer",
+      "count": 4,
+      "speedMultiplier": 0.88,
+      "hpMultiplier": 1.25,
+      "formationParams": { "laneIndex": 3, "spread": 120 },
+      "telegraph": { "type": "line", "durationMs": 620 },
+      "telegraphDelayMs": 420,
+      "audioCue": "announcer_warning",
+      "category": "heavy",
+      "tags": ["mirrorer"],
+      "cooldownMs": 6800,
       "minimumStage": 4
     },
     {

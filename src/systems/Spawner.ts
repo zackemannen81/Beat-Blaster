@@ -10,12 +10,15 @@ export type Enemy = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
 export type PatternData =
   | { kind: 'lane'; anchorX: number; speedY: number }
   | { kind: 'sine'; anchorX: number; amplitude: number; angularVelocity: number; spawnTime: number; speedY: number }
+  | { kind: 'weaver'; anchorX: number; amplitude: number; angularVelocity: number; spawnTime: number; speedY: number }
   | { kind: 'drift'; velocityX: number; speedY: number }
   | { kind: 'circle'; anchorX: number; anchorY: number; radius: number; angularVelocity: number }
   | { kind: 'spiral'; anchorX: number; anchorY: number; angularVelocity: number }
   | { kind: 'spiral_drop'; anchorX: number; anchorY: number; angularVelocity: number }
   | { kind: 'burst'; speedY: number }
   | { kind: 'lane_hopper'; laneA: number; laneB: number; hopEveryBeats?: number; speedY: number }
+  | { kind: 'formation_dancer'; centerX: number; offsets: number[]; speedY: number }
+  | { kind: 'mirrorer'; speedY: number }
   | { kind: 'boss'; speedY: number }
 
 type SpawnConfig = {
@@ -81,7 +84,19 @@ export default class Spawner {
     for (let i = 0; i < count; i++) {
       const { x, y } = this.randomOffscreen()
       const angle = Phaser.Math.Angle.Between(x, y, this.scene.scale.width / 2, this.scene.scale.height / 2)
-      const speedBase = type === 'swarm' ? 85 : type === 'dasher' ? 110 : type === 'exploder' ? 55 : 65
+      const speedBase = type === 'swarm'
+        ? 85
+        : type === 'dasher'
+          ? 110
+          : type === 'exploder'
+            ? 55
+            : type === 'weaver'
+              ? 90
+              : type === 'mirrorer'
+                ? 75
+                : type === 'formation'
+                  ? 70
+                  : 65
       const speed = speedBase * 0.25
       const enemy = this.createEnemy({
         type,
@@ -235,6 +250,9 @@ export default class Spawner {
       case 'sine':
         enemies = this.spawnSineWaveDescriptor(descriptor, waveId, options.skipTelegraph === true)
         break
+      case 'weaver':
+        enemies = this.spawnWeaverWave(descriptor, waveId, options.skipTelegraph === true)
+        break
       case 'v':
         enemies = this.spawnVWaveDescriptor(descriptor, waveId, options.skipTelegraph === true)
         break
@@ -252,6 +270,12 @@ export default class Spawner {
         break
       case 'burst':
         enemies = this.spawnBurstWave(descriptor, anchor, waveId, options.skipTelegraph === true)
+        break
+      case 'formation_dancer':
+        enemies = this.spawnFormationDancerWave(descriptor, anchor, waveId, options.skipTelegraph === true)
+        break
+      case 'mirrorer':
+        enemies = this.spawnMirrorerWave(descriptor, waveId, options.skipTelegraph === true)
         break
       default:
         enemies = this.spawn(descriptor.enemyType, descriptor.count ?? 3, {
@@ -347,6 +371,47 @@ export default class Spawner {
     return enemies
   }
 
+  private spawnWeaverWave(
+    descriptor: WaveDescriptor,
+    waveId: string,
+    skipTelegraph: boolean
+  ): Enemy[] {
+    const params = descriptor.formationParams ?? {}
+    const count = descriptor.count ?? 4
+    const amplitude = params.amplitude ?? 160
+    const wavelength = params.wavelength ?? 420
+    const speedMul = descriptor.speedMultiplier ?? 0.82
+    const speedY = this.scrollBase * speedMul
+    const angularVelocity = wavelength > 0 ? ((2 * Math.PI) * speedY) / wavelength : 0
+    const margin = 70
+    const width = this.scene.scale.width
+    const spacing = width / (count + 1)
+    const now = this.scene.time.now
+    const enemies: Enemy[] = []
+    for (let i = 0; i < count; i++) {
+      const anchorX = spacing * (i + 1)
+      const enemy = this.createEnemy({
+        type: descriptor.enemyType,
+        x: anchorX,
+        y: -margin - i * 36,
+        velocityY: speedY,
+        hpMultiplier: descriptor.hpMultiplier,
+        waveId,
+        pattern: { kind: 'weaver', anchorX, amplitude, angularVelocity, spawnTime: now, speedY }
+      })
+      enemy.setData('weaverBaseAmplitude', amplitude)
+      enemy.setData('weaverBaseSpeedY', speedY)
+      enemies.push(enemy)
+    }
+    if (!skipTelegraph && descriptor.telegraph) {
+      const mid = enemies[Math.floor(enemies.length / 2)]
+      if (mid) {
+        showTelegraph(this.scene, descriptor.telegraph, { x: mid.x, y: mid.y }, { length: width * 0.6 })
+      }
+    }
+    return enemies
+  }
+
   private spawnVWaveDescriptor(
     descriptor: WaveDescriptor,
     waveId: string,
@@ -369,6 +434,84 @@ export default class Spawner {
       if (center) {
         showTelegraph(this.scene, descriptor.telegraph, { x: center.x, y: center.y }, { length: spread * 4 })
       }
+    }
+    return enemies
+  }
+
+  private spawnFormationDancerWave(
+    descriptor: WaveDescriptor,
+    anchor: Phaser.Types.Math.Vector2Like,
+    waveId: string,
+    skipTelegraph: boolean
+  ): Enemy[] {
+    const params = descriptor.formationParams ?? {}
+    const count = Phaser.Math.Clamp(descriptor.count ?? 4, 3, 5)
+    const laneIndex = typeof params.laneIndex === 'number' ? params.laneIndex : Math.floor(this.laneCount / 2)
+    const centerX = this.getLaneCenterX(laneIndex)
+    const spacing = params.spacing ?? 80
+    const speedMul = descriptor.speedMultiplier ?? 0.6
+    const speedY = this.scrollBase * speedMul
+    const offsets: number[] = []
+    for (let i = 0; i < count; i++) {
+      const offsetIndex = i - (count - 1) / 2
+      offsets[i] = offsetIndex * spacing
+    }
+    const enemies: Enemy[] = []
+    const margin = 70
+    const direction = typeof params.direction === 'number' && params.direction < 0 ? -1 : 1
+    for (let i = 0; i < count; i++) {
+      const x = centerX + offsets[i]
+      const y = -margin - Math.abs(i - (count - 1) / 2) * 34
+      const enemy = this.createEnemy({
+        type: descriptor.enemyType,
+        x,
+        y,
+        velocityY: speedY,
+        hpMultiplier: descriptor.hpMultiplier,
+        waveId,
+        pattern: { kind: 'formation_dancer', centerX, offsets, speedY }
+      })
+      enemy.setData('formationIndex', i)
+      enemy.setData('formationDirection', direction)
+      enemies.push(enemy)
+    }
+    if (!skipTelegraph && descriptor.telegraph) {
+      showTelegraph(this.scene, descriptor.telegraph, { x: centerX, y: anchor.y }, { radius: spacing * count })
+    }
+    return enemies
+  }
+
+  private spawnMirrorerWave(
+    descriptor: WaveDescriptor,
+    waveId: string,
+    skipTelegraph: boolean
+  ): Enemy[] {
+    const params = descriptor.formationParams ?? {}
+    const laneIndex = typeof params.laneIndex === 'number' ? params.laneIndex : Math.floor(this.laneCount / 2)
+    const centerX = this.getLaneCenterX(laneIndex)
+    const count = descriptor.count ?? 3
+    const spread = params.spread ?? 90
+    const speedMul = descriptor.speedMultiplier ?? 0.72
+    const speedY = this.scrollBase * speedMul
+    const margin = 80
+    const enemies: Enemy[] = []
+    for (let i = 0; i < count; i++) {
+      const offsetIndex = i - (count - 1) / 2
+      const enemy = this.createEnemy({
+        type: descriptor.enemyType,
+        x: centerX + offsetIndex * spread,
+        y: -margin - Math.abs(offsetIndex) * 32,
+        velocityY: speedY,
+        hpMultiplier: descriptor.hpMultiplier,
+        waveId,
+        pattern: { kind: 'mirrorer', speedY }
+      })
+      enemy.setData('mirrorerBaseSpeedY', speedY)
+      enemies.push(enemy)
+    }
+    if (!skipTelegraph && descriptor.telegraph) {
+      const left = centerX - spread * (count - 1) / 2
+      showTelegraph(this.scene, descriptor.telegraph, { x: left, y: -60 }, { length: spread * (count - 1) })
     }
     return enemies
   }
@@ -611,7 +754,19 @@ export default class Spawner {
     const balance = this.scene.registry.get('balance') as any
     let baseHp = balance?.enemies?.[config.type]?.hp as number | undefined
     if (!Number.isFinite(baseHp)) {
-      baseHp = config.type === 'brute' ? 6 : config.type === 'dasher' ? 3 : config.type === 'exploder' ? 3 : 1
+      baseHp = config.type === 'brute'
+        ? 6
+        : config.type === 'dasher'
+          ? 3
+          : config.type === 'exploder'
+            ? 3
+            : config.type === 'weaver'
+              ? 2
+              : config.type === 'mirrorer'
+                ? 4
+                : config.type === 'formation'
+                  ? 5
+                  : 1
     }
     let rawHp = config.hpOverride ?? baseHp
     if (config.type === 'dasher' && !config.isBoss) rawHp = Math.max(1, Math.round(rawHp * 0.85))
@@ -630,7 +785,16 @@ export default class Spawner {
 
     const body = sprite.body as Phaser.Physics.Arcade.Body
     body.setAllowGravity(false)
-    const defaultVy = config.velocityY ?? this.scrollBase * (config.type === 'exploder' ? 0.45 : 0.75)
+    const baseVyMul = config.type === 'exploder'
+      ? 0.45
+      : config.type === 'weaver'
+        ? 0.7
+        : config.type === 'mirrorer'
+          ? 0.6
+          : config.type === 'formation'
+            ? 0.5
+            : 0.75
+    const defaultVy = config.velocityY ?? this.scrollBase * baseVyMul
     body.setVelocity(config.velocityX ?? 0, defaultVy)
     if (config.type === 'exploder') {
       body.setDrag(36, 0)
@@ -663,6 +827,9 @@ export default class Spawner {
     if (type === 'brute') return 'enemy_brute_0'
     if (type === 'dasher') return 'enemy_dasher_0'
     if (type === 'exploder') return 'enemy_brute_0'
+    if (type === 'weaver') return 'enemy_dasher_0'
+    if (type === 'formation') return 'enemy_brute_0'
+    if (type === 'mirrorer') return 'enemy_dasher_0'
     return 'enemy_swarm_0'
   }
 

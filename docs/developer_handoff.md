@@ -53,6 +53,18 @@ Useful docs
 - Countdown-driven detonation tied to `beat:low`; survivors burst in a radial blast that penalises the player and drains HP if they are within range (`src/scenes/GameScene.ts`).
 - Warning telegraph + announcer cue before final beat, with initial wave available in `normal_exploder_pair` (`src/config/waves/normal.json`).
 
+### Weavers
+- Added `weaver` archetype riding sine lanes; gains amplitude + scroll bursts on `beat:high` (hi-hats) via `GameScene.updateWeaversOnBeat`.
+- Spawn helpers accept amplitude/wavelength overrides and appear across easy/normal/hard playlists (`src/systems/Spawner.ts`, `src/config/waves/*`).
+
+### Formation Dancers
+- New formation pattern that rotates offsets on snare beats (`beat:mid`), handled through formation metadata and beat hooks in `GameScene`.
+- Added mid-stage waves with lane-index/spacing params for choreographed swaps.
+
+### Mirrorers
+- Mirrorers track the player’s X-position and lunge forward on high beats; boost window signalled through beat hooks (`GameScene.updateMirrorersOnBeat`).
+- Integrated lane-aware spawn helper plus wave entries for all difficulties.
+
 ## QA Snapshot (Sprint 1)
 - Build: `npm run build` (success, chunk size warning only).
 - Manual passes outstanding per checklist (BPM variants, mobile touch vs desktop, performance soak, latency tuning).
@@ -64,7 +76,7 @@ Useful docs
 3. **HUD polish** – Shot feedback should fade faster on mobile (verify with actual touch devices).
 4. **Wave coverage** – Add lane hopper patterns to `easy.json` and `hard.json`; ensure enemy counts respect lane availability.
 5. **Options UI** – Surface BeatWindow window ratio & lane debug toggle for testers (new mouse aim toggle is in place).
-6. **Exploder progression** – Add exploder encounters to Easy/Hard playlists and extend detonation telegraphing for higher difficulties.
+6. **Enemy tuning** – Balance new Weaver/Formation/Mirrorer waves across difficulties and add hard-mode telegraph variants.
 
 ## Hand-off Checklist
 - [ ] Review `docs/sprint1_checklist.md` and tick completed items; add notes for outstanding QA rows.

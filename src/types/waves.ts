@@ -2,6 +2,7 @@ import { EnemyType } from '../config/enemyStyles'
 
 export type FormationId =
   | 'lane'
+  | 'lane_hopper'
   | 'sine'
   | 'v'
   | 'swirl'

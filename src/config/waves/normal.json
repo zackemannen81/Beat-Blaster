@@ -17,6 +17,20 @@
       "fallbackEligible": true
     },
     {
+      "id": "normal_lane_hopper_intro",
+      "formation": "lane_hopper",
+      "enemyType": "brute",
+      "speedMultiplier": 0.9,
+      "hpMultiplier": 1,
+      "formationParams": { "laneA": 0, "laneB": 2, "hopEveryBeats": 1 },
+      "telegraph": { "type": "zone", "durationMs": 700 },
+      "telegraphDelayMs": 420,
+      "category": "standard",
+      "tags": ["brute"],
+      "cooldownMs": 4200,
+      "fallbackEligible": true
+    },
+    {
       "id": "normal_lane_dashers",
       "formation": "lane",
       "enemyType": "dasher",

@@ -151,10 +151,10 @@ this.emBackground = this.scene.add.particles(0, 0, texKey, {
     })
     // Gemensam konfiguration för alla emitters
     const baseEmitterConfig: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig = {
-      lifespan: { min: 220, max: 1024 },
+      lifespan: { min: 220, max: 800 },
       speed: { min: 40, max: 110 },
-      scale: { start: 0.45, end: 0.1 },
-      alpha: { start: 1, end: 0.2 },
+      scale: { start: 0.35, end: 0.1 },
+      alpha: { start: 0.6, end: 0.0 },
       quantity: 1,
       frequency: 16, // Styrs ändå manuellt i follow-loopen
       blendMode: 'ADD',
@@ -162,10 +162,10 @@ this.emBackground = this.scene.add.particles(0, 0, texKey, {
     }
     
     // Skapa EN manager för alla partiklar. Detta är mer effektivt och modernt.
-    const particleManager = this.scene.add.particles(0, 0, texKey, {
+  /*  const particleManager = this.scene.add.particles(0, 0, texKey, {
       frame: frame, ...baseEmitterConfig
       // Andra manager-specifika inställningar kan gå här om det behövs
-    });
+    });*/
  //this.particleManager?.createEmitter()
     // Skapa tre emitters från SAMMA manager
    // this.emMain = particleManager.createEmitter()
@@ -173,8 +173,8 @@ this.emBackground = this.scene.add.particles(0, 0, texKey, {
    // this.emWingR = particleManager.createEmitter()
 
     // Sätt djupet på hela partikelsystemet så det ritas bakom skeppet
-    particleManager.setDepth(this.gfx.depth - 1)
-    particleManager.startFollow(this.host.body as Phaser.Physics.Arcade.Body) 
+    //particleManager.setDepth(this.gfx.depth - 1)
+    //particleManager.startFollow(this.gfx.body as Phaser.Physics.Arcade.Body) 
     //this.emBackground.startFollow(this.host.body as Phaser.Physics.Arcade.Body)
 
   }
@@ -212,7 +212,7 @@ this.emBackground = this.scene.add.particles(0, 0, texKey, {
     if (this.emMain) this.emMain.setPosition(tailPos.x, tailPos.y+5)
     if (this.emWingL) this.emWingL.setPosition(wingLPos.x, wingLPos.y+15)
     if (this.emWingR) this.emWingR.setPosition(wingRPos.x, wingRPos.y+15)
-    if (this.particleManager) this.particleManager.setPosition(tailPos.x, tailPos.y)
+ //   if (this.particleManager) this.particleManager.setPosition(tailPos.x+10, tailPos.y+20)
     // Rotera partiklarnas vinkel med skeppet
     const angle = Phaser.Math.RadToDeg(currentRotation) + 90
     this.emMain!.updateConfig({angle: {  min: angle - 5, max: angle + 5 }})
@@ -226,18 +226,18 @@ this.emBackground = this.scene.add.particles(0, 0, texKey, {
     const backNorm = Phaser.Math.Clamp(vy / this.expectMaxVY, 0, 1)
 
     const baseScale = 0.25
-    const upBoost = 0.32
+    const upBoost = 0.38
     const backCut = 0.20
 
     const startScale = Phaser.Math.Clamp(baseScale + upBoost * upNorm - backCut * backNorm, 0.18, 0.72)
-    const sideNorm = Phaser.Math.Clamp(Math.abs(vx) / this.expectMaxVX, 0, 1)
+    const sideNorm = Phaser.Math.Clamp(Math.abs(vx) / this.expectMaxVX, 0.15, 1)
     const wingScale = Phaser.Math.Clamp(startScale + 0.12 * sideNorm, 0.18, 0.84)
 
-    const freqMain = Phaser.Math.Clamp(Phaser.Math.Linear(40, 8, upNorm) + Phaser.Math.Linear(0, 12, backNorm), 8, 52)
-    const freqWing = Phaser.Math.Clamp(freqMain - 6 * sideNorm, 6, 52)
+    const freqMain = Phaser.Math.Clamp(Phaser.Math.Linear(40, 8, upNorm) + Phaser.Math.Linear(2, 12, backNorm), 8, 52)
+    const freqWing = Phaser.Math.Clamp(freqMain - 5 * sideNorm, 6, 52)
 
-    if(this.emMain) this.emMain.setFrequency(freqMain)
-    if(this.emMain) this.emMain.setScale(startScale)
+    if(this.emMain) this.emMain.setFrequency( freqMain)
+    if(this.emMain) this.emMain.setScale( startScale)
 
     if(this.emWingL) this.emWingL.setFrequency(freqWing)
     if(this.emWingL) this.emWingL.setScale(wingScale)

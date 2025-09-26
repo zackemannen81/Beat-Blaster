@@ -46,9 +46,9 @@ export default class StickyLaneController {
     this.player = player
     this.deadzone = options.deadzone ?? 0
     this.moveSpeed = options.moveSpeed ?? 800
-    this.lerpFactor = options.lerpFactor ?? 0.25
+    this.lerpFactor = options.lerpFactor ?? 0.2
     // Default stopThreshold: 0.5px per frame; adjust to match moveSpeed
-    this.stopThreshold = options.stopThreshold ?? 0.5
+    this.stopThreshold = options.stopThreshold ?? 1
     this.lastX = player.x
   }
 
@@ -82,21 +82,26 @@ export default class StickyLaneController {
 
     // Spara nuvarande X för att mäta förflyttning mellan frames
     const currentX = this.player.x
-
-    if (dir !== 0) {
+    const currentY = this.player.y
+   if (dir !== 0) {
       // Spelaren trycker aktivt vänster/höger: flytta fritt utan att snappa
-      const deltaX = dir * this.moveSpeed * (delta / 1000)
+     /* const deltaX = dir * this.moveSpeed * (delta / 1000)
+      const newX = currentX + deltaX
+      const deltaY = dir * this.moveSpeed * (delta / 1000)
       const newX = currentX + deltaX
       // Flytta kroppen/spriten direkt
       const body = this.player.body
       if (body && typeof body.reset === 'function') {
-        body.reset(newX, body.y)
+        body.reset(newX, currentY )
       } else {
         this.player.x = newX
-      }
+      }*/
       // Avbryt eventuell magnetisering
       this.targetX = null
-    } else {
+    } 
+      
+     
+    else {
       // Ingen horisontell input: kolla om spelaren rört sig minimalt
       const moved = Math.abs(currentX - this.lastX)
       // Endast räkna som stopp om spelaren rört sig mindre än threshold
@@ -121,14 +126,14 @@ export default class StickyLaneController {
       const nextX = Phaser.Math.Linear(x, this.targetX, this.lerpFactor)
       const body = this.player.body
       if (body && typeof body.reset === 'function') {
-        body.reset(nextX, body.y)
+        body.reset(nextX, currentY )
       } else {
         this.player.x = nextX
       }
       // Om vi är tillräckligt nära, gör en sista snap
-      if (Math.abs(nextX - this.targetX) < 1) {
+      if (Math.abs(nextX - this.targetX) < 2) {
         if (body && typeof body.reset === 'function') {
-          body.reset( this.targetX, body.y)
+          body.reset(this.targetX, currentY )
         } else {
           this.player.x = this.targetX
         }

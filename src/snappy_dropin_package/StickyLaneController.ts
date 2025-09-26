@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import LaneManager from './LaneManager'
+import LaneManager from '../systems/LaneManager'
 
 /**
  * StickyLaneController – Free‑movement with snap
@@ -48,7 +48,7 @@ export default class StickyLaneController {
     this.moveSpeed = options.moveSpeed ?? 800
     this.lerpFactor = options.lerpFactor ?? 0.25
     // Default stopThreshold: 0.5px per frame; adjust to match moveSpeed
-    this.stopThreshold = options.stopThreshold ?? 0.5
+    this.stopThreshold = options.stopThreshold ?? 1
     this.lastX = player.x
   }
 
@@ -90,7 +90,7 @@ export default class StickyLaneController {
       // Flytta kroppen/spriten direkt
       const body = this.player.body
       if (body && typeof body.reset === 'function') {
-        body.reset(newX, body.y)
+        //body.reset(newX,this.player.body.y)
       } else {
         this.player.x = newX
       }
@@ -121,14 +121,14 @@ export default class StickyLaneController {
       const nextX = Phaser.Math.Linear(x, this.targetX, this.lerpFactor)
       const body = this.player.body
       if (body && typeof body.reset === 'function') {
-        body.reset(nextX, body.y)
+        body.reset(nextX, this.player)
       } else {
         this.player.x = nextX
       }
       // Om vi är tillräckligt nära, gör en sista snap
       if (Math.abs(nextX - this.targetX) < 1) {
         if (body && typeof body.reset === 'function') {
-          body.reset( this.targetX, body.y)
+          body.reset(this.targetX, this.player.body.y)
         } else {
           this.player.x = this.targetX
         }

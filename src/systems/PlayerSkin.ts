@@ -13,6 +13,7 @@ export default class PlayerSkin {
   private emMain!: Phaser.GameObjects.Particles.ParticleEmitter
   private emWingL!: Phaser.GameObjects.Particles.ParticleEmitter
   private emWingR!: Phaser.GameObjects.Particles.ParticleEmitter
+  //private emBackground!: Phaser.GameObjects.Particles.ParticleEmitter
 
   // Behåller alla dina inställningar
   private size = 18
@@ -105,7 +106,16 @@ export default class PlayerSkin {
     const texKey = hasPink ? 'thruster_pink' : 'particles'
     const frame: string | undefined = hasPink ? undefined : 'particle_glow_small'
 //this.particleManager.createEmitter()
-
+/*
+this.emBackground = this.scene.add.particles(0, 0, texKey, {
+  frame: frame,
+  speed: this.host.body.speed,
+  lifespan: Phaser.Math.Percent(this.host.body.speed, 0, 300) * 20000,
+  alpha:  Phaser.Math.Percent(this.host.body.speed, 0, 300) * 1000,
+  scale: { start: 1.0, end: 0 },
+  blendMode: 'ADD'
+  })
+*/
     this.emMain = this.scene.add.particles(0, 0, texKey, {
       frame: frame,
       lifespan: { min: 220, max: 1024 },
@@ -141,10 +151,10 @@ export default class PlayerSkin {
     })
     // Gemensam konfiguration för alla emitters
     const baseEmitterConfig: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig = {
-      lifespan: { min: 220, max: 1024 },
+      lifespan: { min: 220, max: 800 },
       speed: { min: 40, max: 110 },
-      scale: { start: 0.45, end: 0.1 },
-      alpha: { start: 1, end: 0.2 },
+      scale: { start: 0.35, end: 0.1 },
+      alpha: { start: 0.6, end: 0.0 },
       quantity: 1,
       frequency: 16, // Styrs ändå manuellt i follow-loopen
       blendMode: 'ADD',
@@ -152,18 +162,21 @@ export default class PlayerSkin {
     }
     
     // Skapa EN manager för alla partiklar. Detta är mer effektivt och modernt.
-    const particleManager = this.scene.add.particles(0, 0, texKey, {
-      frame: frame,
+  /*  const particleManager = this.scene.add.particles(0, 0, texKey, {
+      frame: frame, ...baseEmitterConfig
       // Andra manager-specifika inställningar kan gå här om det behövs
-    });
-
+    });*/
+ //this.particleManager?.createEmitter()
     // Skapa tre emitters från SAMMA manager
    // this.emMain = particleManager.createEmitter()
    // this.emWingL = particleManager.createEmitter()
    // this.emWingR = particleManager.createEmitter()
 
     // Sätt djupet på hela partikelsystemet så det ritas bakom skeppet
-    particleManager.setDepth(this.gfx.depth - 1)
+    //particleManager.setDepth(this.gfx.depth - 1)
+    //particleManager.startFollow(this.gfx.body as Phaser.Physics.Arcade.Body) 
+    //this.emBackground.startFollow(this.host.body as Phaser.Physics.Arcade.Body)
+
   }
 
   // Din follow-metod, nu med korrekt positionering
@@ -174,6 +187,9 @@ export default class PlayerSkin {
     const body = this.host.body as Phaser.Physics.Arcade.Body
     const vx = body?.velocity.x ?? 0
     const vy = body?.velocity.y ?? 0
+ //   this.emBackground.x= this.host.x
+ //   this.emBackground.y= this.host.y
+
 
     // Tilt-logiken är oförändrad
     const maxTiltRad = Phaser.Math.DegToRad(this.tiltMaxDeg)
@@ -192,35 +208,36 @@ export default class PlayerSkin {
     const wingRPos = this.wingROffset.clone().rotate(currentRotation).add(this.host)
 
     // *** KORREKT POSITIONERING AV EMITTERS ***
+    //if (this.emBackground) this.emBackground.setPosition(tailPos.x, tailPos.y) 
     if (this.emMain) this.emMain.setPosition(tailPos.x, tailPos.y+5)
     if (this.emWingL) this.emWingL.setPosition(wingLPos.x, wingLPos.y+15)
     if (this.emWingR) this.emWingR.setPosition(wingRPos.x, wingRPos.y+15)
-
+ //   if (this.particleManager) this.particleManager.setPosition(tailPos.x+10, tailPos.y+20)
     // Rotera partiklarnas vinkel med skeppet
     const angle = Phaser.Math.RadToDeg(currentRotation) + 90
     this.emMain!.updateConfig({angle: {  min: angle - 5, max: angle + 5 }})
     this.emWingL!.updateConfig({angle: {  min: angle - 5, max: angle + 5 }})
     this.emWingR!.updateConfig({angle: {  min: angle - 5, max: angle + 5 }})
-
+    //this.particleManager!.updateConfig({angle: {  min: angle - 5, max: angle + 5 }})
     //    this.emWingR.setAngle({  angle: min: angle - 5, max: angle + 5 })
     
     // All din logik för intensitet är oförändrad
     const upNorm = Phaser.Math.Clamp(-vy / this.expectMaxVY, 0, 1)
     const backNorm = Phaser.Math.Clamp(vy / this.expectMaxVY, 0, 1)
 
-    const baseScale = 0.30
-    const upBoost = 0.40
+    const baseScale = 0.25
+    const upBoost = 0.38
     const backCut = 0.20
 
     const startScale = Phaser.Math.Clamp(baseScale + upBoost * upNorm - backCut * backNorm, 0.18, 0.72)
-    const sideNorm = Phaser.Math.Clamp(Math.abs(vx) / this.expectMaxVX, 0, 1)
+    const sideNorm = Phaser.Math.Clamp(Math.abs(vx) / this.expectMaxVX, 0.15, 1)
     const wingScale = Phaser.Math.Clamp(startScale + 0.12 * sideNorm, 0.18, 0.84)
 
-    const freqMain = Phaser.Math.Clamp(Phaser.Math.Linear(40, 8, upNorm) + Phaser.Math.Linear(0, 12, backNorm), 8, 52)
-    const freqWing = Phaser.Math.Clamp(freqMain - 6 * sideNorm, 6, 52)
+    const freqMain = Phaser.Math.Clamp(Phaser.Math.Linear(40, 8, upNorm) + Phaser.Math.Linear(2, 12, backNorm), 8, 52)
+    const freqWing = Phaser.Math.Clamp(freqMain - 5 * sideNorm, 6, 52)
 
-    if(this.emMain) this.emMain.setFrequency(freqMain)
-    if(this.emMain) this.emMain.setScale(startScale)
+    if(this.emMain) this.emMain.setFrequency( freqMain)
+    if(this.emMain) this.emMain.setScale( startScale)
 
     if(this.emWingL) this.emWingL.setFrequency(freqWing)
     if(this.emWingL) this.emWingL.setScale(wingScale)
@@ -240,11 +257,18 @@ export default class PlayerSkin {
     const extra = Phaser.Math.Linear(0, 0.18, f)
     const freqB = Phaser.Math.Linear(0, -10, f)
 
+    // Minimum values for thrusters to stay active
+    const MIN_SCALE = 0.15;  // Minimum scale for visibility
+    const MIN_FREQ = 4;      // Minimum frequency for continuous effect
+
     const bump = (em: Phaser.GameObjects.Particles.ParticleEmitter) => {
       if (!em) return
-      const s = Phaser.Math.Clamp(0.30 + extra, 0.18, 0.9)
+      // Ensure scale never goes below minimum
+      const s = Math.max(MIN_SCALE, Phaser.Math.Clamp(0.25 + extra, 0.18, 0.9))
       em.setScale(s)
-      em.setFrequency(Math.max(6, (em.frequency.valueOf() ?? 16) + freqB))
+      // Ensure frequency never goes below minimum
+      const currentFreq = (em.frequency?.valueOf() ?? 16) + freqB
+      em.setFrequency(Math.max(MIN_FREQ, currentFreq))
     }
     bump(this.emMain); bump(this.emWingL); bump(this.emWingR)
   }
@@ -267,4 +291,3 @@ export default class PlayerSkin {
     }
   }
 }
-

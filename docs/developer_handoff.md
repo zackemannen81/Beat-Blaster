@@ -31,8 +31,13 @@ Useful docs
 ### Fire & Aim
 - `BeatWindow` helper (`src/systems/BeatWindow.ts`) still grades timing, but firing defaults to classic click/hold behaviour again (`src/scenes/GameScene.ts`).
 - OptionsScene gained a `Mouse Aim Unlock` toggle so testers can enable free pointer aiming in vertical mode; when locked, vertical mode reverts to forward-facing aim (`src/scenes/OptionsScene.ts`, `src/scenes/GameScene.ts`).
+- Perfect-timed shots now grant bonus plasma damage plus an upgraded hit VFX burst (`src/scenes/GameScene.ts`, `src/systems/Effects.ts`).
 - HUD exposes real-time shot feedback plus BPM/lane count widgets (`src/ui/HUD.ts:55`).
 - Tuning: `BeatWindow` window ratio defaults to 0.15; adjust once latency calibration UI from Options scene is revived.
+
+### Bomb & Power Controls
+- Desktop: Bombs trigger via space **or** right-click once charged to 100% (context menu disabled at runtime).
+- Touch: Bombs fire on a double-tap anywhere in the fire zone (`src/scenes/GameScene.ts`).
 
 ### LaneHopper Pattern
 - `Spawner` now supports `lane_hopper` pattern descriptors with beat counters and tween storage (`src/systems/Spawner.ts`).

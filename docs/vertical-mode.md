@@ -11,9 +11,9 @@ This document captures the gameplay rules, configuration knobs, and QA checklist
 ## Control Summary
 ### Desktop / Keyboard & Mouse
 - Movement: Arrow keys eller WASD ger fri thrust i både X- och Y-led; lane-snapping kickar in mot närmaste lane när du släpper vänster/höger.
-- Fire: Vänster musknapp (click/hold). Skott tidsbedöms via BeatWindow.
+- Fire: Vänster musknapp (click/hold). Skott tidsbedöms via BeatWindow och perfect-träffar ger bonus-skada.
 - Aim: Låst framåt som standard. Aktivera `Mouse Aim Unlock` i OptionsScene för fritt mus-sikte.
-- Bomb: Space när bomb-mätaren når 100%.
+- Bomb: Space **eller höger musknapp** när bomb-mätaren når 100% (context-menyn stängs av av GameScene).
 - Options: `O` öppnar OptionsScene för runtime-tuning.
 
 ### Gamepad
@@ -24,7 +24,7 @@ This document captures the gameplay rules, configuration knobs, and QA checklist
 
 ### Touch / Mobile
 - Left half of the screen provides a horizontal slide pad to steer the ship.
-- Right half acts as a hold-to-fire surface; triple tapping anywhere triggers a bomb.
+- Right half acts as a hold-to-fire surface; double tapping anywhere triggers a bomb.
 
 ## Difficulty Profiles
 Difficulty is selected through `difficultyProfileId` inside `src/config/tracks.json`. The profile contributes multipliers that feed GameScene and Spawner.
@@ -56,4 +56,4 @@ Runtime stage progression applies an additional 12% spawn-density ramp and 8% HP
 5. Reduced Motion pass: enable the toggle, defeat a boss, and ensure screen shake/particle effects are suppressed.
 6. Regression: switch back to omni mode (`?mode=omni`) and confirm original spawn routines still execute.
 
-Document last revised: 2025-09-26.
+Document last revised: 2025-09-27.

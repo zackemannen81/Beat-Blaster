@@ -291,8 +291,17 @@ export default class GameScene extends Phaser.Scene {
       this.input.gamepad?.off('disconnected', this.onGamepadDisconnected, this)
       this.conductor?.off('bar:start', this.handleBarStart)
     })
+    this.input.mouse?.disableContextMenu()
+
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       const pointerType = (pointer as any)?.pointerType ?? 'mouse'
+      if (pointerType === 'mouse') {
+        if (pointer.button === 2) {
+          if (this.bombCharge >= 100) this.triggerBomb()
+          return
+        }
+        if (pointer.button !== 0) return
+      }
       if (this.gameplayMode === 'vertical' && pointerType !== 'mouse') {
         const half = this.scale.width * 0.5
         if (pointer.x < half) {
@@ -313,6 +322,7 @@ export default class GameScene extends Phaser.Scene {
     })
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       const pointerType = (pointer as any)?.pointerType ?? 'mouse'
+      if (pointerType === 'mouse' && pointer.button === 2) return
       if (this.gameplayMode === 'vertical' && pointerType !== 'mouse') {
         if (pointer.id === this.touchMovePointerId) {
           this.touchMovePointerId = undefined
@@ -1179,9 +1189,9 @@ pskin?.setThrust?.(thrustLevel)
   }
 
   private registerTouchTap(time: number) {
-    this.touchTapTimes = this.touchTapTimes.filter(t => time - t < 600)
+    this.touchTapTimes = this.touchTapTimes.filter(t => time - t < 500)
     this.touchTapTimes.push(time)
-    if (this.touchTapTimes.length >= 3) {
+    if (this.touchTapTimes.length >= 2) {
       this.touchTapTimes = []
       if (this.bombCharge >= 100) this.triggerBomb()
     }

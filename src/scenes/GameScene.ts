@@ -23,6 +23,12 @@ import Announcer from '../systems/Announcer'
 
 type Enemy = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
 type PowerupSprite = Phaser.Physics.Arcade.Sprite
+type BulletMetadata = {
+  damage: number
+  judgement: BeatJudgement
+  accuracy: AccuracyLevel
+  isPerfect: boolean
+}
 
 export default class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
@@ -114,7 +120,6 @@ export default class GameScene extends Phaser.Scene {
   private laneSnapElapsed = 0
   private laneSnapDurationMs = 160
   private laneSnapActive = false
-  private laneAxisLatchMs = 0
   private laneDeadzonePx = 6
   private touchLaneIndexBaseline = 0
   private touchLaneAccum = 0
@@ -123,6 +128,8 @@ export default class GameScene extends Phaser.Scene {
   private onLaneSnapshot = (snapshot: ReturnType<LaneManager['getSnapshot']>) => {
     this.hud?.setLaneCount(snapshot.count)
   }
+  private horizontalInputActive = false
+  private unlockMouseAim = false
 
   private cleanupEnemy(enemy: Enemy, doDeathFx = true) {
     const enemyId = (enemy.getData('eid') as string) ?? null
@@ -152,7 +159,8 @@ export default class GameScene extends Phaser.Scene {
     this.crosshairMode = this.opts.crosshairMode
     this.verticalSafetyBand = !!this.opts.verticalSafetyBand
     this.gameplayMode = resolveGameplayMode(this.opts.gameplayMode)
-    this.releaseFireMode = this.gameplayMode === 'vertical'
+    this.unlockMouseAim = !!this.opts.unlockMouseAim
+    this.releaseFireMode = false
     this.gamepadDeadzone = this.opts.gamepadDeadzone
     this.gamepadSensitivity = this.opts.gamepadSensitivity
 
@@ -531,18 +539,23 @@ export default class GameScene extends Phaser.Scene {
       const enemy = _e as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
       const etype = (enemy.getData('etype') as 'brute' | 'dasher' | 'swarm') || 'swarm'
 
+      const { damage, isPerfect } = this.readBulletMetadata(bullet)
+      if (damage <= 0) {
+        this.disableBullet(bullet)
+        return
+      }
+
       const hp = (enemy.getData('hp') as number) ?? 1
-      const dmg = 1
-      const newHp = hp - dmg
+      const newHp = hp - damage
       enemy.setData('hp', newHp)
       const maxHp = (enemy.getData('maxHp') as number) ?? hp
       const isBoss = enemy.getData('isBoss') === true
       if (isBoss) {
         this.hud.setBossHealth(Math.max(newHp, 0) / Math.max(maxHp, 1), enemy.getData('etype') as string)
       }
-      this.scoring.registerShot(0) // Perfect hit
+
       this.disableBullet(bullet)
-      this.effects.enemyHitFx(enemy.x, enemy.y)
+      this.effects.enemyHitFx(enemy.x, enemy.y, { critical: isPerfect })
       this.effects.hitFlash(enemy)
       const skin = enemy.getData('skin') as any
       skin?.onHit?.()
@@ -665,6 +678,8 @@ this.lastHitAt = this.time.now
       this.registry.set('reducedMotion', this.reducedMotion)
       this.crosshairMode = this.opts.crosshairMode
       this.verticalSafetyBand = !!this.opts.verticalSafetyBand
+      this.unlockMouseAim = !!this.opts.unlockMouseAim
+      this.releaseFireMode = false
       this.padAimVector.set(0, -1)
       this.announcer.setVoice('bee')
       this.announcer.setEnabled(true)
@@ -751,10 +766,6 @@ this.lastHitAt = this.time.now
       moveX += processedX
       moveY += processedY
 
-      if (this.gameplayMode === 'vertical') {
-        this.handleLaneAxis(processedX, delta)
-      }
-
       const aimAxisX = pad.axes.length > 2 ? pad.axes[2].getValue() : axisX
       const aimAxisY = pad.axes.length > 3 ? pad.axes[3].getValue() : axisY
       const aimX = this.applyGamepadDeadzone(aimAxisX)
@@ -783,13 +794,9 @@ this.lastHitAt = this.time.now
       this.handleFireInputUp()
     }
 
-    if (this.gameplayMode === 'vertical') {
-      this.handleLaneKeyboardInput(wasdKeys)
-    }
-
     if (this.touchMovePointerId !== undefined) moveX = 0
 
-    if (this.gameplayMode === 'vertical') moveX = 0
+    this.horizontalInputActive = Math.abs(moveX) > 0.05
 
     const magnitude = Math.hypot(moveX, moveY)
     if (magnitude > 1) {
@@ -806,8 +813,6 @@ this.lastHitAt = this.time.now
     if (targetVelocity.lengthSq() > 1) targetVelocity.normalize()
     targetVelocity.scale(maxSpeed)
 
-    if (this.gameplayMode === 'vertical') targetVelocity.x = 0
-
     const lerp = 0.22
     let newVelX = Phaser.Math.Linear(body.velocity.x, targetVelocity.x, lerp)
     let newVelY = Phaser.Math.Linear(body.velocity.y, targetVelocity.y, lerp)
@@ -815,7 +820,6 @@ this.lastHitAt = this.time.now
       newVelX *= 0.82
       newVelY *= 0.82
     }
-    if (this.gameplayMode === 'vertical') newVelX = 0
     body.setVelocity(newVelX, newVelY)
 
     if (this.gameplayMode === 'vertical' && this.verticalSafetyBand) {
@@ -945,8 +949,20 @@ pskin?.setThrust?.(thrustLevel)
     this.effects.muzzleFlash(muzzleX, muzzleY)
 
     const ttl = this.computeBulletLifetime(direction)
-    const bullet = this.spawnPlasmaBullet(direction, ttl)
+    const deltaMs = typeof deltaOverride === 'number'
+      ? deltaOverride
+      : this.analyzer?.nearestBeatDeltaMs?.() ?? 999
+    const derivedJudgement = this.beatWindow.classify(deltaMs)
+    const judgement = judgementOverride ?? derivedJudgement
+    const accuracy = this.scoring.registerShot(deltaMs)
+    const bulletMetadata = this.buildBulletMetadata(accuracy, judgement)
+
+    const bullet = this.spawnPlasmaBullet(direction, ttl, bulletMetadata)
     if (!bullet) return
+
+    if (bulletMetadata.isPerfect) {
+      this.effects.perfectShotBurst(muzzleX, muzzleY)
+    }
 
     this.sound.play('shot', { volume: this.opts.sfxVolume })
 
@@ -954,15 +970,11 @@ pskin?.setThrust?.(thrustLevel)
       const offset = Phaser.Math.DegToRad(12)
       const leftDir = direction.clone().rotate(-offset)
       const rightDir = direction.clone().rotate(offset)
-      this.spawnPlasmaBullet(leftDir, ttl)
-      this.spawnPlasmaBullet(rightDir, ttl)
+      this.spawnPlasmaBullet(leftDir, ttl, { ...bulletMetadata })
+      this.spawnPlasmaBullet(rightDir, ttl, { ...bulletMetadata })
     }
 
-    const deltaMs = typeof deltaOverride === 'number'
-      ? deltaOverride
-      : this.analyzer?.nearestBeatDeltaMs?.() ?? 999
-    const accuracy = this.scoring.registerShot(deltaMs)
-    this.showShotFeedback(accuracy, judgementOverride)
+    this.showShotFeedback(accuracy, judgement)
 
     const g = this.add.graphics({ x: this.player.x, y: this.player.y })
     g.lineStyle(2, 0x00e5ff, 0.8)
@@ -976,7 +988,7 @@ pskin?.setThrust?.(thrustLevel)
     this.hud.showShotFeedback(quality, accuracy)
   }
 
-  private spawnPlasmaBullet(direction: Phaser.Math.Vector2, lifetimeMs?: number) {
+  private spawnPlasmaBullet(direction: Phaser.Math.Vector2, lifetimeMs?: number, metadata?: BulletMetadata) {
     const bullet = this.bullets.get(this.player.x, this.player.y) as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null
     if (!bullet) return null
 
@@ -998,11 +1010,41 @@ pskin?.setThrust?.(thrustLevel)
     bullet.setScale(0.55)
 
     bullet.setData('spawnTime', this.time.now)
+    bullet.setData('damage', metadata?.damage ?? 1)
+    bullet.setData('judgement', metadata?.judgement ?? 'normal')
+    bullet.setData('accuracy', metadata?.accuracy ?? 'Offbeat')
+    bullet.setData('isPerfect', metadata?.isPerfect ?? false)
 
     this.effects.attachPlasmaTrail(bullet)
     this.scheduleBulletTtl(bullet, lifetimeMs)
 
     return bullet
+  }
+
+  private buildBulletMetadata(accuracy: AccuracyLevel, judgement: BeatJudgement): BulletMetadata {
+    const isPerfect = accuracy === 'Perfect' && judgement === 'perfect'
+    let damage = 1
+    if (isPerfect) damage += 1
+    return {
+      damage,
+      judgement,
+      accuracy,
+      isPerfect
+    }
+  }
+
+  private readBulletMetadata(bullet: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody): BulletMetadata {
+    const damageRaw = Number(bullet.getData('damage'))
+    const judgementRaw = bullet.getData('judgement') as BeatJudgement | undefined
+    const accuracyRaw = bullet.getData('accuracy') as AccuracyLevel | undefined
+    const isPerfect = bullet.getData('isPerfect') === true
+    const damage = Number.isFinite(damageRaw) && damageRaw > 0 ? damageRaw : 1
+    return {
+      damage,
+      judgement: judgementRaw ?? (isPerfect ? 'perfect' : 'normal'),
+      accuracy: accuracyRaw ?? (isPerfect ? 'Perfect' : 'Offbeat'),
+      isPerfect
+    }
   }
 
   private scheduleBulletTtl(bullet: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody, lifetimeMs?: number) {
@@ -1181,7 +1223,6 @@ pskin?.setThrust?.(thrustLevel)
     this.laneSnapActive = false
     this.touchLaneIndexBaseline = targetIndex
     this.touchLaneAccum = 0
-    this.laneAxisLatchMs = 0
     this.releaseFireArmed = false
 
     this.player.setX(targetX)
@@ -1210,31 +1251,6 @@ pskin?.setThrust?.(thrustLevel)
       samples++
     }
     return samples > 0 ? sum / samples : this.scale.width / 3
-  }
-
-  private handleLaneKeyboardInput(wasdKeys: any) {
-    if (!this.lanes) return
-    const leftPressed = (this.cursors.left && Phaser.Input.Keyboard.JustDown(this.cursors.left))
-      || (wasdKeys?.A && Phaser.Input.Keyboard.JustDown(wasdKeys.A))
-    const rightPressed = (this.cursors.right && Phaser.Input.Keyboard.JustDown(this.cursors.right))
-      || (wasdKeys?.D && Phaser.Input.Keyboard.JustDown(wasdKeys.D))
-    if (leftPressed) this.shiftLane(-1)
-    else if (rightPressed) this.shiftLane(1)
-  }
-
-  private handleLaneAxis(value: number, delta: number) {
-    if (!this.lanes) return
-    const threshold = 0.4
-    if (Math.abs(value) < threshold) {
-      this.laneAxisLatchMs = 0
-      return
-    }
-    if (this.laneAxisLatchMs > 0) {
-      this.laneAxisLatchMs = Math.max(0, this.laneAxisLatchMs - delta)
-      return
-    }
-    this.shiftLane(value > 0 ? 1 : -1)
-    this.laneAxisLatchMs = 180
   }
 
   private shiftLane(direction: number): boolean {
@@ -1271,17 +1287,27 @@ pskin?.setThrust?.(thrustLevel)
 
   private updateLaneSnap(delta: number) {
     if (!this.lanes) return
+    if (this.horizontalInputActive) {
+      this.laneSnapActive = false
+      return
+    }
+
     const body = this.player.body as Phaser.Physics.Arcade.Body
-    const targetX = this.lanes.centerX(this.targetLaneIndex)
+    const preservedVy = body.velocity.y
     if (!this.laneSnapActive) {
-      if (Math.abs(targetX - this.player.x) > this.laneDeadzonePx) {
+      const nearest = this.lanes.nearest(this.player.x)
+      if (!nearest) return
+      const distance = Math.abs(nearest.centerX - this.player.x)
+      if (distance > this.laneDeadzonePx) {
+        this.targetLaneIndex = nearest.index
         this.laneSnapFromX = this.player.x
-        this.laneSnapTargetX = targetX
+        this.laneSnapTargetX = nearest.centerX
         this.laneSnapElapsed = 0
         this.laneSnapActive = true
       } else {
-        this.player.setX(targetX)
+        this.player.setX(nearest.centerX)
         body.updateFromGameObject()
+        body.velocity.y = preservedVy
       }
       return
     }
@@ -1292,10 +1318,12 @@ pskin?.setThrust?.(thrustLevel)
     const newX = Phaser.Math.Linear(this.laneSnapFromX, this.laneSnapTargetX, eased)
     this.player.setX(newX)
     body.updateFromGameObject()
+    body.velocity.y = preservedVy
 
     if (t >= 1) {
       this.player.setX(this.laneSnapTargetX)
       body.updateFromGameObject()
+      body.velocity.y = preservedVy
       this.laneSnapActive = false
     }
   }
@@ -1318,6 +1346,14 @@ pskin?.setThrust?.(thrustLevel)
           const aim = this.padAimVector.clone()
           if (aim.y > -0.2) aim.y = -0.2
           return aim.normalize()
+        }
+      }
+      if (this.unlockMouseAim) {
+        const pointer = this.input.activePointer
+        const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+        const dir = new Phaser.Math.Vector2(world.x - this.player.x, world.y - this.player.y)
+        if (dir.lengthSq() > 0.0001) {
+          return dir.normalize()
         }
       }
       return fallbackUp.clone()
@@ -1354,6 +1390,10 @@ pskin?.setThrust?.(thrustLevel)
           this.player.x + dir.x * distance,
           this.player.y + dir.y * distance
         ))
+      }
+      if (this.unlockMouseAim) {
+        const pointer = this.input.activePointer
+        return clampPoint(this.cameras.main.getWorldPoint(pointer.x, pointer.y))
       }
       const offset = height * 0.35
       const targetY = this.player.y - offset
@@ -1530,10 +1570,12 @@ pskin?.setThrust?.(thrustLevel)
 
       const currentLane = (enemy.getData('laneHopCurrent') as number | undefined) ?? pattern.laneA
       const nextLane = currentLane === pattern.laneA ? pattern.laneB : pattern.laneA
-      const clampedLane = Phaser.Math.Clamp(nextLane, 0, this.lanes.getCount() - 1)
+      const laneManager = this.lanes
+      if (!laneManager) return true
+      const clampedLane = Phaser.Math.Clamp(nextLane, 0, laneManager.getCount() - 1)
       enemy.setData('laneHopCurrent', clampedLane)
 
-      const targetX = this.lanes.centerX(clampedLane)
+      const targetX = laneManager.centerX(clampedLane)
       const body = enemy.body as Phaser.Physics.Arcade.Body
       const existingTween = enemy.getData('laneHopTween') as Phaser.Tweens.Tween | null
       existingTween?.remove()

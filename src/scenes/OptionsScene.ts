@@ -25,7 +25,7 @@ export default class OptionsScene extends Phaser.Scene {
 
     const baseY = 0.32
     const stepY = 0.055
-    const rowCount = 13
+    const rowCount = 14
     this.entries = Array.from({ length: rowCount }, (_, i) =>
       this.add.text(width / 2, height * (baseY + stepY * i), '', { fontFamily: 'UiFont', fontSize: '18px' }).setOrigin(0.5)
     )
@@ -66,6 +66,7 @@ export default class OptionsScene extends Phaser.Scene {
       `Fire Mode: ${fm === 'click' ? 'Click' : fm === 'hold_quantized' ? 'Hold (Quantized)' : 'Hold (Raw)'}`,
       `Gameplay Mode: ${modeLabel}${overrideSuffix}`,
       `Crosshair Mode: ${crosshairLabel}`,
+      `Mouse Aim Unlock: ${this.opts.unlockMouseAim ? 'Unlocked' : 'Locked'}`,
       `Vertical Safety Band: ${this.opts.verticalSafetyBand ? 'On' : 'Off'}`,
       `Fallback Waves: ${this.opts.allowFallbackWaves ? 'On' : 'Off'}`,
       `Gamepad Deadzone: ${(this.opts.gamepadDeadzone * 100).toFixed(0)}%`,
@@ -112,18 +113,22 @@ export default class OptionsScene extends Phaser.Scene {
         break
       }
       case 9: {
-        this.opts.verticalSafetyBand = !this.opts.verticalSafetyBand
+        this.opts.unlockMouseAim = !this.opts.unlockMouseAim
         break
       }
       case 10: {
-        this.opts.allowFallbackWaves = !this.opts.allowFallbackWaves
+        this.opts.verticalSafetyBand = !this.opts.verticalSafetyBand
         break
       }
       case 11: {
-        this.opts.gamepadDeadzone = Phaser.Math.Clamp(this.opts.gamepadDeadzone + step * 0.05, 0, 0.6)
+        this.opts.allowFallbackWaves = !this.opts.allowFallbackWaves
         break
       }
       case 12: {
+        this.opts.gamepadDeadzone = Phaser.Math.Clamp(this.opts.gamepadDeadzone + step * 0.05, 0, 0.6)
+        break
+      }
+      case 13: {
         this.opts.gamepadSensitivity = Phaser.Math.Clamp(this.opts.gamepadSensitivity + step * 0.1, 0.5, 2)
         break
       }

@@ -83,6 +83,34 @@ export default class Effects {
     this.scene.time.delayedCall(140, () => emitter.destroy())
   }
 
+  perfectShotBurst(x: number, y: number) {
+    if (this.reducedMotion) return
+    const ring = this.scene.add.circle(x, y, 12, 0xfff0a6, 0.9)
+    ring.setStrokeStyle(2, 0xffffff, 0.85)
+    ring.setBlendMode(Phaser.BlendModes.ADD)
+    this.scene.tweens.add({
+      targets: ring,
+      radius: { from: 12, to: 38 },
+      alpha: { from: 0.9, to: 0 },
+      duration: 220,
+      ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy()
+    })
+
+    const emitter = this.scene.add.particles(x, y, 'particles', {
+      frame: ['star_small', 'particle_glow_small'],
+      speed: { min: 120, max: 260 },
+      lifespan: 260,
+      scale: { start: 0.9, end: 0 },
+      alpha: { start: 1, end: 0 },
+      blendMode: 'ADD',
+      quantity: 16,
+      angle: { min: 0, max: 360 }
+    })
+    emitter.explode(16)
+    this.scene.time.delayedCall(260, () => emitter.destroy())
+  }
+
   showComboText(x: number, y: number, count: number) {
     if (this.reducedMotion) return
     //console.log('Creating combo text:', count, 'at', x, y)
@@ -247,7 +275,7 @@ export default class Effects {
     bullet.setData('plasmaTrailTimer', undefined)
   }
 
-  enemyHitFx(x: number, y: number) {
+  enemyHitFx(x: number, y: number, opts: { critical?: boolean } = {}) {
     if (this.reducedMotion) {
       this.hitSpark(x, y)
       return
@@ -262,17 +290,32 @@ export default class Effects {
     }
 
     if (this.scene.textures.exists('particle_plasma_spark')) {
+      const quantity = opts.critical ? 22 : 12
       const emitter = this.scene.add.particles(0, 0, 'particle_plasma_spark', {
-        lifespan: 260,
-        speed: { min: 80, max: 220 },
+        lifespan: opts.critical ? 320 : 260,
+        speed: { min: 80, max: opts.critical ? 280 : 220 },
         angle: { min: 0, max: 360 },
-        scale: { start: 0.8, end: 0 },
+        scale: { start: opts.critical ? 1 : 0.8, end: 0 },
         alpha: { start: 1, end: 0 },
-        quantity: 12,
+        quantity,
         blendMode: 'ADD'
       })
-      emitter.explode(12, x, y)
-      this.scene.time.delayedCall(260, () => emitter.destroy())
+      emitter.explode(quantity, x, y)
+      this.scene.time.delayedCall(opts.critical ? 320 : 260, () => emitter.destroy())
+    }
+
+    if (opts.critical) {
+      const shock = this.scene.add.circle(x, y, 14, 0xffffff, 0)
+      shock.setStrokeStyle(3, 0xfff5c3, 0.9)
+      shock.setBlendMode(Phaser.BlendModes.ADD)
+      this.scene.tweens.add({
+        targets: shock,
+        radius: { from: 14, to: 48 },
+        alpha: { from: 0.9, to: 0 },
+        duration: 200,
+        ease: 'Cubic.easeOut',
+        onComplete: () => shock.destroy()
+      })
     }
   }
 

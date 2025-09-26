@@ -15,6 +15,7 @@ export type Options = {
   crosshairMode: 'pointer' | 'fixed' | 'pad-relative'
   verticalSafetyBand: boolean
   allowFallbackWaves: boolean
+  unlockMouseAim: boolean
 }
 
 const KEY = 'bb_options_v1'
@@ -33,7 +34,8 @@ export const DEFAULT_OPTIONS: Options = {
   gamepadSensitivity: 1,
   crosshairMode: 'pointer',
   verticalSafetyBand: false,
-  allowFallbackWaves: true
+  allowFallbackWaves: true,
+  unlockMouseAim: false
 }
 
 const VALID_FIRE_MODES: Options['fireMode'][] = ['click', 'hold_raw', 'hold_quantized']
@@ -93,6 +95,7 @@ function withDefaults(raw: Partial<Options> | null | undefined): Options {
 
   merged.verticalSafetyBand = Boolean(raw?.verticalSafetyBand)
   merged.allowFallbackWaves = raw?.allowFallbackWaves !== false
+  merged.unlockMouseAim = Boolean(raw?.unlockMouseAim)
 
   return merged
 }

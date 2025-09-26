@@ -2,8 +2,8 @@
 
 ## Summary
 Beat Blaster now ships with the vertical rhythm shooter slice targeted for Sprint 1. Core systems implemented on branch `dev`:
-- Lane-managed vertical traversal with sticky snapping tied to easing and deadzones.
-- Release-to-shoot flow that grades timing windows against live BPM and feeds HUD feedback.
+- Lane-managed vertical traversal with full XY thrust; lane snapping only engages when horizontal input is idle.
+- Click-to-fire restored as the default with beat grading preserved, plus an option to unlock free mouse aiming in vertical mode.
 - Lane-aware enemy pipeline including the prototype LaneHopper pattern that hops on `beat:low` events.
 - HUD telemetry for BPM, lane count, and shot quality to close the feedback loop for playtests.
 
@@ -25,19 +25,19 @@ Useful docs
 ## Feature Status
 ### LaneManager & Sticky Movement
 - Implemented in `src/systems/LaneManager.ts` with resize-aware rebuilds, event emitter, and optional debug overlay.
-- `GameScene` integrates the manager when vertical mode is active, clamps player X via Sine easing, and supports keyboard, pad, and touch lane shifts (`src/scenes/GameScene.ts:1152`).
+- `GameScene` now allows continuous movement on both axes while snapping the player back to the nearest lane whenever horizontal input is neutral (`src/scenes/GameScene.ts`).
 - Lane count currently static per difficulty profile (Normal → 6). TODO: hook dynamic lane count swaps planned for Sprint 2.
 
-### Release-to-Shoot & Beat Window
-- `BeatWindow` helper added (`src/systems/BeatWindow.ts`) to classify shot timing (`perfect` vs `normal`).
-- Vertical mode arms fire on pointer down/tap and resolves on release. Gamepad buttons respect the same flow (`src/scenes/GameScene.ts:1682`).
+### Fire & Aim
+- `BeatWindow` helper (`src/systems/BeatWindow.ts`) still grades timing, but firing defaults to classic click/hold behaviour again (`src/scenes/GameScene.ts`).
+- OptionsScene gained a `Mouse Aim Unlock` toggle so testers can enable free pointer aiming in vertical mode; when locked, vertical mode reverts to forward-facing aim (`src/scenes/OptionsScene.ts`, `src/scenes/GameScene.ts`).
 - HUD exposes real-time shot feedback plus BPM/lane count widgets (`src/ui/HUD.ts:55`).
 - Tuning: `BeatWindow` window ratio defaults to 0.15; adjust once latency calibration UI from Options scene is revived.
 
 ### LaneHopper Pattern
-- `Spawner` now supports `lane_hopper` pattern descriptors with beat counters and tween storage (`src/systems/Spawner.ts:127`).
-- `GameScene` listens to `beat:low`, increments per-enemy beat state, and drives a 140 ms Sine tween back into the lane manager (`src/scenes/GameScene.ts:1517`).
-- Wave library includes the first lane hopper encounter for Normal difficulty (`src/config/waves/normal.json:20`). Extend playlists for Easy/Hard.
+- `Spawner` now supports `lane_hopper` pattern descriptors with beat counters and tween storage (`src/systems/Spawner.ts`).
+- `GameScene` listens to `beat:low`, increments per-enemy beat state, and drives a 140 ms Sine tween back into the lane manager (`src/scenes/GameScene.ts`).
+- Wave library includes the first lane hopper encounter for Normal difficulty (`src/config/waves/normal.json`). Extend playlists for Easy/Hard.
 
 ### HUD & Telemetry
 - New HUD fields: BPM, lane count, shot feedback. Layout auto-adjusts on resize (`src/ui/HUD.ts:147`).
@@ -53,8 +53,8 @@ Useful docs
 2. **Analyzer fallback** – Lane hopper currently assumes analyzer fires `beat:low`. Implement BPM fallback path before QA.
 3. **HUD polish** – Shot feedback should fade faster on mobile (verify with actual touch devices).
 4. **Wave coverage** – Add lane hopper patterns to `easy.json` and `hard.json`; ensure enemy counts respect lane availability.
-5. **Options UI** – Expose BeatWindow window ratio & lane debug toggle for testers.
-6. **Docs** – Update `docs/vertical-mode.md` with release-to-shoot controls and lane indicators.
+5. **Options UI** – Surface BeatWindow window ratio & lane debug toggle for testers (new mouse aim toggle is in place).
+6. **Docs** – Update `docs/vertical-mode.md` to detail free-aim toggle and lane snap behaviour.
 
 ## Hand-off Checklist
 - [ ] Review `docs/sprint1_checklist.md` and tick completed items; add notes for outstanding QA rows.

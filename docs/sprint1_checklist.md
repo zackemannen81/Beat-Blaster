@@ -24,19 +24,17 @@
 ---
 
 ## 2) Sticky lanes (spelarrörelse)
-- [ ] Input (PC: W/A/D/S/pilar, Mobil: styr mot Touchpoint
-- [ ] Snapping: lerpa mot `nearest().centerX` med easing (Sine.inOut) + deadzone (~6 px). Påbörja lerping när man inte styr höger eller vänster med tangenterna , Mobil: påbörja lerping när man släpper touchpoint.
-- [ ] **Kriterium:** Ingen fladder/jitter nära gränser; snappy men mjukt.
+- [ ] Input (PC: WASD/pilar, Mobil: touch) ger fri rörelse i både X- och Y-led.
+- [ ] Snapping: lerpa mot `nearest().centerX` med easing (Sine.inOut) + deadzone (~6 px) **endast** när spelaren inte styr vänster/höger (touch: när man släpper touchpoint).
+- [ ] **Kriterium:** Ingen fladder/jitter nära gränser; snappy men mjukt. Upp/ner-rörelse ska inte störa snap.
 
 ---
 
-## 3) Release‑to‑Shoot + BeatWindow
-- [ ] Skapa `src/systems/BeatWindow.ts` med:
-  - [ ] `classifyShot(): "perfect"|"normal"` baserat på BPM och fönsterprocent (start 15%).
-  - [ ] `setBPM(bpm)`, `setWindow(p)`
-- [ ] Hooka `pointerup`/`mouseup` → `classifyShot()` → `playerShoot(type)`.
+## 3) Fire + BeatWindow
+- [ ] `BeatWindow` (`src/systems/BeatWindow.ts`) fortsätter att ge `"perfect"|"normal"` baserat på BPM och fönsterprocent (start 15%).
+- [ ] Standardläge: click/hold-to-fire (`pointerdown`/`mousedown`), beat grading sker på varje skott.
 - [ ] HUD‑feedback för **perfect** (kort glow/ikon).
-- [ ] **Kriterium:** Tydlig skillnad i feedback; känslan är rytmisk.
+- [ ] **Kriterium:** Tydlig skillnad i feedback; click-to-fire känns rytmisk och responsiv.
 
 ---
 
@@ -60,11 +58,15 @@
 - [ ] Visa **perfect/normal** feedback.
 - [ ] **Kriterium:** All info läsbar och diskret (ingen UI‑störning).
 
+## 6b) Options – Mouse Aim Unlock
+- [ ] Lägg till `Mouse Aim Unlock` i OptionsScene (togglar mellan låst framåtriktat sikte och fritt mus-sikte i vertical-läge).
+- [ ] **Kriterium:** Togglingen sparas i options och GameScene uppdaterar sikte/reticle utan omladdning.
+
 ---
 
 ## 7) DoD (Definition of Done) – Sprint 1
 - [ ] Vertical‑läge kör 3 lanes med sticky rörelse.
-- [ ] Release‑to‑shoot fungerar och markerar perfect vs normal.
+- [ ] Click-to-fire (med beat-grading) fungerar och markerar perfect vs normal.
 - [ ] LaneHopper hoppar lanes på beat:low.
 - [ ] Minst 60 FPS på desktop (med sample‑låt ~120 BPM).
 - [ ] README/ROADMAP uppdaterad (Sprint 1 status).

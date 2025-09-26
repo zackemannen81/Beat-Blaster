@@ -10,16 +10,17 @@ This document captures the gameplay rules, configuration knobs, and QA checklist
 
 ## Control Summary
 ### Desktop / Keyboard & Mouse
-- Movement: Arrow keys or WASD (vertical motion clamped to the safety zone).
-- Fire: Left mouse button (auto-fire in hold modes).
-- Bomb: Space when the bomb meter reaches 100%.
-- Options: `O` opens OptionsScene for runtime tuning.
+- Movement: Arrow keys eller WASD ger fri thrust i både X- och Y-led; lane-snapping kickar in mot närmaste lane när du släpper vänster/höger.
+- Fire: Vänster musknapp (click/hold). Skott tidsbedöms via BeatWindow.
+- Aim: Låst framåt som standard. Aktivera `Mouse Aim Unlock` i OptionsScene för fritt mus-sikte.
+- Bomb: Space när bomb-mätaren når 100%.
+- Options: `O` öppnar OptionsScene för runtime-tuning.
 
 ### Gamepad
-- Movement: Left stick with adjustable deadzone and sensitivity.
-- Fire: Face buttons (A/B or X/Square depending on layout) act as hold-to-fire.
-- Bomb: Right shoulder/trigger (RB/R1 or RT/R2) when charged.
-- Difficulty / reduced-motion toggles via OptionsScene.
+- Movement: Vänster spak med justerbar deadzone/sensitivitet; lane-snapping gäller när spaken returnerar till neutral.
+- Fire: Face-knappar (A/B eller X/Square beroende på layout) fungerar som hold-to-fire.
+- Bomb: Höger shoulder/trigger (RB/R1 eller RT/R2) när laddad.
+- Difficulty / Reduced Motion / Mouse Aim Unlock togglas via OptionsScene.
 
 ### Touch / Mobile
 - Left half of the screen provides a horizontal slide pad to steer the ship.
@@ -55,4 +56,4 @@ Runtime stage progression applies an additional 12% spawn-density ramp and 8% HP
 5. Reduced Motion pass: enable the toggle, defeat a boss, and ensure screen shake/particle effects are suppressed.
 6. Regression: switch back to omni mode (`?mode=omni`) and confirm original spawn routines still execute.
 
-Document last revised: 2025-09-20.
+Document last revised: 2025-09-26.

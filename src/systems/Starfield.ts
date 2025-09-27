@@ -38,6 +38,12 @@ export default class Starfield {
     makeLayer(80, 0.3, 0.8, 0.5)
     makeLayer(60, 0.55, 0.6, 0.4)
     makeLayer(40, 0.85, 0.4, 0.3)
+    const bgimage = this.scene.add.image(width / 2, height / 2, 'background')
+    bgimage.setOrigin(0.5)
+    // Adjust scale if needed:
+    bgimage.setScale(1)
+
+    bgimage.setDepth(-2000)
   }
 
   update(dt: number) {

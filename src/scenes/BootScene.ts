@@ -109,6 +109,8 @@ export default class BootScene extends Phaser.Scene {
     // Background now procedural (Starfield system); no image required
     // Load menu logo
     this.load.image('menulogo', 'src/assets/sprites/menulogo.png')
+    // Load background image.
+    this.load.image('background', 'src/assets/backgrounds/anal.png')
 
     // Config
     this.load.json('tracks', 'src/config/tracks.json')

@@ -862,28 +862,33 @@ export default class Spawner {
     sprite.setData('healthBar', healthBar)
 
     const balance = this.scene.registry.get('balance') as any
-    let baseHp = balance?.enemies?.[config.type]?.hp as number | undefined
-    if (!Number.isFinite(baseHp)) {
-      baseHp = config.type === 'brute'
-        ? 6
-        : config.type === 'dasher'
+    const baseHpFromBalance = balance?.enemies?.[config.type]?.hp
+    const fallbackBaseHp = config.type === 'brute'
+      ? 6
+      : config.type === 'dasher'
+        ? 3
+        : config.type === 'exploder'
           ? 3
-          : config.type === 'exploder'
-            ? 3
-            : config.type === 'weaver'
-              ? 2
-              : config.type === 'mirrorer'
-                ? 4
-                : config.type === 'formation'
-                  ? 5
-                  : config.type === 'teleporter'
-                    ? 3
-                    : config.type === 'flooder'
-                      ? 6
-                      : 1
+          : config.type === 'weaver'
+            ? 2
+            : config.type === 'mirrorer'
+              ? 4
+              : config.type === 'formation'
+                ? 5
+                : config.type === 'teleporter'
+                  ? 3
+                  : config.type === 'flooder'
+                    ? 6
+                    : 1
+    const baseHp = typeof baseHpFromBalance === 'number' && Number.isFinite(baseHpFromBalance)
+      ? baseHpFromBalance
+      : fallbackBaseHp
+    let rawHp = typeof config.hpOverride === 'number' && Number.isFinite(config.hpOverride)
+      ? config.hpOverride
+      : baseHp
+    if (config.type === 'dasher' && !config.isBoss) {
+      rawHp = Math.max(1, Math.round(rawHp * 0.85))
     }
-    let rawHp = config.hpOverride ?? baseHp
-    if (config.type === 'dasher' && !config.isBoss) rawHp = Math.max(1, Math.round(rawHp * 0.85))
     const perWaveMul = typeof config.hpMultiplier === 'number' && Number.isFinite(config.hpMultiplier) ? config.hpMultiplier : 1
     const multiplier = (config.isBoss ? this.bossHpMultiplier : this.hpMultiplier) * perWaveMul
     const hp = Math.max(1, Math.round(rawHp * multiplier))

@@ -1,100 +1,64 @@
-# Beat Blaster – Sprint 1 Handoff Brief
+# Beat Blaster - Handoff Brief (March 2025)
 
-## Summary
-Beat Blaster now ships with the vertical rhythm shooter slice targeted for Sprint 1. Core systems implemented on branch `dev`:
-- Lane-managed vertical traversal with full XY thrust; lane snapping only engages when horizontal input is idle.
-- Click-to-fire restored as the default with beat grading preserved, plus an option to unlock free mouse aiming in vertical mode.
-- Lane-aware enemy pipeline including the prototype LaneHopper pattern that hops on `beat:low` events.
-- HUD telemetry for BPM, lane count, and shot quality to close the feedback loop for playtests.
+## Snapshot
+- Vertical scroller is now the primary experience; omni arena mode remains accessible through Options or `?mode=omni`.
+- Enemy roster (brute, dasher, exploder, weaver, mirrorer, teleporter, flooder, formation, boss shells) is live with lane-aware telegraphs and HP scaling tied to difficulty profiles.
+- Audio pipeline ships with the Web Audio analyzer, Conductor event bus, BPM fallback scheduling, announcer hooks, and per-track input offsets.
+- WaveDirector orchestrates scripted playlists per difficulty, coordinating Spawner patterns, LaneManager snapshots, and EnemyLifecycle bookkeeping.
+- Presentation pass includes NeonGrid backdrop, Starfield layers, cube enemy skins, telegraphs, and reduced-motion toggles. Recent crash on tweening destroyed circles was fixed (Effects tweens defer destroy).
 
-The omni-directional arena mode remains intact. Vertical mode is now the default gameplay mode in Options. Build tooling still uses Vite + TypeScript with Phaser 3.80.
+## Build & Tooling
+- Node.js >=18 (tested on 20.x). Install via `npm install`.
+- Development: `npm run dev` (Vite + hot reload).
+- Production build: `npm run build`.
+- Tests: `npm run test` (Vitest) - suite exists but is currently sparse; no automated coverage for beat timing or lane math yet.
+- Engine: Phaser 3.90.0 (matching dev server console output). Types are aligned with TypeScript 5.6.x in `tsconfig.json`.
+- Assets live under `src/assets`; audio tracks now provided as WAV/MP3 (`track_00.wav`, `track_01.wav`, `track_03.mp3`). OGG mirrors still missing.
 
-## Environment & Tooling
-- Node.js 18.x+ recommended (tested locally with Node 20 LTS).
-- Install deps: `npm install`
-- Run dev server: `npm run dev`
-- Production bundle: `npm run build` (current build passes; expect Rollup warning about >500 kB chunk size)
-- Tests: `npm run test` (Vitest; no Sprint 1 unit tests yet)
-- Engine: Phaser 3.80.x
+## Implemented Systems
+- **Audio & Rhythm** - `AudioAnalyzer` computes band energy, emits `beat:low/mid/high`, `bar`, and feeds `Conductor`; analyzer gracefully drops to BPM fallback when unavailable.
+- **Wave & Spawn Layer** - `WaveDirector` reads difficulty playlists, enforces heavy cadence and cooldowns, and schedules descriptors for `Spawner`, which handles formation math, telegraphs, enemy pooling, and HP scaling (incl. boss multipliers and overrides).
+- **Player & Controls** - `LaneManager` maintains vertical lanes with sticky snap logic; GameScene supports mouse/keyboard, gamepad (deadzone + sensitivity), and touch (lane drags + double-tap bomb). Options persist crosshair modes, reduced-motion, safety band, aim unlock, etc.
+- **Combat & Scoring** - `BeatWindow` grades shots (Perfect/Great/Good), `Scoring` applies combo logic and penalties, bullets carry judgement metadata, and bombs charge on perfect streaks. Powerups (`Powerups.ts`) implement shield, rapid, split, slowmo, with HUD timers.
+- **Enemy Behaviours** - Lane hoppers, weavers, mirrorers, teleporters, flooders, dasher modifiers, exploder telegraphs, and boss shells all integrated with beat hooks and telegraph graphics.
+- **UI & Meta** - `HUD` exposes BPM, lane count, combo, accuracy, bomb charge; OptionsScene persists settings; ResultScene writes to `localLeaderboard`. Announcer VO cues, reduced-motion adjustments, and metronome toggle wired in.
+- **Presentation** - `Effects` handles perfect shot bursts, teleporter blinks, plasma hits, etc.; `NeonGrid`, `Starfield`, `BackgroundScroller`, and `CubeSkin` coordinate parallax and enemy skins.
 
-Useful docs
-- `docs/ROADMAP.md` – project phases & milestones
-- `docs/sprint1_checklist.md` – acceptance checklist for this sprint
-- `docs/vertical-mode.md` – legacy control reference (needs refresh post-handoff)
+## Content & Data Status
+- `src/config/tracks.json` currently maps three tracks: easy (Neon Crusader), normal (Neon Heartbeat), hard (Neon Reverie). Hashes in config must be kept in sync with audio replacements; be mindful of new WAV sources.
+- Difficulty profiles (`src/config/difficultyProfiles.ts`) define lane counts (4/6/7), spawn multipliers, HP scaling, heavy cadence controls, and stage ramps.
+- Wave playlists (see `src/systems/WaveLibrary.ts` and `docs/brainstorming.md`) contain lane-hopper, formation, flooder, and teleporter sets across all difficulties. Hard playlist still needs more late-stage boss compositions.
+- Balance data lives in registry `balance.enemies` at runtime; fallback HP logic ensures defaults for missing config.
+- Assets: Favicon missing (404 seen in dev); add under `public` and reference in Vite if desired.
 
-## Feature Status
-### LaneManager & Sticky Movement
-- Implemented in `src/systems/LaneManager.ts` with resize-aware rebuilds, event emitter, and optional debug overlay.
-- `GameScene` now allows continuous movement on both axes while snapping the player back to the nearest lane whenever horizontal input is neutral (`src/scenes/GameScene.ts`).
-- Lane count currently static per difficulty profile (Normal → 6). TODO: hook dynamic lane count swaps planned for Sprint 2.
+## QA & Operations
+- Manual smoke (vertical mode, audio analyzer) passes; recent playtest exposed the `Arc.radius` tween crash, now resolved.
+- TypeScript strict mode surfaces no errors after recent fixes (e.g., `rawHp` undefined guard, Effects tween destroy guard).
+- No automated regression suite for beat timings, spawner cadence, or input handling.
+- Performance: No recent profiling data; ensure 60 FPS target holds after new VFX. Reduced-motion path disables heavy tweens and particles.
+- Build artifacts in `dist/` via Vite are stable; chunk size warning persists (>500 kB) and should be tracked when adding assets.
 
-### Fire & Aim
-- `BeatWindow` helper (`src/systems/BeatWindow.ts`) still grades timing, but firing defaults to classic click/hold behaviour again (`src/scenes/GameScene.ts`).
-- OptionsScene gained a `Mouse Aim Unlock` toggle so testers can enable free pointer aiming in vertical mode; when locked, vertical mode reverts to forward-facing aim (`src/scenes/OptionsScene.ts`, `src/scenes/GameScene.ts`).
-- Perfect-timed shots now grant bonus plasma damage plus an upgraded hit VFX burst (`src/scenes/GameScene.ts`, `src/systems/Effects.ts`).
-- HUD exposes real-time shot feedback plus BPM/lane count widgets (`src/ui/HUD.ts:55`).
-- Tuning: `BeatWindow` window ratio defaults to 0.15; adjust once latency calibration UI from Options scene is revived.
+## Risks & Open Items
+1. **Analyzer Fallback Coverage** - Need automated verification that BPM fallback stays in sync when analyzer fails or on mobile browsers.
+2. **Dynamic Lane Counts** - Planned feature (stage-based lane expansion) still pending; requires camera, telegraph, and wave support.
+3. **Asset Parity** - MP3/WAV variants exist, but OGG mirrors and hashed filenames absent; impacts web delivery size and caching.
+4. **Testing Debt** - Lack of Vitest/Playwright coverage for timing, options persistence, or leaderboard flows.
+5. **Content Balance** - Hard playlist lacks final boss patterns; Easy playlist missing lane hopper introduction wave.
+6. **Accessibility Surfacing** - Latency calibration UI and color presets still not exposed in Options despite plumbing existing for offsets/reduced motion.
 
-### Bomb & Power Controls
-- Desktop: Bombs trigger via space **or** right-click once charged to 100% (context menu disabled at runtime).
-- Touch: Bombs fire on a double-tap anywhere in the fire zone (`src/scenes/GameScene.ts`).
+## Immediate Next Steps
+- Wire up latency calibration controls in Options and surface per-track offset values.
+- Audit `WaveLibrary` to add Easy/H/Hard variants for new enemy archetypes, including boss/bullet patterns.
+- Add Playwright or in-engine integration harness for beat windows and lane snapping regression.
+- Compress/convert audio to OGG + update hashes; restore favicon to eliminate dev server 404 noise.
+- Profile performance on mid-tier hardware with new WAV assets; adjust particle caps if needed.
 
-### LaneHopper Pattern
-- `Spawner` now supports `lane_hopper` pattern descriptors with beat counters and tween storage (`src/systems/Spawner.ts`).
-- `GameScene` listens to `beat:low`, increments per-enemy beat state, and drives a 140 ms Sine tween back into the lane manager (`src/scenes/GameScene.ts`).
-- Wave library includes the first lane hopper encounter for Normal difficulty (`src/config/waves/normal.json`). Extend playlists for Easy/Hard.
+## Handoff Checklist
+- [ ] `npm run dev` -> verify audio analyzer handshake, reduced-motion toggle, and track selection (ensure new WAV files load without CORS issues).
+- [ ] Confirm Difficulty profile linking (`tracks.json` <-> `difficultyProfiles.ts`) and wave playlists (`WaveLibrary`) for each track.
+- [ ] Run `npm run build` -> watch for asset path errors or bundle growth.
+- [ ] Validate local leaderboard persistence and reset between sessions.
+- [ ] Document outstanding QA tasks in `docs/sprint1_checklist.md` or create Sprint 2 checklist before next handover.
 
-### HUD & Telemetry
-- New HUD fields: BPM, lane count, shot feedback. Layout auto-adjusts on resize (`src/ui/HUD.ts:147`).
-- Combo indicator unchanged but still resets on miss or lane hopper escape.
-
-### Exploders
-- New `exploder` enemy type added to `enemyStyles` with slow drift lanes and armour tuned to 3 HP (`src/config/enemyStyles.ts`, `src/systems/Spawner.ts`).
-- Countdown-driven detonation tied to `beat:low`; survivors burst in a radial blast that penalises the player and drains HP if they are within range (`src/scenes/GameScene.ts`).
-- Warning telegraph + announcer cue before final beat, with initial wave available in `normal_exploder_pair` (`src/config/waves/normal.json`).
-
-### Weavers
-- Added `weaver` archetype riding sine lanes; gains amplitude + scroll bursts on `beat:high` (hi-hats) via `GameScene.updateWeaversOnBeat`.
-- Spawn helpers accept amplitude/wavelength overrides and appear across easy/normal/hard playlists (`src/systems/Spawner.ts`, `src/config/waves/*`).
-
-### Formation Dancers
-- New formation pattern that rotates offsets on snare beats (`beat:mid`), handled through formation metadata and beat hooks in `GameScene`.
-- Added mid-stage waves with lane-index/spacing params for choreographed swaps.
-
-### Mirrorers
-- Mirrorers track the player’s X-position and lunge forward on high beats; boost window signalled through beat hooks (`GameScene.updateMirrorersOnBeat`).
-- Integrated lane-aware spawn helper plus wave entries for all difficulties.
-
-### Teleporters & Lane Flooders
-- Teleporters blink between lanes on hi-hats with dedicated spawn helper and telegraph glow.
-- Lane Flooders spawn as wide barriers that occupy a lane and push players into movement checks.
-
-### Visual Polish
-- CubeSkin now supports per-enemy silhouettes (diamond dashers, ringed teleporters, flooder bars, etc.) with bespoke pulses/auras so each archetype reads immediately (`src/systems/CubeSkin.ts`).
-
-## QA Snapshot (Sprint 1)
-- Build: `npm run build` (success, chunk size warning only).
-- Manual passes outstanding per checklist (BPM variants, mobile touch vs desktop, performance soak, latency tuning).
-- No automated unit tests cover BeatWindow or LaneManager yet; consider adding Vitest cases for lane geometry and beat window thresholds.
-
-## Known Gaps & Next Steps
-1. **Dynamic lane phases** – Planned feature to cycle 3→5→7 lanes by bar; requires LaneManager.rebuild + re-snap of player/enemies.
-2. **Analyzer fallback** – Lane hopper currently assumes analyzer fires `beat:low`. Implement BPM fallback path before QA.
-3. **HUD polish** – Shot feedback should fade faster on mobile (verify with actual touch devices).
-4. **Wave coverage** – Add lane hopper patterns to `easy.json` and `hard.json`; ensure enemy counts respect lane availability.
-5. **Options UI** – Surface BeatWindow window ratio & lane debug toggle for testers (new mouse aim toggle is in place).
-6. **Enemy tuning** – Balance new Weaver/Formation/Mirrorer waves across difficulties and add hard-mode telegraph variants.
-
-## Hand-off Checklist
-- [ ] Review `docs/sprint1_checklist.md` and tick completed items; add notes for outstanding QA rows.
-- [ ] Run `npm run dev` and validate vertical mode with latest assets.
-- [ ] Confirm tracks in `src/config/tracks.json` reference desired difficulty profiles and BPM metadata (critical for BeatWindow accuracy).
-- [ ] Coordinate with art/audio for lane hopper telegraphing (currently reuses generic telegraph visuals).
-- [ ] Prep Sprint 2 backlog: dynamic lanes, additional enemy patterns, latency calibration UI.
-
-## Contact & Ownership
-- Gameplay engineering lead: _TBD_ (assign on team stand-up)
-- Audio/Analyzer: ensure someone owns fallback tuning and metronome assets
-- QA lead: define manual pass template using the Test & Kvalitet section from `docs/sprint1_checklist.md`
-
-Keep this brief updated after each sprint review so future hand-offs stay accurate.
+---
+Maintain this brief after each sprint or major content drop so incoming developers have a single source of truth.

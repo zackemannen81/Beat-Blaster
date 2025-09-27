@@ -94,7 +94,11 @@ export default class Effects {
       alpha: { from: 0.9, to: 0 },
       duration: 220,
       ease: 'Cubic.easeOut',
-      onComplete: () => ring.destroy()
+      onComplete: () => {
+        const scene = ring.scene
+        if (!scene) return
+        scene.time.delayedCall(0, () => ring.destroy())
+      }
     })
 
     const emitter = this.scene.add.particles(x, y, 'particles', {
@@ -122,7 +126,11 @@ export default class Effects {
       alpha: { from: 0.9, to: 0 },
       duration: 260,
       ease: 'Cubic.easeOut',
-      onComplete: () => ring.destroy()
+      onComplete: () => {
+        const scene = ring.scene
+        if (!scene) return
+        scene.time.delayedCall(0, () => ring.destroy())
+      }
     })
   }
 
@@ -147,7 +155,11 @@ export default class Effects {
       alpha: { from: 1, to: 0 },
       duration: 160,
       ease: 'Cubic.easeOut',
-      onComplete: () => ring.destroy()
+      onComplete: () => {
+        const scene = ring.scene
+        if (!scene) return
+        scene.time.delayedCall(0, () => ring.destroy())
+      }
     })
   }
 
@@ -354,7 +366,11 @@ export default class Effects {
         alpha: { from: 0.9, to: 0 },
         duration: 200,
         ease: 'Cubic.easeOut',
-        onComplete: () => shock.destroy()
+        onComplete: () => {
+          const scene = shock.scene
+          if (!scene) return
+          scene.time.delayedCall(0, () => shock.destroy())
+        }
       })
     }
   }

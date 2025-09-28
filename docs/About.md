@@ -5,11 +5,11 @@ Beat Blaster is a rhythm-driven vertical shooter built with Phaser 3 and TypeScr
 ## Implemented Features
 - **Dual Game Modes**: Vertical scroller (default) with lane snapping and safety band; omni arena mode still selectable for legacy play.
 - **Rhythm-Conducted Gameplay**: Web Audio analyzer detects low/mid/high beats, backed by BPM fallback scheduling. Conductor broadcasts timing events to spawners, announcer, and FX.
-- **Enemy Roster & Patterns**: Brutes, dashers, weavers, lane hoppers, mirrorers, teleporters, lane flooders, formation dancers, exploders, and boss shells. Behaviours react to beat events, lane layout, and difficulty tuning.
-- **Wave & Spawn Pipeline**: WaveDirector orchestrates playlists per difficulty, Spawner instantiates patterns with telegraphs, HP scaling, and pooled sprites. Telegraph system renders zone/line/circle warnings with reduced-motion handling.
+- **Enemy Roster & Patterns**: Brutes, dashers, weavers, lane hoppers, mirrorers, teleporters, lane flooders, formation dancers, exploders, and boss shells. Behaviours react to beat events, lane layout, and difficulty tuning. A scripted 16-beat lane cycle ensures every archetype appears each bar, independent of playlist RNG.
+- **Wave & Spawn Pipeline**: WaveDirector orchestrates playlists per difficulty, while a new `LanePatternController` drives deterministic beat-by-beat spawns, lane expansions (3→5→7→3), and telegraph pulses. Spawner instantiates patterns with telegraphs, HP scaling, pooled sprites, and the lane-aware boss entry fix. Telegraph system renders zone/line/circle warnings with reduced-motion handling.
 - **Player Combat Loop**: BeatWindow grading (Perfect/Great/Good) feeds Scoring and combo multipliers. Semi-auto fire with quantised fallback, bomb charge meter, powerups (shield, rapid, split, slowmo), and damage/iframes.
 - **UI & HUD**: Live BPM, lane count, combo, bomb meter, accuracy, and shot feedback. Options scene with reduced motion, crosshair mode, aim unlock, vertical safety band, volume sliders, and persistent storage. Result scene writes to local leaderboard.
-- **Presentation & FX**: NeonGrid, starfield, background scroller, enemy CubeSkin silhouettes, particle bursts, teleporter blinks, perfect-shot rings, announcer VO integration, and reduced-motion pathways.
+- **Presentation & FX**: NeonGrid, starfield, background scroller, refreshed CubeSkin colour palettes per archetype, particle bursts, teleporter blinks, perfect-shot rings, announcer VO integration, and reduced-motion pathways.
 - **Data & Config**: Difficulty profiles (easy/normal/hard) define lane counts, spawn envelopes, HP multipliers, heavy cadence. Tracks config maps audio assets, hash, per-track offsets. Registry-driven balance overrides guard missing data.
 
 ## Key Implemented Modules
@@ -17,7 +17,8 @@ Beat Blaster is a rhythm-driven vertical shooter built with Phaser 3 and TypeScr
 - `src/systems/Conductor.ts`: Central dispatcher translating analyzer output into quantised beat/bar events for listeners.
 - `src/systems/Spawner.ts`: Core factory handling enemy pooling, telegraphs, formation math, HP scaling, and boss modifiers.
 - `src/systems/WaveDirector.ts`: Playlist scheduler, heavy wave throttling, and fallback injection when analyzer stalls.
-- `src/systems/LaneManager.ts`: Lane geometry, snapping, resize handling, and debug overlays.
+- `src/systems/LaneManager.ts`: Lane geometry, snapping, resize handling, debug overlays, and integer-aligned lane centres for jitter-free snaps.
+- `src/systems/LanePatternController.ts`: Rhythm script that schedules waves per beat, manages lane-count transitions, and issues pulse events.
 - `src/systems/BeatWindow.ts`: Timing window calculations for shot grading and quantisation helpers.
 - `src/systems/Scoring.ts`: Combo management, score multipliers, penalty application, and perfect streak tracking.
 - `src/systems/Powerups.ts`: Lifecycle for rapid, split, shield, and slowmo buffs, including timescale adjustments.

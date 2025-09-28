@@ -2,7 +2,7 @@
 
 ### PC
 - **Rörelse:** WASD / piltangenter där spelaren navigerar runt skärmen för att undvika fiender 
-    och sticky i X led (lane-baserat (X axeln), sticky till mitten av lane när spelaren inte styr i X-led). 
+    och sticky i X led (lane-baserat (X axeln), sticky till mitten av lane när spelaren inte styr i X-led). Lane centers är nu pixel-snap: LaneManager rundar centerpunkter och GameScene justerar Arcade-bodyn varje frame för att undvika jitter.
 - **Sikte:** muspekaren. (free aim)
 - **Skott:** *push-to-shoot* → skott går iväg när musknappen trycks ner.
 - **Powerups/Bomb:** högerklick eller tangent (t.ex. Space).
@@ -33,10 +33,11 @@
 
 ## 🎵 Beat / Taktstruktur (4/4)
 
-- **Beat 1 (Low/Kick):** rörelser (hopp, lane-shifts, spawn triggers).
+- **LanePatternController** (nytt 2025-03) lyssnar på `beat:low` och kör en deterministisk 16-beats loop: lane count 3→5→7→3, spawn-tabeller för varje slag samt visuell puls event. WaveDirector används som backup; dess playlists triggas när mönstret inte schemalägger något.
+- **Beat 1 (Low/Kick):** rörelser (hopp, lane-shifts, spawn triggers). LanePatternController spawnar huvudsakligen lane-fiender och flooders här.
 - **Beat 2 (Mid/Snare):** attacker (formation rotation, enemy shots).
-- **Beat 3 (High/Hi-hat):** effekter (teleports, småfiender).
-- **Beat 4 (Takt-slut):** specials (shuffle, lane flood, boss-intro).
+- **Beat 3 (High/Hi-hat):** effekter (teleports, småfiender) + teleporter blink.
+- **Beat 4 (Takt-slut):** specials (shuffle, lane flood, boss-intro) samt lane-expansion/kollaps.
 
 ---
 
@@ -44,22 +45,22 @@
 
 1. **Lane Hoppers**  
    - Hoppar rytmiskt mellan två lanes (på low beats).  
-   - Byter partner-lane på varje fjärde takt.  
+   - Byter partner-lane på varje fjärde takt (styrt av lane pattern).  
 
 2. **Weavers**  
    - Rör sig i sinuskurvor över flera lanes.  
    - Synkas med hi-hats (beat 3).  
-   - Implementerat: vertikal build 2025-09-27 – amplitude-boost och scrollburst på `beat:high`.  
+   - Implementerat: vertikal build 2025-09-27 – amplitude-boost och scrollburst på `beat:high`. 2025-03-palettuppdatering ger cyan/grön neonmix.  
 
 3. **Formation Dancers**  
    - 3–5 fiender i en formation.  
    - Roterar eller byter plats på snare (beat 2).  
-   - Implementerat: formtåget roterar offsets per `beat:mid`, lane-parametrar styr center och spacing.  
+   - Implementerat: formtåget roterar offsets per `beat:mid`, lane-parametrar styr center och spacing. Ny palette = lila/neon-blå mix.
 
 4. **Exploders**  
    - Långsamma.  
    - Exploderar i kulmönster om inte dödade inom 3 beats.  
-   - Implementerat: vertikal build 2025-09-27 – lane-spawnade exploders får varningstelegram och radial explosion som gör skada vid träff.  
+   - Implementerat: vertikal build 2025-09-27 – lane-spawnade exploders får varningstelegram och radial explosion som gör skada vid träff. Paletten har uppdaterats till orange/brun för tydligare telegraph.
 
 5. **Mirrorers**  
    - Speglar spelarens X-position.  
@@ -68,20 +69,20 @@
 
 6. **Teleporters**  
    - Försvinner från lane och dyker upp i annan lane på beat.  
-   - Implementerat: blinkar på `beat:high` med laneswap + teleporterglow.  
+   - Implementerat: blinkar på `beat:high` med laneswap + teleporterglow. Ring-pulse använder säkra tweens (Arc radius crash fix 2025-03).  
 
 7. **Lane Flooders**  
    - Fyller en hel lane som en vägg.  
    - Tvingar spelaren byta lane.  
-   - Implementerat: flood-wall spawn med telegraph och brett hitbox.  
+   - Implementerat: flood-wall spawn med telegraph och brett hitbox (turkos/grön uppdaterad CubeSkin).  
 
 8. **Bosses**  
    - Stora skepp med beat-baserade attackfaser.  
-   - Tål mycket men har skada-fönster i rytm (ex: endast skada på 1 & 3).
+   - Tål mycket men har skada-fönster i rytm (ex: endast skada på 1 & 3). Spawner justerar boss spawn-y så de alltid kommer in i bild.
 
 ---
 
-## 🕹Exempel 1:  16-takters Flow
+## 🕹Exempel 1:  16-takters Flow (implementerat i LanePatternController)
 
 ### Takter 1–4
 - Intro Groove: hoppers, weavers, teleporters.
@@ -103,7 +104,7 @@
 - Mirrorers jagar spelaren.
 - Boss spawn på takt 16, bakgrund flashar.
 
-## 🕹 Exempel 2: 16-takters Wave
+## 🕹 Exempel 2: 16-takters Wave (implemented script)
 
 ### Takter 1–4 (Intro Groove)
 - Beat 1: Lane Hoppers hoppar.  

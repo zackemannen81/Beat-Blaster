@@ -142,3 +142,5 @@ vite.config.ts.timestamp-*
 
 # dist
 dist/
+dist/Arcive.zip
+dist/Arkiv.zip

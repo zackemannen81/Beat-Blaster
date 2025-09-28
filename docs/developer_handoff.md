@@ -5,7 +5,7 @@
 - Enemy roster (brute, dasher, exploder, weaver, mirrorer, teleporter, flooder, formation, boss shells) is live with lane-aware telegraphs and HP scaling tied to difficulty profiles. A scripted 16-beat lane pattern now guarantees every archetype appears each cycle regardless of difficulty playlist RNG.
 - Audio pipeline ships with the Web Audio analyzer, Conductor event bus, BPM fallback scheduling, announcer hooks, and per-track input offsets. Announcer voices now ship in three flavours (default, Bee, and the new Cyborg AI profile) with runtime voice selection.
 - WaveDirector orchestrates scripted playlists per difficulty, coordinating Spawner patterns, LaneManager snapshots, and EnemyLifecycle bookkeeping.
-- Presentation pass includes NeonGrid backdrop with beat-driven lane border runway lights, Starfield layers, cube enemy skins, telegraphs, and reduced-motion toggles. Recent crash on tweening destroyed circles was fixed (Effects tweens defer destroy). Enemy CubeSkin palettes were refreshed to better differentiate archetypes.
+- Presentation pass includes NeonGrid backdrop with beat-driven lane border runway lights and lane-width-matched grid spacing, Starfield layers, cube enemy skins, telegraphs, and reduced-motion toggles. Recent crash on tweening destroyed circles was fixed (Effects tweens defer destroy). Enemy CubeSkin palettes were refreshed to better differentiate archetypes.
 
 ## Build & Tooling
 - Node.js >=18 (tested on 20.x). Install via `npm install`.
@@ -24,7 +24,7 @@
 - **Combat & Scoring** - `BeatWindow` grades shots (Perfect/Great/Good), `Scoring` applies combo logic and penalties, bullets carry judgement metadata, and bombs charge on perfect streaks. Powerups (`Powerups.ts`) implement shield, rapid, split, slowmo, with HUD timers.
 - **Enemy Behaviours** - Lane hoppers, weavers, mirrorers, teleporters, flooders, dasher modifiers, exploder telegraphs, and boss shells all integrated with beat hooks and telegraph graphics.
 - **UI & Meta** - `HUD` exposes BPM, lane count, combo, accuracy, bomb charge; OptionsScene persists settings; ResultScene writes to `localLeaderboard`. Announcer VO cues, reduced-motion adjustments, and metronome toggle wired in.
-- **Presentation** - `Effects` handles perfect shot bursts, teleporter blinks, plasma hits, etc.; `NeonGrid` renders beat-driven lane border lights aligned to lanes, while `Starfield`, `BackgroundScroller`, and `CubeSkin` coordinate parallax and enemy skins.
+- **Presentation** - `Effects` handles perfect shot bursts, teleporter blinks, plasma hits, etc.; `NeonGrid` renders beat-driven lane border lights and lane-aligned grid cells that rescale with lane count, while `Starfield`, `BackgroundScroller`, and `CubeSkin` coordinate parallax and enemy skins.
 
 ## Content & Data Status
 - `src/config/tracks.json` currently maps three tracks: easy (Neon Crusader), normal (Neon Heartbeat), hard (Neon Reverie). Hashes in config must be kept in sync with audio replacements; be mindful of new WAV sources.

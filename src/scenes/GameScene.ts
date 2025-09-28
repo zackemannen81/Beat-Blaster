@@ -12,7 +12,7 @@ import { loadOptions, resolveGameplayMode, GameplayMode } from '../systems/Optio
 import PlayerSkin from '../systems/PlayerSkin'
 import NeonGrid from '../systems/NeonGrid'
 import CubeSkin from '../systems/CubeSkin'
-import LaneManager from '../systems/LaneManager'
+import LaneManager, { LaneSnapPoint } from '../systems/LaneManager'
 import LanePatternController, { LaneEffect } from '../systems/LanePatternController'
 import BeatWindow, { BeatJudgement } from '../systems/BeatWindow'
 import { getDifficultyProfile, DifficultyProfile, DifficultyProfileId, StageTuning } from '../config/difficultyProfiles'
@@ -127,6 +127,7 @@ export default class GameScene extends Phaser.Scene {
   private laneSnapElapsed = 0
   private laneSnapDurationMs = 160
   private laneSnapActive = false
+  private currentSnapPoint: LaneSnapPoint | null = null
   private laneDeadzonePx = 6
   private touchLaneIndexBaseline = 0
   private touchLaneAccum = 0
@@ -134,6 +135,7 @@ export default class GameScene extends Phaser.Scene {
   private releaseFireArmed = false
   private onLaneSnapshot = (snapshot: ReturnType<LaneManager['getSnapshot']>) => {
     this.hud?.setLaneCount(snapshot.count)
+    this.neon?.setLaneSnapshot(snapshot)
   }
   private horizontalInputActive = false
   private unlockMouseAim = false
@@ -296,6 +298,7 @@ export default class GameScene extends Phaser.Scene {
       this.analyzer?.removeAllListeners?.()
       this.backgroundScroller?.destroy()
       this.starfield?.destroy()
+      this.neon?.destroy()
       this.spawner?.setLaneManager(null)
       this.lanes?.off(LaneManager.EVT_CHANGED, this.onLaneSnapshot, this)
       this.lanes?.destroy()
@@ -322,7 +325,8 @@ export default class GameScene extends Phaser.Scene {
           if (this.touchMovePointerId === undefined) {
             this.touchMovePointerId = pointer.id
             this.touchMoveBaselineX = pointer.x
-            this.touchLaneIndexBaseline = this.targetLaneIndex
+            const baselineIndex = this.lanes ? this.lanes.indexAt(this.player.x) : this.targetLaneIndex
+            this.touchLaneIndexBaseline = baselineIndex
             this.touchLaneAccum = 0
           }
         } else {
@@ -414,6 +418,7 @@ export default class GameScene extends Phaser.Scene {
       this.updateWeaversOnBeat(band)
       this.updateFormationDancersOnBeat(band)
       this.updateMirrorersOnBeat(band)
+      this.neon?.onBeat(band)
       if (!this.beatStatusDetectedShown) {
         this.onBeatDetection()
       }
@@ -1263,7 +1268,7 @@ pskin?.setThrust?.(thrustLevel)
         this.lanes.rebuild(count)
         const snapIndex = Phaser.Math.Clamp(previousLane, 0, this.lanes.getCount() - 1)
         this.startLaneSnap(snapIndex)
-        this.touchLaneIndexBaseline = this.targetLaneIndex
+        this.touchLaneIndexBaseline = this.lanes.indexAt(this.player.x)
         this.touchLaneAccum = 0
         this.hud?.setLaneCount(this.lanes.getCount())
       }
@@ -1281,6 +1286,8 @@ pskin?.setThrust?.(thrustLevel)
     const laneCount = this.resolveLaneCount()
     this.lanes?.off(LaneManager.EVT_CHANGED, this.onLaneSnapshot, this)
     this.lanes?.destroy()
+    this.neon?.setLaneSnapshot(null)
+    this.currentSnapPoint = null
     this.lanes = new LaneManager({
       scene: this,
       count: laneCount,
@@ -1289,6 +1296,7 @@ pskin?.setThrust?.(thrustLevel)
       debug: true
     })
     this.lanes.on(LaneManager.EVT_CHANGED, this.onLaneSnapshot, this)
+    this.onLaneSnapshot(this.lanes.getSnapshot())
 
     const lanes = this.lanes.getAll()
     const middle = this.lanes.middle() ?? lanes[Math.floor(lanes.length / 2)] ?? lanes[0]
@@ -1296,11 +1304,12 @@ pskin?.setThrust?.(thrustLevel)
     const targetX = middle?.centerX ?? this.scale.width / 2
 
     this.targetLaneIndex = targetIndex
+    this.currentSnapPoint = this.lanes.getLaneSnapPoint(targetIndex) ?? null
     this.laneSnapFromX = targetX
     this.laneSnapTargetX = targetX
     this.laneSnapElapsed = this.laneSnapDurationMs
     this.laneSnapActive = false
-    this.touchLaneIndexBaseline = targetIndex
+    this.touchLaneIndexBaseline = this.lanes.indexAt(targetX)
     this.touchLaneAccum = 0
     this.releaseFireArmed = false
 
@@ -1337,8 +1346,16 @@ pskin?.setThrust?.(thrustLevel)
     const normalizedDir = direction < 0 ? -1 : direction > 0 ? 1 : 0
     if (normalizedDir === 0) return false
     const count = this.lanes.getCount()
-    const next = Phaser.Math.Clamp(this.targetLaneIndex + normalizedDir, 0, count - 1)
-    if (next === this.targetLaneIndex) return false
+    const fallbackIndex = Phaser.Math.Clamp(this.targetLaneIndex, 0, count - 1)
+    const point = this.currentSnapPoint
+      ?? this.lanes.getLaneSnapPoint(fallbackIndex)
+      ?? this.lanes.nearestSnap(this.player.x)
+    const indices = point?.laneIndices ?? [fallbackIndex]
+    const baseIndex = indices.length === 1
+      ? indices[0]
+      : (normalizedDir > 0 ? indices[0] : indices[indices.length - 1])
+    const next = Phaser.Math.Clamp(baseIndex + normalizedDir, 0, count - 1)
+    if (next === baseIndex) return false
     this.startLaneSnap(next)
     return true
   }
@@ -1349,6 +1366,7 @@ pskin?.setThrust?.(thrustLevel)
     const clamped = Phaser.Math.Clamp(index, 0, count - 1)
     const targetX = Math.round(this.lanes.centerX(clamped))
     this.targetLaneIndex = clamped
+    this.currentSnapPoint = this.lanes.getLaneSnapPoint(clamped) ?? null
     const currentX = this.player.x
     if (Math.abs(targetX - currentX) <= this.laneDeadzonePx) {
       this.player.setX(targetX)
@@ -1376,16 +1394,19 @@ pskin?.setThrust?.(thrustLevel)
 
     const body = this.player.body as Phaser.Physics.Arcade.Body
     if (!this.laneSnapActive) {
-      const nearest = this.lanes.nearest(this.player.x)
+      const nearest = this.lanes.nearestSnap(this.player.x)
       if (!nearest) return
       const snappedCenter = Math.round(nearest.centerX)
       const distance = Math.abs(snappedCenter - this.player.x)
       if (distance > this.laneDeadzonePx) {
-        this.targetLaneIndex = nearest.index
+        if (nearest.type === 'lane') {
+          this.targetLaneIndex = nearest.laneIndices[0]
+        }
         this.laneSnapFromX = this.player.x
         this.laneSnapTargetX = snappedCenter
         this.laneSnapElapsed = 0
         this.laneSnapActive = true
+        this.currentSnapPoint = nearest
       } else {
         const prevX = this.player.x
         this.player.setX(snappedCenter)
@@ -1394,6 +1415,10 @@ pskin?.setThrust?.(thrustLevel)
         body.prev.x += dx
         body.updateCenter()
         body.setVelocity(0, preservedVy)
+        this.currentSnapPoint = nearest
+        if (nearest.type === 'lane') {
+          this.targetLaneIndex = nearest.laneIndices[0]
+        }
       }
       return
     }
@@ -1420,6 +1445,13 @@ pskin?.setThrust?.(thrustLevel)
       body.prev.x += snapDx
       body.updateCenter()
       body.setVelocity(0, preservedVy)
+      const finalPoint = this.lanes.nearestSnap(aligned)
+      if (finalPoint) {
+        this.currentSnapPoint = finalPoint
+        if (finalPoint.type === 'lane') {
+          this.targetLaneIndex = finalPoint.laneIndices[0]
+        }
+      }
       this.laneSnapActive = false
     }
   }

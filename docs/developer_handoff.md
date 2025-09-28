@@ -20,7 +20,7 @@
 - **Audio & Rhythm** - `AudioAnalyzer` computes band energy, emits `beat:low/mid/high`, `bar`, and feeds `Conductor`; analyzer gracefully drops to BPM fallback when unavailable.
 - **Wave & Spawn Layer** - `WaveDirector` reads difficulty playlists, enforces heavy cadence and cooldowns, and schedules descriptors for `Spawner`, which handles formation math, telegraphs, enemy pooling, and HP scaling (incl. boss multipliers and overrides).
 - **Rhythm Lane Pattern** - `LanePatternController` runs a deterministic 16-beat script that drives lane count transitions (3→5→7→3), spawns per beat, and issues lane pulse events. It falls back to playlist-driven waves if disabled.
-- **Player & Controls** - `LaneManager` maintains vertical lanes with sticky snap logic; GameScene supports mouse/keyboard, gamepad (deadzone + sensitivity), and touch (lane drags + double-tap bomb). Options persist crosshair modes, reduced-motion, safety band, aim unlock, etc.
+- **Player & Controls** - `LaneManager` maintains vertical lanes with sticky snap logic and mid-lane magnet points; GameScene supports mouse/keyboard, gamepad (deadzone + sensitivity), and touch (lane drags + double-tap bomb). Options persist crosshair modes, reduced-motion, safety band, aim unlock, etc.
 - **Combat & Scoring** - `BeatWindow` grades shots (Perfect/Great/Good), `Scoring` applies combo logic and penalties, bullets carry judgement metadata, and bombs charge on perfect streaks. Powerups (`Powerups.ts`) implement shield, rapid, split, slowmo, with HUD timers.
 - **Enemy Behaviours** - Lane hoppers, weavers, mirrorers, teleporters, flooders, dasher modifiers, exploder telegraphs, and boss shells all integrated with beat hooks and telegraph graphics.
 - **UI & Meta** - `HUD` exposes BPM, lane count, combo, accuracy, bomb charge; OptionsScene persists settings; ResultScene writes to `localLeaderboard`. Announcer VO cues, reduced-motion adjustments, and metronome toggle wired in.
@@ -36,7 +36,7 @@
 ## QA & Operations
 - Manual smoke (vertical mode, audio analyzer, scripted lane cycle) passes; recent playtest exposed the `Arc.radius` tween crash, now resolved.
 - TypeScript strict mode surfaces no errors after recent fixes (e.g., `rawHp` undefined guard, Effects tween destroy guard).
-- No automated regression suite for beat timings, spawner cadence, or input handling. Lane snap rounding fix relies on Arcade body's alignment—consider capturing a regression test once input harness exists.
+- No automated regression suite for beat timings, spawner cadence, or input handling. Lane snap rounding fix (and the new between-lane magnet anchors) rely on Arcade body's alignment—capture a regression test once input harness exists.
 - Performance: No recent profiling data; ensure 60 FPS target holds after new VFX. Reduced-motion path disables heavy tweens and particles.
 - Build artifacts in `dist/` via Vite are stable; chunk size warning persists (>500 kB) and should be tracked when adding assets.
 

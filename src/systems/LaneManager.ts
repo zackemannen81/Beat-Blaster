@@ -18,6 +18,15 @@ export interface Lane {
 
 export type LaneCount = 3 | 5 | 7
 
+export type LaneSnapPointType = 'lane' | 'between'
+
+export interface LaneSnapPoint {
+  type: LaneSnapPointType
+  centerX: number
+  /** Sorted list of lane indices this snap point is associated with. */
+  laneIndices: LaneIndex[]
+}
+
 export interface LaneConfig {
   scene: Phaser.Scene
   /** Hur många lanes initialt (3/5/7). */
@@ -39,6 +48,7 @@ export default class LaneManager extends Phaser.Events.EventEmitter {
   private width: number
   private lanes: Lane[] = []
   private step: number = 0
+  private snapPoints: LaneSnapPoint[] = []
   private debugGfx?: Phaser.GameObjects.Graphics
   private debugTxt?: Phaser.GameObjects.Text[]
 
@@ -73,12 +83,35 @@ export default class LaneManager extends Phaser.Events.EventEmitter {
   private build() {
     // "Steg" mellan centers = width / (count + 1) (ger luft i kanterna)
     this.step = this.width / (this.count + 1)
-    this.lanes = []
+    const lanes: Lane[] = []
     for (let i = 0; i < this.count; i++) {
       const rawCenter = this.left + this.step * (i + 1)
       const centerX = Math.round(rawCenter)
-      this.lanes.push({ index: i, centerX })
+      lanes.push({ index: i, centerX })
     }
+    this.lanes = lanes
+
+    const snapPoints: LaneSnapPoint[] = []
+    for (const lane of lanes) {
+      snapPoints.push({
+        type: 'lane',
+        centerX: lane.centerX,
+        laneIndices: [lane.index]
+      })
+    }
+    for (let i = 0; i < lanes.length - 1; i++) {
+      const left = lanes[i]
+      const right = lanes[i + 1]
+      const centerX = Math.round((left.centerX + right.centerX) / 2)
+      snapPoints.push({
+        type: 'between',
+        centerX,
+        laneIndices: [left.index, right.index]
+      })
+    }
+    snapPoints.sort((a, b) => a.centerX - b.centerX)
+    this.snapPoints = snapPoints
+
     this.emit(LaneManager.EVT_CHANGED, this.getSnapshot())
     this.redrawDebug()
   }
@@ -109,6 +142,17 @@ export default class LaneManager extends Phaser.Events.EventEmitter {
     return this.lanes
   }
 
+  getSnapPoints(): LaneSnapPoint[] {
+    return this.snapPoints
+  }
+
+  /** Returns the snap point associated with a specific lane index, if any. */
+  getLaneSnapPoint(index: LaneIndex): LaneSnapPoint | undefined {
+    return this.snapPoints.find(point =>
+      point.type === 'lane' && point.laneIndices[0] === index
+    )
+  }
+
   /** Center-X för ett lane-index. */
   centerX(index: LaneIndex): number {
     return this.lanes[Math.max(0, Math.min(this.lanes.length - 1, index))].centerX
@@ -118,6 +162,13 @@ export default class LaneManager extends Phaser.Events.EventEmitter {
   nearest(x: number): Lane {
     return this.lanes.reduce((a, b) =>
       Math.abs(a.centerX - x) < Math.abs(b.centerX - x) ? a : b
+    )
+  }
+
+  nearestSnap(x: number): LaneSnapPoint | undefined {
+    if (this.snapPoints.length === 0) return undefined
+    return this.snapPoints.reduce((a, b) =>
+      Math.abs(a.centerX - x) <= Math.abs(b.centerX - x) ? a : b
     )
   }
 

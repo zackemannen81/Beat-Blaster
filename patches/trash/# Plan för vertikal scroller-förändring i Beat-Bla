@@ -1,0 +1,113 @@
+# Plan för vertikal scroller-förändring i Beat-Blaster
+
+## 0) Mål, scope och antaganden
+- **Mål:** Spelaren rör sig främst horisontellt längst ned på skärmen; världen “rullar” uppifrån-och-ner; fiender spawnar ovanför viewporten och färdas nedåt; powerups, projektiler, HUD och beat-synkade effekter anpassas till det nya flödet.  
+- **Teknik:** Phaser 3.x, Arcade Physics, befintlig modulstruktur (GameScene, AudioAnalyzer, Conductor, Spawner, Scoring, HUD, Effects, Powerups, Starfield, Options).  
+- **Rullning:** Använd TileSprite-bakgrunder och parallaxlager som scrollas via `tilePositionY` för oändligt flöde.
+
+## 1) Branch & konfiguration
+1. Skapa branch: `feat/vertical-scroller`.  
+2. Lägg till speloptionsflagga:  
+   - `Options.gameplayMode: 'omni' | 'vertical'` (default: `'vertical'`).  
+   - Läs in i `loadOptions()` och exponera i `GameScene`.  
+3. Feature flag (URL/env): `?mode=vertical` för att forceras till vertikalläge.
+
+## 2) Kameraloggik & koordinatsystem
+- Kameran hålls statisk; simulera rörelse genom att scrolla bakgrunder och flytta objekt nedåt med global `SCROLL_BASE`.  
+- I `Starfield`/bakgrundslager: ersätt horisontell parallax med vertikal; `tilePositionY += baseScroll * parallax`.  
+- Inkludera `SCROLL_BASE` (px/s) som konfigurerbar parameter beroende av svårighet/BPM.
+
+## 3) Spelarstyrning & input
+- **Desktop:**  
+  - WASD eller piltangenter: främst X-led; begränsad Y-rörelse för finjustering längst nederdelen av skärmen.  
+  - Autofire: håll ner skjutknappen (Space/LMB) → repetition.  
+- **Mobil:**  
+  - Vänster tumme: virtuell horisontell slider för X.  
+  - Höger tumme: håll för autofire.  
+  - Triple-tap: bomb eller powerup.  
+- Begränsa spelaren till nedersta zonen (t.ex. 65-95 % av skärmhöjd).
+
+## 4) Fiender, formationer och spawns (vertikala modellen)
+- Alla fiender spawnar ovanför viewport (y < 0), rör sig nedåt med `velocityY = SCROLL_BASE + patternSpeed`.  
+- Utforma formationer:  
+  - `spawnLane(count, laneIndex, speedMultiplier)`  
+  - `spawnSineWave(count, amplitudePx, wavelengthPx, speedMul)`  
+  - `spawnVFormation(size, spreadPx, speedMul)`  
+  - `spawnBoss(...)`  
+- Använd bullet pattern-script för fiendekulor och rörelsemönster.
+
+## 5) Projektiler (spelare & fiender)
+- Spelarkulor: `velocityY = -BULLET_SPEED` (uppåt).  
+- Fiendekulor: `velocityY = +BULLET_SPEED` (nedåt).  
+- Pooling och återvinning: objekten ska inaktiveras och döljas när de lämnar skärmen med viss margin.
+
+## 6) Kollidering & regler
+- Collision matrix:  
+  - `playerBullets` × `enemies`  
+  - `enemyBullets` × `player`  
+  - `enemies` × `player`  
+- Om fiende når botten (y > height + margin) räknas som “miss” → combo bryts / minuspoäng.  
+- Säkerställ att korrekt fysik och kollisionsdetektion används (Arcade Overlap/Collision).
+
+## 7) Beat-synk & tempo
+- Conductor och AudioAnalyzer används för att synkronisera spawns till beats:  
+  - Kick → kolumner / lanes  
+  - Snare → formationer / sidleds  
+  - High → täta små svärmar / kulor  
+- Seed eller determinism beaktas för repeterbara banor.
+
+## 8) Bakgrunder, parallax & visuella effekter
+- Flera TileSprite-lager med olika scrollhastigheter för parallaxeffekt.  
+- Beat-kopplade visuella cues: subtila blinkningar, pulser, färgskiftningar.  
+- Effektintensitet justerbar via svårighets-/optionparameter.
+
+## 9) HUD & spelregler
+- Lägg till: Stage/Area indikator, Boss HP bar, Bombs om aktuellt.  
+- Poäng, combo & “miss” logik enligt §6.  
+- Reduced Motion-läge: alternativ där visuella effekter minskas.
+
+## 10) Bossar
+- Trigger vid t.ex. varv/takt (%-regel).  
+- Flera faser, ökande utmaning.  
+- Telegraphy: varning innan stora attacker.
+
+## 11) Balans & svårighet
+- Parametrar att påverka: scrollhastighet, spawn-täthet, kul-hastighet, HP/för fiender.  
+- Minst 3 nivåer: lätt, normal, svår; tydliga skillnader i gameplay.
+
+## 12) Prestanda & minneshantering
+- Pooling av fiender, kulor, explosioner etc.  
+- Culling: inaktivera/dölj objekt utanför vy.  
+- Begränsa partikeleffekter och dyra shaders, särskilt på mobil.
+
+## 13) Testplan
+- Enhetstester: Spawner, Scoring, Options.  
+- Visuella/E2E-tester: kontroller, bossfas, bakgrundsrullning etc.  
+- Testa på olika enheter (mobil, surfplatta, desktop) för prestanda.
+
+## 14) Migreringschecklista (kodnivå)
+- GameScene: SCROLL_BASE, bakgrundsrullning, clamp-spelaryta, mode-flagga.  
+- Starfield: vertikal parallax & TileSprites.  
+- Spawner: nya spawn-metoder, spawnPosition y < 0 etc.  
+- Scoring: hantera miss på botten.  
+- HUD: nya element (boss, stage etc.)  
+- Powerups, Effects: anpassning till nytt flöde.  
+- Options: parametrar för gameplayMode.
+
+## 15) Leverabler
+- Kod: alla funktioner enligt plan.  
+- Dokumentation: uppdaterad README + docs/vertical-scroller.md.  
+- Exempel (fiendetyp, formationer, bullet patterns, boss).
+
+## 16) Risker & motåtgärder
+- Mobilautoplay eller ljudproblem → “Tap to start”.  
+- FPS-problem vid hög densitet → cap/hård limit, pooling.  
+- Sömmar i bakgrunder → testa sömlösa texturer och TileSprite korrekt.
+
+## 17) Tidslinje
+- Dag 1-2: branch + grundläggande rörelse, background scroll, spelarklämma  
+- Dag 3-4: spawn/formationer + pooling  
+- Dag 5: kollisionslogik + miss/regler  
+- Dag 6: boss & HUD-kompletteringar  
+- Dag 7: balans, optimering & QA
+

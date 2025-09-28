@@ -2,13 +2,13 @@
 
 ### PC
 - **Rörelse:** WASD / piltangenter där spelaren navigerar runt skärmen för att undvika fiender 
-    och sticky i X led (lane-baserat (X axeln), sticky till mitten av lane när spelaren inte styr i X-led). Lane centers är nu pixel-snap: LaneManager rundar centerpunkter och GameScene justerar Arcade-bodyn varje frame för att undvika jitter.
+    och sticky i X led (lane-baserat (X axeln), magnet till lane-centra och mellan-lane-ankare när spelaren inte styr i X-led). Lane centers är nu pixel-snap: LaneManager rundar centerpunkter och GameScene justerar Arcade-bodyn varje frame för att undvika jitter – samma logik driver även mellan-lane-ankarna.
 - **Sikte:** muspekaren. (free aim)
 - **Skott:** *push-to-shoot* → skott går iväg när musknappen trycks ner.
 - **Powerups/Bomb:** högerklick eller tangent (t.ex. Space).
 
 ### Mobil
-- **Rörelse:** Spelaren rör sig mot touchpoint och även siktar mot touchpoint → sticky till mitten av lane när spelaren inte rör fingret + deadzone längs X axeln.
+- **Rörelse:** Spelaren rör sig mot touchpoint och även siktar mot touchpoint → sticky till lane-centra samt mellan-lane-ankare när spelaren inte rör fingret + deadzone längs X axeln.
 - **Sikte:** finger på skärmen.
 - **Skott:** *hold-to-shoot* → när fingret är mot displayen.
 - **Powerups/Bomb:** dubbeltryck.

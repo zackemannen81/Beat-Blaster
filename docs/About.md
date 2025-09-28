@@ -3,7 +3,7 @@
 Beat Blaster is a rhythm-driven vertical shooter built with Phaser 3 and TypeScript. The project now blends a lane-based shmup ruleset with the legacy omni arena mode, syncing enemy behaviour, scoring, and presentation to the soundtrack.
 
 ## Implemented Features
-- **Dual Game Modes**: Vertical scroller (default) with lane snapping and safety band; omni arena mode still selectable for legacy play.
+- **Dual Game Modes**: Vertical scroller (default) with lane snapping, mid-lane magnet anchors, and safety band; omni arena mode still selectable for legacy play.
 - **Rhythm-Conducted Gameplay**: Web Audio analyzer detects low/mid/high beats, backed by BPM fallback scheduling. Conductor broadcasts timing events to spawners, announcer, and FX.
 - **Enemy Roster & Patterns**: Brutes, dashers, weavers, lane hoppers, mirrorers, teleporters, lane flooders, formation dancers, exploders, and boss shells. Behaviours react to beat events, lane layout, and difficulty tuning. A scripted 16-beat lane cycle ensures every archetype appears each bar, independent of playlist RNG.
 - **Wave & Spawn Pipeline**: WaveDirector orchestrates playlists per difficulty, while a new `LanePatternController` drives deterministic beat-by-beat spawns, lane expansions (3→5→7→3), and telegraph pulses. Spawner instantiates patterns with telegraphs, HP scaling, pooled sprites, and the lane-aware boss entry fix. Telegraph system renders zone/line/circle warnings with reduced-motion handling.
@@ -17,7 +17,7 @@ Beat Blaster is a rhythm-driven vertical shooter built with Phaser 3 and TypeScr
 - `src/systems/Conductor.ts`: Central dispatcher translating analyzer output into quantised beat/bar events for listeners.
 - `src/systems/Spawner.ts`: Core factory handling enemy pooling, telegraphs, formation math, HP scaling, and boss modifiers.
 - `src/systems/WaveDirector.ts`: Playlist scheduler, heavy wave throttling, and fallback injection when analyzer stalls.
-- `src/systems/LaneManager.ts`: Lane geometry, snapping, resize handling, debug overlays, and integer-aligned lane centres for jitter-free snaps.
+- `src/systems/LaneManager.ts`: Lane geometry, snapping (including between-lane magnets), resize handling, debug overlays, and integer-aligned lane centres for jitter-free snaps.
 - `src/systems/LanePatternController.ts`: Rhythm script that schedules waves per beat, manages lane-count transitions, and issues pulse events.
 - `src/systems/BeatWindow.ts`: Timing window calculations for shot grading and quantisation helpers.
 - `src/systems/Scoring.ts`: Combo management, score multipliers, penalty application, and perfect streak tracking.

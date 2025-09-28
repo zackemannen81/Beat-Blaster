@@ -830,7 +830,7 @@ this.lastHitAt = this.time.now
 
     if (this.touchMovePointerId !== undefined) moveX = 0
 
-    this.horizontalInputActive = Math.abs(moveX) > 0.05
+    this.horizontalInputActive = Math.abs(moveX) > 0.1
 
     const magnitude = Math.hypot(moveX, moveY)
     if (magnitude > 1) {
@@ -840,14 +840,14 @@ this.lastHitAt = this.time.now
 
     const stageHeight = this.scale.height
     const maxSpeed = this.gameplayMode === 'vertical'
-      ? stageHeight / 1.4
-      : this.scale.width / 1.1
+      ? stageHeight / 1
+      : this.scale.width / 1
 
     const targetVelocity = new Phaser.Math.Vector2(moveX, moveY)
     if (targetVelocity.lengthSq() > 1) targetVelocity.normalize()
     targetVelocity.scale(maxSpeed)
 
-    const lerp = 0.22
+    const lerp = 0.2
     let newVelX = Phaser.Math.Linear(body.velocity.x, targetVelocity.x, lerp)
     let newVelY = Phaser.Math.Linear(body.velocity.y, targetVelocity.y, lerp)
     if (targetVelocity.lengthSq() < 0.01) {
@@ -1267,7 +1267,7 @@ pskin?.setThrust?.(thrustLevel)
       count: laneCount,
       width: this.scale.width,
       left: 0,
-      debug: false
+      debug: true
     })
     this.lanes.on(LaneManager.EVT_CHANGED, this.onLaneSnapshot, this)
 
@@ -1328,13 +1328,16 @@ pskin?.setThrust?.(thrustLevel)
     if (!this.lanes) return
     const count = this.lanes.getCount()
     const clamped = Phaser.Math.Clamp(index, 0, count - 1)
-    const targetX = this.lanes.centerX(clamped)
+    const targetX = Math.round(this.lanes.centerX(clamped))
     this.targetLaneIndex = clamped
     const currentX = this.player.x
     if (Math.abs(targetX - currentX) <= this.laneDeadzonePx) {
       this.player.setX(targetX)
       const body = this.player.body as Phaser.Physics.Arcade.Body
-      body.updateFromGameObject()
+      const dx = targetX - currentX
+      body.position.x += dx
+      body.prev.x += dx
+      body.updateCenter()
       this.laneSnapActive = false
       this.laneSnapElapsed = this.laneSnapDurationMs
       return
@@ -1356,16 +1359,17 @@ pskin?.setThrust?.(thrustLevel)
     if (!this.laneSnapActive) {
       const nearest = this.lanes.nearest(this.player.x)
       if (!nearest) return
-      const distance = Math.abs(nearest.centerX - this.player.x)
+      const snappedCenter = Math.round(nearest.centerX)
+      const distance = Math.abs(snappedCenter - this.player.x)
       if (distance > this.laneDeadzonePx) {
         this.targetLaneIndex = nearest.index
         this.laneSnapFromX = this.player.x
-        this.laneSnapTargetX = nearest.centerX
+        this.laneSnapTargetX = snappedCenter
         this.laneSnapElapsed = 0
         this.laneSnapActive = true
       } else {
         const prevX = this.player.x
-        this.player.setX(nearest.centerX)
+        this.player.setX(snappedCenter)
         const dx = this.player.x - prevX
         body.position.x += dx
         body.prev.x += dx
@@ -1388,11 +1392,13 @@ pskin?.setThrust?.(thrustLevel)
     body.setVelocity(0, preservedVy)
 
     if (t >= 1) {
+      const aligned = Math.round(this.laneSnapTargetX)
+      this.laneSnapTargetX = aligned
       const prev = this.player.x
-      this.player.setX(this.laneSnapTargetX)
-      const dx = this.player.x - prev
-      body.position.x += dx
-      body.prev.x += dx
+      this.player.setX(aligned)
+      const snapDx = this.player.x - prev
+      body.position.x += snapDx
+      body.prev.x += snapDx
       body.updateCenter()
       body.setVelocity(0, preservedVy)
       this.laneSnapActive = false

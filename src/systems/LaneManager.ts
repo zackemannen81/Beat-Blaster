@@ -75,7 +75,9 @@ export default class LaneManager extends Phaser.Events.EventEmitter {
     this.step = this.width / (this.count + 1)
     this.lanes = []
     for (let i = 0; i < this.count; i++) {
-      this.lanes.push({ index: i, centerX: this.left + this.step * (i + 1) })
+      const rawCenter = this.left + this.step * (i + 1)
+      const centerX = Math.round(rawCenter)
+      this.lanes.push({ index: i, centerX })
     }
     this.emit(LaneManager.EVT_CHANGED, this.getSnapshot())
     this.redrawDebug()

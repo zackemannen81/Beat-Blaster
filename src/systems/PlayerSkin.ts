@@ -44,11 +44,11 @@ export default class PlayerSkin {
     const g = this.gfx
     g.clear()
 
-    const tip = size * 1.9
+    const tip = size * 1.7
     const bodyW = size * 1.0
     const baseY = size * 0.82
     const wingSpan = size * 1.6
-    const wingDepth = size * 0.55
+    const wingDepth = size * 0.82
 
     // Glow bak
     g.fillStyle(0x00e5ff, 0.12)

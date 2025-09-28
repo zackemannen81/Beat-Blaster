@@ -1,0 +1,36 @@
+[
+  {
+    "id": "track_00",
+    "name": "Neon Crusader (Main track, easy)",
+    "artist": "Echoheart 💜",
+    "inputOffsetMs": 0,
+    "lengthSec": 166,
+    "fileOgg": "",
+    "fileMp3": "src/assets/audio/tracks/track_00.wav",
+    "difficultyProfileId": "easy",
+    "hash": "60e768ef0395baadf5ee504e66cd56fc45108afd"
+  },
+  {
+    "id": "track_01",
+    "name": "Neon Heartbeat (Normal)",
+    "artist": "Mr.White",
+    "inputOffsetMs": 0,
+    "lengthSec": 215,
+    "fileOgg": "",
+    "fileMp3": "src/assets/audio/tracks/track_01.wav",
+    "difficultyProfileId": "normal",
+    "hash": "60e768ef0395baadf5ee504e66cd56fc45108afd"
+  },
+  {
+    "id": "track_02",
+    "name": "Neon Reverie (Hard)",
+    "artist": "Alex Harmony",
+    "inputOffsetMs": 0,
+    "lengthSec": 128,
+    "fileOgg": "",
+    "fileMp3": "src/assets/audio/tracks/track_03.mp3",
+    "difficultyProfileId": "hard",
+    "hash": "91913fcb63140356966ac881688e6ae6170bc333"
+  }
+  
+]

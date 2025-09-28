@@ -1,0 +1,111 @@
+{
+  "frames": {
+    "star_small": {
+      "frame": {
+        "x": 6,
+        "y": 6,
+        "w": 512,
+        "h": 512
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 512
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 512
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "trail_streak": {
+      "frame": {
+        "x": 6,
+        "y": 530,
+        "w": 198,
+        "h": 504
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 157,
+        "y": 2,
+        "w": 198,
+        "h": 504
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 512
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "particle_glow_small": {
+      "frame": {
+        "x": 6,
+        "y": 1046,
+        "w": 496,
+        "h": 502
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 7,
+        "y": 5,
+        "w": 496,
+        "h": 502
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 512
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "particle_circle_small": {
+      "frame": {
+        "x": 6,
+        "y": 1560,
+        "w": 385,
+        "h": 449
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 64,
+        "y": 0,
+        "w": 385,
+        "h": 449
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 512
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    }
+  },
+  "meta": {
+    "app": "http://github.com/odrick/free-tex-packer-cli",
+    "version": "0.3.0",
+    "image": "particles.atlas.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1024,
+      "h": 2048
+    },
+    "scale": 1
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "player": {"speed": 250, "accel": 1800, "friction": 0.9, "hp": 3},
+  "bullets": {"speed": 900, "cooldownMs": 200, "damage": 1, "ttlMs": 2000},
+  "enemies": {
+    "brute": {"hp": 4, "speed": 30, "damage": 1, "score": 100},
+    "dasher": {"hp": 1, "speed": 50, "damage": 1, "score": 75},
+    "swarm": {"hp": 1, "speed": 70, "damage": 1, "score": 25},
+    "elite": {"hp": 24, "speed": 45, "damage": 2, "score": 500}
+  },
+  "spawn": {"baseDensity": 0.2, "eliteEveryNBars": 8},
+  "scoring": {"perfectMs": 60, "goodMs": 120, "comboStep": 0.1, "comboMax": 8},
+  "powerups": {"dropRates": {"shield": 0.12, "rapid": 0.06, "split": 0.1, "magnet": 0.06, "slowmo": 0.05}, "durations": {"shield": 5, "rapid": 8, "magnet": 8, "slowmo": 3}, "stackRules": "refresh"},
+  "difficultyRamp": {"perMinuteHpPct": 6, "spawnRatePct": 15, "patternVariety": 1}
+}

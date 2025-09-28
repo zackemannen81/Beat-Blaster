@@ -1,0 +1,6 @@
+{
+  "shaders": {"enabled": true, "glowIntensity": 1.8},
+  "particles": {"maxActiveAvg": 800, "maxActivePeak": 1500},
+  "camera": {"shakeIntensity": 0.08, "hitStopScale": 0.85},
+  "accessibility": {"highContrastDefault": false, "colorBlindPaletteId": "protanopia"}
+}

@@ -20,7 +20,7 @@ import WaveDirector from '../systems/WaveDirector'
 import EnemyLifecycle from '../systems/EnemyLifecycle'
 import type { WaveDescriptor } from '../types/waves'
 import { getWavePlaylist } from '../systems/WaveLibrary'
-import Announcer from '../systems/Announcer'
+import Announcer, { AnnouncerVoiceId } from '../systems/Announcer'
 
 type Enemy = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
 type PowerupSprite = Phaser.Physics.Arcade.Sprite
@@ -175,8 +175,9 @@ export default class GameScene extends Phaser.Scene {
     this.gamepadDeadzone = this.opts.gamepadDeadzone
     this.gamepadSensitivity = this.opts.gamepadSensitivity
 
+    const preferredVoice: AnnouncerVoiceId = this.cache.audio.exists('announcer_cyborg_new_game') ? 'cyborg' : 'bee'
     this.announcer = new Announcer(this, () => this.opts.sfxVolume, {
-      voice: 'bee'
+      voice: preferredVoice
     })
 
     this.neon = new NeonGrid(this)

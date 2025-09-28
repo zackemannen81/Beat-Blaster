@@ -1,7 +1,7 @@
 # Announcer Voice Clip Requirements
 
 ## System Overview
-- Central announcer logic maps gameplay events to audio keys per voice id (`default`, `bee`) and handles priorities, cooldowns, and fallbacks; see `src/systems/Announcer.ts:11`.
+- Central announcer logic maps gameplay events to audio keys per voice id (`default`, `bee`, `cyborg`) and handles priorities, cooldowns, and fallbacks; see `src/systems/Announcer.ts:11`.
 - BootScene preloads every announcer asset; use it as the source of truth for file names and formats (`.wav` primary, optional `.mp3` mirror) in `src/scenes/BootScene.ts:150`.
 - GameScene dispatches announcer events for run flow, powerups, combos, bombs, and wave telegraphs; key call sites are `src/scenes/GameScene.ts:589`, `src/scenes/GameScene.ts:642`, `src/scenes/GameScene.ts:1210`, `src/scenes/GameScene.ts:2054`, and `src/scenes/GameScene.ts:2249`.
 - Lane-driven wave scripting guarantees varied enemy patterns and lane transitions (3→5→7→3) every 16 beats, making enemy-specific and lane-transition callouts essential; see `docs/Beat-blaster_MechanicsAndFeatures.md:85` and `docs/About.md:9`.
@@ -51,7 +51,21 @@
 - Trim leading/trailing silence (<10 ms) and note pronunciation for unique terms ("Beat Blaster", "Neon Crusader").
 
 ## Asset Naming & Integration Notes
-- Mirror existing naming: `announcer_<cue>.wav` for default voice, `announcer_<voice>_<cue>.wav` for alternates; update `announcerSources` in `src/scenes/BootScene.ts:150` as new keys land.
+- Mirror existing naming: `announcer_<cue>.wav` for default voice, `announcer_<voice>_<cue>.wav` for alternates; BootScene auto-loads anything matching that pattern under `src/assets/audio/sfx/**`.
 - For combo milestones, adopt explicit filenames (`announcer_combo_10.wav`, etc.) and extend `playCombo` logic accordingly (`src/systems/Announcer.ts:98`).
 - Document script text, emotional intensity, and length per cue in source control alongside audio (`docs/voice_scripts/` recommended) to aid localisation.
 - After importing new assets, run `npm run build` to confirm bundle size and audio cache registration; check console for missing-key warnings during `npm run dev`.
+
+## Cyborg Voice Pipeline
+- Script & prompts live in `tools/voices/cyborg/lines.json`.
+- Render clips with `tools/voices/cyborg/generate_clips.py` (edge-tts via the local venv). Default output lands in `src/assets/audio/sfx/voices/cyborg/` with both WAV and MP3 mirrors.
+- BootScene auto-loads any announcer assets that exist under `src/assets/audio/sfx/**`; no manual registration required.
+- Placekeeping README in `src/assets/audio/sfx/voices/cyborg/README.md` describes mastering targets and file layout.
+
+## Post-generation QA Checklist
+- [ ] Verify every generated key resolves in-game by checking the console for `announcer_*` load errors during `npm run dev`.
+- [ ] Spot-check clip loudness (target -12 LUFS) and ensure no tails exceed 1.2 s unless intended.
+- [ ] Play a vertical run: confirm `new_game`, `warning`, `powerup`, and `bomb_ready` fire with the Cyberg timbre.
+- [ ] Trigger combo 10/20/30 (use debug or sandbox) to validate milestone routing via `playCombo`.
+- [ ] Simulate analyzer drop (`window.dispatchEvent(new CustomEvent('conductor:analyzer:fallback'))` or disable analyser) and ensure fallback/resync cues play.
+- [ ] Capture final waveform hashes and update docs if alternate takes replace existing masters.

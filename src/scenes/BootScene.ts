@@ -1,5 +1,35 @@
 import Phaser from 'phaser'
 
+type AudioSourceManifest = Record<string, string[]>
+
+const ANNOUNCER_AUDIO_SOURCES: AudioSourceManifest = (() => {
+  const wavFiles = import.meta.glob('../assets/audio/sfx/**/*.wav', {
+    eager: true,
+    as: 'url'
+  }) as Record<string, string>
+  const mp3Files = import.meta.glob('../assets/audio/sfx/**/*.mp3', {
+    eager: true,
+    as: 'url'
+  }) as Record<string, string>
+
+  const grouped: AudioSourceManifest = {}
+
+  const register = (entries: Record<string, string>) => {
+    Object.entries(entries).forEach(([path, url]) => {
+      const fileName = path.split('/').pop() ?? ''
+      if (!fileName.startsWith('announcer_')) return
+      const key = fileName.replace(/\.(wav|mp3)$/i, '')
+      if (!grouped[key]) grouped[key] = []
+      if (!grouped[key].includes(url)) grouped[key].push(url)
+    })
+  }
+
+  register(wavFiles)
+  register(mp3Files)
+
+  return grouped
+})()
+
 export default class BootScene extends Phaser.Scene {
   constructor() {
     super('BootScene')
@@ -147,71 +177,7 @@ export default class BootScene extends Phaser.Scene {
       'src/assets/audio/sfx/metronome.wav',
       'src/assets/audio/sfx/metronome.mp3'
     ])
-    const announcerSources: Record<string, string[]> = {
-      announcer_powerup: ['src/assets/audio/sfx/announcer_powerup.wav'],
-      announcer_shield: ['src/assets/audio/sfx/announcer_shield.wav'],
-      announcer_rapid_fire: ['src/assets/audio/sfx/announcer_rapid_fire.wav'],
-      announcer_split_shot: ['src/assets/audio/sfx/announcer_split_shot.wav'],
-      announcer_slowmo: ['src/assets/audio/sfx/announcer_slowmo.wav'],
-      announcer_bomb_ready: ['src/assets/audio/sfx/announcer_bomb_ready.wav'],
-      announcer_combo: ['src/assets/audio/sfx/announcer_combo.wav'],
-      announcer_new_game: ['src/assets/audio/sfx/announcer_new_game.wav'],
-      announcer_warning: ['src/assets/audio/sfx/announcer_warning.wav'],
-      announcer_enemies_approching: ['src/assets/audio/sfx/announcer_enemies_approching.wav'],
-      announcer_bee_powerup: [
-        'src/assets/audio/sfx/voices/bee/announcer_bee_powerup.wav',
-        'src/assets/audio/sfx/voices/bee/announcer_bee_powerup.mp3'
-      ],
-      announcer_bee_shield: [
-        'src/assets/audio/sfx/voices/bee/announcer_bee_shield.wav',
-        'src/assets/audio/sfx/voices/bee/announcer_bee_shield.mp3'
-      ],
-      announcer_bee_rapid_fire: [
-        'src/assets/audio/sfx/voices/bee/announcer_bee_rapid_fire.wav',
-        'src/assets/audio/sfx/voices/bee/announcer_bee_rapid_fire.mp3'
-      ],
-      announcer_bee_split_shot: [
-        'src/assets/audio/sfx/voices/bee/announcer_bee_split_shot.wav',
-        'src/assets/audio/sfx/voices/bee/announcer_bee_split_shot.mp3'
-      ],
-      announcer_bee_slowmo: [
-        'src/assets/audio/sfx/voices/bee/announcer_bee_slowmo.wav',
-        'src/assets/audio/sfx/voices/bee/announcer_bee_slowmo.mp3'
-      ],
-      announcer_bee_bomb_ready: [
-        'src/assets/audio/sfx/voices/bee/announcer_bee_bomb_ready.wav',
-        'src/assets/audio/sfx/voices/bee/announcer_bee_bomb_ready.mp3'
-      ],
-      announcer_bee_new_game: [
-        'src/assets/audio/sfx/voices/bee/announcer_bee_new_game.wav',
-        'src/assets/audio/sfx/voices/bee/announcer_bee_new_game.mp3'
-      ],
-      announcer_bee_warning: [
-        'src/assets/audio/sfx/voices/bee/announcer_bee_warning.wav',
-        'src/assets/audio/sfx/voices/bee/announcer_bee_warning.mp3'
-      ],
-      announcer_bee_enemies_approching: [
-        'src/assets/audio/sfx/voices/bee/announcer_bee_enemies_approching.wav',
-        'src/assets/audio/sfx/voices/bee/announcer_bee_enemies_approching.mp3'
-      ],
-      announcer_bee_wave: [
-        'src/assets/audio/sfx/voices/bee/announcer_bee_wave.wav',
-        'src/assets/audio/sfx/voices/bee/announcer_bee_wave.mp3'
-      ],
-      announcer_bee_boss: [
-        'src/assets/audio/sfx/voices/bee/announcer_bee_boss.wav',
-        'src/assets/audio/sfx/voices/bee/announcer_bee_boss.mp3'
-      ],
-      announcer_bee_enemy: [
-        'src/assets/audio/sfx/voices/bee/announcer_bee_enemy.wav',
-        'src/assets/audio/sfx/voices/bee/announcer_bee_enemy.mp3'
-      ],
-      announcer_bee_get_ready: [
-        'src/assets/audio/sfx/voices/bee/announcer_bee_get_ready.wav',
-        'src/assets/audio/sfx/voices/bee/announcer_bee_get_ready.mp3'
-      ]
-    }
-    Object.entries(announcerSources).forEach(([key, sources]) => {
+    Object.entries(ANNOUNCER_AUDIO_SOURCES).forEach(([key, sources]) => {
       this.load.audio(key, sources)
     })
     // Note: pickup sound uses UI select as placeholder for browser compatibility

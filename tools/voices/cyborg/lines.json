@@ -1,0 +1,116 @@
+{
+  "announcer_cyborg_powerup": {
+    "text": "Power module secured."
+  },
+  "announcer_cyborg_shield": {
+    "text": "Shield lattice online."
+  },
+  "announcer_cyborg_rapid_fire": {
+    "text": "Rapid-fire rails synced."
+  },
+  "announcer_cyborg_split_shot": {
+    "text": "Split-shot trajectory armed."
+  },
+  "announcer_cyborg_slowmo": {
+    "text": "Temporal dampers engaged."
+  },
+  "announcer_cyborg_bomb_ready": {
+    "text": "Quantum bomb charge at maximum."
+  },
+  "announcer_cyborg_combo_10": {
+    "text": "Combo ten. Keep cycling."
+  },
+  "announcer_cyborg_combo_20": {
+    "text": "Combo twenty. Rhythm locked."
+  },
+  "announcer_cyborg_combo_30": {
+    "text": "Combo thirty. You are the beat."
+  },
+  "announcer_cyborg_new_game": {
+    "text": "Systems green. Ride the beat."
+  },
+  "announcer_cyborg_get_ready": {
+    "text": "Recalibrating lanes. Get ready."
+  },
+  "announcer_cyborg_warning": {
+    "text": "Warning. Heavy signatures inbound."
+  },
+  "announcer_cyborg_enemies_approching": {
+    "text": "Contact detected. Maintain flow."
+  },
+  "announcer_cyborg_boss": {
+    "text": "Boss entity materializing. Brace."
+  },
+  "announcer_cyborg_enemy": {
+    "text": "Hostile locked."
+  },
+  "announcer_cyborg_stage_clear": {
+    "text": "Stage clear. Re-syncing systems."
+  },
+  "announcer_cyborg_lane_expand": {
+    "text": "Lanes expanding. Spread formation."
+  },
+  "announcer_cyborg_lane_collapse": {
+    "text": "Lanes collapsing. Collapse inward."
+  },
+  "announcer_cyborg_lane_pulse": {
+    "text": "Lane pulse. Adapt movement."
+  },
+  "announcer_cyborg_enemy_swarm": {
+    "text": "Swarm pods approaching."
+  },
+  "announcer_cyborg_enemy_weaver": {
+    "text": "Weavers inbound. Expect arc motion."
+  },
+  "announcer_cyborg_enemy_mirrorer": {
+    "text": "Mirror units tracking your lane."
+  },
+  "announcer_cyborg_enemy_teleporter": {
+    "text": "Teleporters phasing. Watch every lane."
+  },
+  "announcer_cyborg_enemy_flooder": {
+    "text": "Lane flood incoming. Relocate now."
+  },
+  "announcer_cyborg_enemy_dasher": {
+    "text": "Dashers accelerating."
+  },
+  "announcer_cyborg_enemy_exploder": {
+    "text": "Exploders primed. Clear the radius."
+  },
+  "announcer_cyborg_enemy_brute": {
+    "text": "Brute chassis ahead."
+  },
+  "announcer_cyborg_enemy_formation": {
+    "text": "Formation dancers aligning."
+  },
+  "announcer_cyborg_telegraph_zone": {
+    "text": "Zone hazard highlighted."
+  },
+  "announcer_cyborg_telegraph_line": {
+    "text": "Line strike plotted."
+  },
+  "announcer_cyborg_telegraph_circle": {
+    "text": "Circular impact zone."
+  },
+  "announcer_cyborg_wave_heavy": {
+    "text": "Heavy wave entering the grid."
+  },
+  "announcer_cyborg_wave_boss": {
+    "text": "Boss wave confirmed."
+  },
+  "announcer_cyborg_player_low_hp": {
+    "text": "Critical integrity. Evade immediately."
+  },
+  "announcer_cyborg_bomb_deployed": {
+    "text": "Bomb deployed. Stand clear."
+  },
+  "announcer_cyborg_game_over": {
+    "text": "Run complete. Uploading telemetry."
+  },
+  "announcer_cyborg_analyzer_fallback": {
+    "text": "Audio analyzer offline. Switching to fallback rhythm."
+  },
+  "announcer_cyborg_analyzer_resync": {
+    "text": "Analyzer resynced. Live beat restored."
+  }
+}

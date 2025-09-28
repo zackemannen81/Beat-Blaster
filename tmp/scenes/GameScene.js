@@ -1,0 +1,2180 @@
+import Phaser from 'phaser';
+import AudioAnalyzer from '../systems/AudioAnalyzer';
+import Conductor from '../systems/Conductor';
+import Spawner from '../systems/Spawner';
+import Scoring from '../systems/Scoring';
+import HUD from '../ui/HUD';
+import Effects from '../systems/Effects';
+import Powerups from '../systems/Powerups';
+import Starfield from '../systems/Starfield';
+import BackgroundScroller from '../systems/BackgroundScroller';
+import { loadOptions, resolveGameplayMode } from '../systems/Options';
+import PlayerSkin from '../systems/PlayerSkin';
+import NeonGrid from '../systems/NeonGrid';
+import LaneManager from '../systems/LaneManager';
+import LanePatternController from '../systems/LanePatternController';
+import BeatWindow from '../systems/BeatWindow';
+import { getDifficultyProfile } from '../config/difficultyProfiles';
+import WaveDirector from '../systems/WaveDirector';
+import EnemyLifecycle from '../systems/EnemyLifecycle';
+import { getWavePlaylist } from '../systems/WaveLibrary';
+import Announcer from '../systems/Announcer';
+export default class GameScene extends Phaser.Scene {
+    cleanupEnemy(enemy, doDeathFx = true) {
+        const enemyId = enemy.getData('eid') ?? null;
+        if (enemyId)
+            this.waveDirector?.notifyEnemyDestroyed(enemyId);
+        this.enemyLifecycle?.notifyRemoved(enemy);
+        const skin = enemy.getData('skin');
+        if (doDeathFx)
+            skin?.onDeath?.();
+        skin?.destroy?.();
+        const hb = enemy.getData('healthBar');
+        hb?.destroy();
+        const hopTween = enemy.getData('laneHopTween');
+        hopTween?.remove();
+        enemy.setData('laneHopTween', null);
+        const floodRect = enemy.getData('flooderRect');
+        floodRect?.destroy();
+        enemy.setData('flooderRect', null);
+        enemy.disableBody(true, true);
+    }
+    //private keys:Phaser.Types.Input.Keyboard;
+    constructor() {
+        super('GameScene');
+        this.scoring = new Scoring();
+        this.beatWindow = new BeatWindow();
+        this.isShooting = false;
+        this.lastShotAt = 0;
+        this.bulletSpeed = 900;
+        this.bulletTtlMs = 1000;
+        this.fireCooldownMs = 50;
+        this.playerHp = 3;
+        this.playerMaxHp = 3;
+        this.iframesUntil = 0;
+        this.bombCharge = 0; // 0..100
+        this.bombReadyAnnounced = false;
+        this.metronome = false;
+        this.lastDashToggle = 0;
+        this.lastBeatAt = 0;
+        this.beatCount = 0;
+        this.nextQuantizedShotAt = 0;
+        this.beatPeriodMs = 2000; // fallback
+        this.opts = loadOptions();
+        this.crosshairMode = this.opts.crosshairMode;
+        this.verticalSafetyBand = this.opts.verticalSafetyBand;
+        this.padAimVector = new Phaser.Math.Vector2(0, -1);
+        this.difficultyProfile = getDifficultyProfile('normal');
+        this.currentStageConfig = this.difficultyProfile.stageTuning[0];
+        this.difficultyLabel = this.difficultyProfile.label;
+        this.enemyCap = this.currentStageConfig?.enemyCap ?? 20;
+        this.comboCount = 0;
+        this.comboTimeoutMs = 2000;
+        this.lastHitAt = 0;
+        this.gameplayMode = resolveGameplayMode(this.opts.gameplayMode);
+        this.scrollBase = 128;
+        this.movementMinY = 0;
+        this.movementMaxY = 0;
+        this.gamepadDeadzone = this.opts.gamepadDeadzone;
+        this.gamepadSensitivity = this.opts.gamepadSensitivity;
+        this.gamepadFireActive = false;
+        this.touchMoveBaselineX = 0;
+        this.touchFirePointers = new Set();
+        this.touchTapTimes = [];
+        this.beatStatusDetectedShown = false;
+        this.lastHitEnemyId = null;
+        this.powerupDurations = {
+            shield: 8,
+            rapid: 10,
+            split: 15,
+            slowmo: 5
+        };
+        this.activePowerups = new Set();
+        this.waveDescriptorIndex = new Map();
+        this.nextWaveInfo = null;
+        this.onWaveScheduledHandler = (payload) => this.handleWaveScheduled(payload, false);
+        this.onWaveFallbackHandler = (payload) => this.handleWaveScheduled(payload, true);
+        this.isPaused = false;
+        this.barsElapsed = 0;
+        this.bossSpawned = false;
+        this.enemyHpMultiplier = this.difficultyProfile.baseEnemyHpMultiplier;
+        this.bossHpMultiplier = this.difficultyProfile.baseBossHpMultiplier;
+        this.missPenalty = this.difficultyProfile.missPenalty;
+        this.bossMissPenalty = this.difficultyProfile.bossMissPenalty;
+        this.verticalLaneCount = this.difficultyProfile.laneCount;
+        this.currentStage = 1;
+        this.reducedMotion = false;
+        this.activeBoss = null;
+        this.onLanePatternPulse = () => this.pulseEnemies(1.3);
+        this.targetLaneIndex = 0;
+        this.laneSnapFromX = 0;
+        this.laneSnapTargetX = 0;
+        this.laneSnapElapsed = 0;
+        this.laneSnapDurationMs = 160;
+        this.laneSnapActive = false;
+        this.laneDeadzonePx = 6;
+        this.touchLaneIndexBaseline = 0;
+        this.touchLaneAccum = 0;
+        this.releaseFireMode = false;
+        this.releaseFireArmed = false;
+        this.onLaneSnapshot = (snapshot) => {
+            this.hud?.setLaneCount(snapshot.count);
+        };
+        this.horizontalInputActive = false;
+        this.unlockMouseAim = false;
+        this.handleWaveSpawned = (payload) => {
+            if (this.nextWaveInfo && payload.descriptorId === this.nextWaveInfo.descriptorId) {
+                this.hud?.clearUpcomingWave();
+                this.nextWaveInfo = null;
+            }
+            this.hud?.clearTelegraphMessage();
+            const descriptor = this.resolveWaveDescriptor(payload.descriptorId);
+            if (!descriptor.telegraph) {
+                this.announcer.playAudioKey(descriptor.audioCue, payload.fallback ? 0 : 1);
+            }
+        };
+        this.handleWaveTelegraph = (payload) => {
+            if (!this.hud)
+                return;
+            const descriptor = this.resolveWaveDescriptor(payload.descriptorId);
+            this.announcer.playAudioKey(descriptor.audioCue, payload.fallback ? 0 : 1);
+            if (descriptor.telegraph) {
+                const typeLabel = descriptor.telegraph.type === 'circle'
+                    ? 'Circular Telegraph'
+                    : descriptor.telegraph.type === 'line'
+                        ? 'Line Telegraph'
+                        : 'Zone Telegraph';
+                this.hud.setTelegraphMessage(`${typeLabel}: ${descriptor.enemyType.toUpperCase()}`);
+            }
+            else {
+                this.hud.setTelegraphMessage(`Incoming: ${descriptor.enemyType.toUpperCase()}`);
+            }
+        };
+        this.handleBarStart = (event) => {
+            this.barsElapsed = event.barIndex;
+            if (this.gameplayMode !== 'vertical')
+                return;
+            if (this.bossSpawned || this.activeBoss)
+                return;
+            const barsPerBoss = 8;
+            if (event.barIndex > 0 && event.barIndex % barsPerBoss === 0 && this.spawner.getGroup().countActive(true) < Math.max(4, Math.round(this.enemyCap * 0.45))) {
+                const boss = this.spawner.spawnBoss('brute', { hp: 120, speedMultiplier: 0.55 });
+                this.bossSpawned = true;
+                this.activeBoss = boss;
+                this.hud.setBossHealth(1, boss.getData('etype'));
+                this.announcer.playEvent('boss');
+            }
+        };
+    }
+    create() {
+        this.opts = loadOptions();
+        this.crosshairMode = this.opts.crosshairMode;
+        this.verticalSafetyBand = !!this.opts.verticalSafetyBand;
+        this.gameplayMode = resolveGameplayMode(this.opts.gameplayMode);
+        this.unlockMouseAim = !!this.opts.unlockMouseAim;
+        this.releaseFireMode = false;
+        this.gamepadDeadzone = this.opts.gamepadDeadzone;
+        this.gamepadSensitivity = this.opts.gamepadSensitivity;
+        this.announcer = new Announcer(this, () => this.opts.sfxVolume, {
+            voice: 'bee'
+        });
+        this.neon = new NeonGrid(this);
+        this.neon.create();
+        const { width, height } = this.scale;
+        this.cameras.main.setBackgroundColor('#0a0a0f');
+        this.reducedMotion = !!this.opts.reducedMotion;
+        this.registry.set('options', this.opts);
+        this.registry.set('reducedMotion', this.reducedMotion);
+        this.backgroundScroller = new BackgroundScroller(this);
+        this.backgroundScroller.create();
+        // Starfield background (procedural)
+        this.starfield = new Starfield(this);
+        this.starfield.create();
+        // Player sprite from atlas
+        /*
+            this.player = this.physics.add.sprite(width / 2, height / 2, 'gameplay', 'player_idle')
+            this.player.setScale(0.5);
+            this.player.setCollideWorldBounds(true)
+            this.player.setRotation(Math.PI/2) // Rotate 90 degrees to face right
+        */
+        // Player sprite (behåll som fysik-host)
+        this.player = this.physics.add.sprite(width / 2, height / 2, 'gameplay', 'player_idle');
+        this.player.setCollideWorldBounds(true);
+        // vi ritar spelaren via PlayerSkin → göm atlas-grafiken
+        this.player.setVisible(false);
+        // sätt en rimlig hitbox (matcha din PlayerSkin-storlek, t.ex. triangel ~18px)
+        const r = 14;
+        this.player.body.setCircle(r, -r + this.player.width / 2, -r + this.player.height / 2);
+        // rotationen behövs fortfarande – PlayerSkin följer host.rotation
+        this.player.setRotation(Math.PI / 2);
+        // koppla på skinet
+        const pskin = new PlayerSkin(this, this.player);
+        this.player.setData('skin', pskin);
+        this.beatIndicator = this.add.graphics();
+        this.beatIndicator.fillStyle(0xff0000, 1);
+        this.beatIndicator.fillCircle(50, 50, 20); // Placera den där det passar i ditt UI
+        this.setupBeatStatusOverlay();
+        if (this.gameplayMode === 'vertical') {
+            this.setupVerticalLaneSystem();
+        }
+        /*
+          // aktivera WASD
+          this.keys = this.input.keyboard!.addKeys({
+            up: Phaser.Input.Keyboard.KeyCodes.W,
+            down: Phaser.Input.Keyboard.KeyCodes.S,
+            left: Phaser.Input.Keyboard.KeyCodes.A,
+            right: Phaser.Input.Keyboard.KeyCodes.D,
+            space: Phaser.Input.Keyboard.KeyCodes.SPACE,
+            shift: Phaser.Input.Keyboard.KeyCodes.SHIFT
+          }) as {
+            up: Phaser.Input.Keyboard.Key;
+            down: Phaser.Input.Keyboard.Key;
+            left: Phaser.Input.Keyboard.Key;
+            right: Phaser.Input.Keyboard.Key;
+            space: Phaser.Input.Keyboard.Key;
+            shift: Phaser.Input.Keyboard.Key;
+          };
+      */
+        this.cursors = this.input.keyboard.createCursorKeys();
+        const wasd = this.input.keyboard.addKeys({
+            W: Phaser.Input.Keyboard.KeyCodes.W,
+            A: Phaser.Input.Keyboard.KeyCodes.A,
+            S: Phaser.Input.Keyboard.KeyCodes.S,
+            D: Phaser.Input.Keyboard.KeyCodes.D,
+        });
+        this.registry.set('wasd', wasd);
+        this.bossSpawned = false;
+        this.barsElapsed = 0;
+        this.activeBoss = null;
+        this.gameplayMode = resolveGameplayMode(this.opts.gameplayMode);
+        this.registry.set('gameplayMode', this.gameplayMode);
+        this.reducedMotion = !!this.opts.reducedMotion;
+        this.updateMovementBounds();
+        this.scale.on(Phaser.Scale.Events.RESIZE, this.updateMovementBounds, this);
+        this.input.addPointer(2);
+        // Read balance
+        const balance = this.registry.get('balance');
+        if (balance?.bullets) {
+            this.bulletSpeed = balance.bullets.speed ?? this.bulletSpeed;
+            this.fireCooldownMs = balance.bullets.cooldownMs ?? this.fireCooldownMs;
+            this.bulletTtlMs = balance.bullets.ttlMs ?? this.bulletTtlMs;
+        }
+        if (balance?.player) {
+            this.playerMaxHp = balance.player.hp ?? this.playerMaxHp;
+            this.playerHp = this.playerMaxHp;
+        }
+        // Bullets group & fire mode
+        this.bullets = this.physics.add.group({
+            classType: Phaser.Physics.Arcade.Sprite,
+            defaultKey: 'bullet_plasma_0',
+            maxSize: 200
+        });
+        this.physics.world.on('worldbounds', this.handleBulletWorldBounds, this);
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            if (this.physics.world)
+                this.physics.world.off('worldbounds', this.handleBulletWorldBounds, this);
+            this.music?.stop();
+            this.music?.destroy();
+            this.music = undefined;
+            this.analyzer?.removeAllListeners?.();
+            this.backgroundScroller?.destroy();
+            this.starfield?.destroy();
+            this.spawner?.setLaneManager(null);
+            this.lanes?.off(LaneManager.EVT_CHANGED, this.onLaneSnapshot, this);
+            this.lanes?.destroy();
+            this.lanes = undefined;
+            this.scale.off(Phaser.Scale.Events.RESIZE, this.updateMovementBounds, this);
+            this.input.gamepad?.off('connected', this.onGamepadConnected, this);
+            this.input.gamepad?.off('disconnected', this.onGamepadDisconnected, this);
+            this.conductor?.off('bar:start', this.handleBarStart);
+        });
+        this.input.mouse?.disableContextMenu();
+        this.input.on('pointerdown', (pointer) => {
+            const pointerType = pointer?.pointerType ?? 'mouse';
+            if (pointerType === 'mouse') {
+                if (pointer.button === 2) {
+                    if (this.bombCharge >= 100)
+                        this.triggerBomb();
+                    return;
+                }
+                if (pointer.button !== 0)
+                    return;
+            }
+            if (this.gameplayMode === 'vertical' && pointerType !== 'mouse') {
+                const half = this.scale.width * 0.5;
+                if (pointer.x < half) {
+                    if (this.touchMovePointerId === undefined) {
+                        this.touchMovePointerId = pointer.id;
+                        this.touchMoveBaselineX = pointer.x;
+                        this.touchLaneIndexBaseline = this.targetLaneIndex;
+                        this.touchLaneAccum = 0;
+                    }
+                }
+                else {
+                    this.touchFirePointers.add(pointer.id);
+                    this.handleFireInputDown();
+                    this.registerTouchTap(this.time.now);
+                }
+                return;
+            }
+            this.handleFireInputDown();
+        });
+        this.input.on('pointerup', (pointer) => {
+            const pointerType = pointer?.pointerType ?? 'mouse';
+            if (pointerType === 'mouse' && pointer.button === 2)
+                return;
+            if (this.gameplayMode === 'vertical' && pointerType !== 'mouse') {
+                if (pointer.id === this.touchMovePointerId) {
+                    this.touchMovePointerId = undefined;
+                    this.touchLaneAccum = 0;
+                }
+                if (this.touchFirePointers.delete(pointer.id) && this.touchFirePointers.size === 0) {
+                    this.handleFireInputUp();
+                }
+                return;
+            }
+            this.handleFireInputUp();
+        });
+        this.input.on('pointermove', (pointer) => {
+            const pointerType = pointer?.pointerType ?? 'mouse';
+            if (this.gameplayMode !== 'vertical' || pointerType === 'mouse')
+                return;
+            if (pointer.id !== this.touchMovePointerId)
+                return;
+            if (!this.lanes)
+                return;
+            const deltaX = pointer.x - this.touchMoveBaselineX;
+            this.touchMoveBaselineX = pointer.x;
+            this.touchLaneAccum += deltaX;
+            const threshold = Math.max(this.getLaneSpacing() * 0.35, 18);
+            while (Math.abs(this.touchLaneAccum) >= threshold) {
+                const dir = this.touchLaneAccum > 0 ? 1 : -1;
+                const moved = this.shiftLane(dir);
+                if (!moved) {
+                    this.touchLaneAccum = 0;
+                    break;
+                }
+                this.touchLaneAccum -= threshold * dir;
+            }
+        });
+        if (this.input.gamepad) {
+            this.input.gamepad.on('connected', this.onGamepadConnected, this);
+            this.input.gamepad.on('disconnected', this.onGamepadDisconnected, this);
+            const pad = this.input.gamepad.gamepads.find(p => p && p.connected);
+            if (pad)
+                this.activeGamepad = pad;
+        }
+        // Load selected track on demand
+        const tracks = this.registry.get('tracks');
+        const selId = this.registry.get('selectedTrackId');
+        const track = tracks?.find((t) => t.id === selId);
+        this.difficultyProfile = getDifficultyProfile(track?.difficultyProfileId);
+        this.currentStage = this.difficultyProfile.stageTuning[0]?.stage ?? 1;
+        this.currentStageConfig = this.getStageConfig(this.currentStage);
+        this.difficultyLabel = this.difficultyProfile.label;
+        this.enemyHpMultiplier = this.difficultyProfile.baseEnemyHpMultiplier * (this.currentStageConfig?.enemyHpMultiplier ?? 1);
+        this.bossHpMultiplier = this.difficultyProfile.baseBossHpMultiplier * (this.currentStageConfig?.bossHpMultiplier ?? 1);
+        this.missPenalty = this.difficultyProfile.missPenalty;
+        this.bossMissPenalty = this.difficultyProfile.bossMissPenalty;
+        this.verticalLaneCount = this.difficultyProfile.laneCount;
+        this.enemyCap = this.currentStageConfig?.enemyCap ?? this.enemyCap;
+        // Initialize analyzer first
+        this.analyzer = new AudioAnalyzer(this);
+        this.conductor = new Conductor(this);
+        this.conductor.on('bar:start', this.handleBarStart);
+        // Set up beat listeners
+        const handleBeat = (band, pulse = false) => {
+            this.conductor.onBeat();
+            this.lastBeatAt = this.time.now;
+            if (band === 'low') {
+                this.beatCount += 1;
+                if (this.gameplayMode === 'vertical')
+                    this.triggerLaneHopperHop();
+            }
+            const usingPattern = this.gameplayMode === 'vertical' && !!this.lanePattern;
+            if (usingPattern) {
+                this.lanePattern?.handleBeat(band);
+            }
+            this.updateExplodersOnBeat(band);
+            this.updateTeleportersOnBeat(band);
+            this.updateWeaversOnBeat(band);
+            this.updateFormationDancersOnBeat(band);
+            this.updateMirrorersOnBeat(band);
+            if (!this.beatStatusDetectedShown) {
+                this.onBeatDetection();
+            }
+            if (!usingPattern) {
+                this.waveDirector.enqueueBeat(band);
+            }
+            if (pulse)
+                this.pulseEnemies();
+        };
+        this.analyzer.on('beat:low', () => handleBeat('low', true));
+        this.analyzer.on('beat:mid', () => handleBeat('mid'));
+        this.analyzer.on('beat:high', () => handleBeat('high'));
+        this.sound.removeByKey('music');
+        this.cache.audio.remove('music');
+        if (track) {
+            // First, ensure the audio context is running
+            const soundManager = this.sound;
+            if (soundManager.context.state === 'suspended') {
+                soundManager.context.resume().catch(console.error);
+            }
+            this.load.audio('music', [track.fileOgg || '', track.fileMp3 || ''].filter(Boolean));
+            this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+                try {
+                    // Create and configure the music
+                    this.music = this.sound.add('music', {
+                        loop: false,
+                        volume: this.opts.musicVolume
+                    });
+                    // Start playing the music
+                    this.music.on('play', () => {
+                        console.log('Music started playing');
+                        // Attach analyzer after a short delay
+                        setTimeout(() => {
+                            if (this.music) {
+                                if (this.analyzer.attachToAudio(this.music)) {
+                                    console.log('Analyzer attached successfully');
+                                }
+                                else {
+                                    console.warn('Failed to attach analyzer');
+                                }
+                            }
+                        }, 500);
+                    });
+                    // Start playback
+                    this.music.play();
+                }
+                catch (error) {
+                    console.error('Error initializing audio:', error);
+                }
+            });
+            this.load.start();
+        }
+        else {
+            console.warn('No track selected or track not found');
+        }
+        // Read metronome from options
+        this.metronome = this.opts.metronome;
+        this.analyzer.on('beat:low', () => {
+            if (this.metronome)
+                this.sound.play('metronome', { volume: 0.2 });
+            this.effects.beatPulse();
+        });
+        // Spawner & wave director
+        this.spawner = new Spawner(this);
+        if (this.gameplayMode === 'vertical') {
+            this.spawner.setLaneManager(this.lanes ?? null);
+        }
+        else {
+            this.spawner.setLaneManager(null);
+        }
+        const playlistId = (this.difficultyProfile.wavePlaylistId ?? this.difficultyProfile.id);
+        const playlist = getWavePlaylist(playlistId);
+        this.waveDescriptorIndex.clear();
+        playlist.waves.forEach((wave) => this.waveDescriptorIndex.set(wave.id, wave));
+        this.waveDirector = new WaveDirector(this, this.spawner, {
+            profileId: playlistId,
+            playlist,
+            anchorProvider: () => ({ x: this.scale.width / 2, y: -140 }),
+            stageProvider: () => this.currentStage,
+            defaultDelayMs: this.difficultyProfile.waveDelayMs,
+            fallbackCooldownMs: this.difficultyProfile.fallbackCooldownMs,
+            waveRepeatCooldownMs: this.difficultyProfile.waveRepeatCooldownMs,
+            maxQueuedWaves: this.currentStageConfig?.maxQueuedWaves ?? 3,
+            heavyCooldownMs: this.difficultyProfile.heavyControls.cooldownMs,
+            heavyWindowMs: this.difficultyProfile.heavyControls.windowMs,
+            maxHeavyInWindow: this.difficultyProfile.heavyControls.maxInWindow,
+            maxSimultaneousHeavy: this.currentStageConfig?.maxSimultaneousHeavy ?? this.difficultyProfile.heavyControls.maxSimultaneous,
+            categoryCooldowns: this.difficultyProfile.categoryCooldowns,
+            logEvents: import.meta?.env?.DEV ?? false,
+            onWaveSpawn: (_instanceId, enemies) => this.enemyLifecycle?.registerSpawn(enemies),
+            enableFallback: this.opts.allowFallbackWaves
+        });
+        this.waveDirector.setFallbackEnabled(this.opts.allowFallbackWaves);
+        this.enemyLifecycle = new EnemyLifecycle({
+            scene: this,
+            spawner: this.spawner,
+            waveDirector: this.waveDirector,
+            boundsProvider: () => ({ width: this.scale.width, height: this.scale.height, gameplayMode: this.gameplayMode }),
+            onExpire: (enemy, cause) => {
+                if (!enemy.active)
+                    return;
+                if (cause === 'miss' || cause === 'timeout') {
+                    this.handleEnemyMiss(enemy);
+                }
+                else {
+                    this.cleanupEnemy(enemy, false);
+                }
+            }
+        });
+        if (this.gameplayMode === 'vertical') {
+            this.lanePattern = new LanePatternController({
+                scene: this,
+                difficulty: this.difficultyProfile,
+                stage: this.currentStageConfig,
+                waveDirector: this.waveDirector,
+                getLaneManager: () => this.lanes,
+                requestLaneCount: (count, effect) => this.applyLanePatternCount(count, effect)
+            });
+            this.applyLanePatternCount(this.resolveLaneCount());
+        }
+        else {
+            this.lanePattern = undefined;
+        }
+        this.events.on('wave:scheduled', this.onWaveScheduledHandler, this);
+        this.events.on('wave:fallback', this.onWaveFallbackHandler, this);
+        this.events.on('wave:spawned', this.handleWaveSpawned, this);
+        this.events.on('wave:telegraph', this.handleWaveTelegraph, this);
+        this.events.on('lanes:pulse', this.onLanePatternPulse, this);
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            this.events.off('wave:scheduled', this.onWaveScheduledHandler, this);
+            this.events.off('wave:fallback', this.onWaveFallbackHandler, this);
+            this.events.off('wave:spawned', this.handleWaveSpawned, this);
+            this.events.off('wave:telegraph', this.handleWaveTelegraph, this);
+            this.events.off('lanes:pulse', this.onLanePatternPulse, this);
+            if (this.beatStatusResizeHandler) {
+                this.scale.off(Phaser.Scale.Events.RESIZE, this.beatStatusResizeHandler, this);
+                this.beatStatusResizeHandler = undefined;
+            }
+            this.beatStatusSearching?.destroy();
+            this.beatStatusDetected?.destroy();
+            this.beatStatusSearching = undefined;
+            this.beatStatusDetected = undefined;
+            this.beatStatusDetectedShown = false;
+            this.announcer.destroy();
+        });
+        this.updateDifficultyForStage();
+        const bpm = (track && track.bpm) ? track.bpm : 120;
+        const interval = 60000 / bpm;
+        this.beatPeriodMs = interval;
+        this.scrollBase = this.computeScrollBase(bpm);
+        this.beatWindow.setBpm(bpm);
+        this.starfield.setBaseScroll(this.scrollBase);
+        this.backgroundScroller.setBaseScroll(this.scrollBase);
+        this.spawner.setScrollBase(this.scrollBase);
+        this.registry.set('scrollBase', this.scrollBase);
+        // HUD
+        this.hud = new HUD(this);
+        this.hud.create();
+        this.hud.setupHearts(this.playerMaxHp);
+        this.hud.setHp(this.playerHp);
+        this.hud.setBombCharge(this.bombCharge / 100);
+        this.hud.setReducedMotion(this.reducedMotion);
+        this.hud.setDifficultyLabel(this.difficultyLabel);
+        this.hud.setStage(this.currentStage);
+        this.hud.setCrosshairMode(this.crosshairMode);
+        this.hud.setBossHealth(null);
+        this.hud.setCombo(0);
+        this.hud.setBpm(bpm);
+        this.hud.setLaneCount(this.lanes?.getCount() ?? this.resolveLaneCount());
+        this.announcer.playEvent('new_game');
+        // Effects
+        this.effects = new Effects(this);
+        this.effects.setReducedMotion(this.reducedMotion);
+        this.powerups = new Powerups(this);
+        this.hud.bindPowerups(this.powerups);
+        // Collisions: bullets -> enemies
+        this.physics.add.overlap(this.bullets, this.spawner.getGroup(), (_b, _e) => {
+            const bullet = _b;
+            const enemy = _e;
+            const etype = enemy.getData('etype') || 'swarm';
+            const { damage, isPerfect } = this.readBulletMetadata(bullet);
+            if (damage <= 0) {
+                this.disableBullet(bullet);
+                return;
+            }
+            const hp = enemy.getData('hp') ?? 1;
+            const newHp = hp - damage;
+            enemy.setData('hp', newHp);
+            const maxHp = enemy.getData('maxHp') ?? hp;
+            const isBoss = enemy.getData('isBoss') === true;
+            if (isBoss) {
+                this.hud.setBossHealth(Math.max(newHp, 0) / Math.max(maxHp, 1), enemy.getData('etype'));
+            }
+            this.disableBullet(bullet);
+            this.effects.enemyHitFx(enemy.x, enemy.y, { critical: isPerfect });
+            this.effects.hitFlash(enemy);
+            const skin = enemy.getData('skin');
+            skin?.onHit?.();
+            // Get a unique ID for the enemy (use the Phaser object's ID)
+            const enemyId = enemy.getData('eid');
+            // enemyId bör vara unikt per fiende
+            if (this.time.now - this.lastHitAt > this.comboTimeoutMs) {
+                // För sent -> reset combo
+                this.comboCount = 0;
+                this.lastHitEnemyId = null;
+            }
+            // Är det en ny fiende inom tidsfönstret?
+            if (this.lastHitEnemyId !== enemyId) {
+                if (this.comboCount > 0) {
+                    // Bara från andra fienden och uppåt
+                    this.comboCount++;
+                    //console.log('New combo count:', this.comboCount)
+                    // Visa text när multiplikatorn ökar
+                    this.effects.showComboText(enemy.x, enemy.y, this.comboCount);
+                    this.hud.setCombo(this.comboCount);
+                    this.announcer.playCombo(this.comboCount);
+                }
+                else {
+                    // Första träffen bara armerar combon
+                    this.comboCount = 1;
+                }
+                this.lastHitEnemyId = enemyId;
+            }
+            // Reset timer
+            this.lastHitAt = this.time.now;
+            if (newHp <= 0) {
+                this.sound.play('hit_enemy', { volume: this.opts.sfxVolume });
+                this.scoring.addKill(etype);
+                this.bumpBomb(10);
+                this.maybeDropPickup(enemy.x, enemy.y);
+                this.effects.enemyExplodeFx(enemy.x, enemy.y);
+                this.cleanupEnemy(enemy, true);
+                if (isBoss) {
+                    this.onBossDown();
+                }
+            }
+            /*
+                  if (newHp <= 0) {
+                    const healthBar = enemy.getData('healthBar') as Phaser.GameObjects.Graphics
+                    if (healthBar) {
+                      healthBar.destroy()
+                    }
+                    enemy.disableBody(true, true)
+                    this.sound.play('hit_enemy', { volume: this.opts.sfxVolume })
+                    this.scoring.addKill(etype)
+                    this.bumpBomb(10)
+                    this.maybeDropPickup(enemy.x, enemy.y)
+                    const skin = enemy.getData('skin') as any
+                skin?.onDeath?.()
+                skin?.destroy?.()
+                  }
+                  */
+        });
+        // Collisions: player <- enemies
+        this.physics.add.overlap(this.player, this.spawner.getGroup(), (_p, _e) => {
+            const enemy = _e;
+            const isBoss = enemy.getData('isBoss') === true;
+            const tookDamage = this.damagePlayer(1, {
+                feedback: isBoss ? 'Boss Crash!' : undefined,
+                missPenalty: isBoss ? this.bossMissPenalty : undefined,
+                showFeedback: isBoss
+            });
+            if (!tookDamage)
+                return;
+            if (!isBoss) {
+                this.cleanupEnemy(enemy, false);
+            }
+            else {
+                this.hud.setBossHealth(null);
+                this.bossSpawned = false;
+                this.activeBoss = null;
+            }
+        });
+        // Back to menu
+        this.input.keyboard.on('keydown-ESC', () => {
+            if (this.isPaused)
+                return;
+            this.pauseGame();
+        });
+        // Bomb on SPACE when charged
+        this.input.keyboard.on('keydown-SPACE', () => {
+            if (this.bombCharge >= 100)
+                this.triggerBomb();
+        });
+        // Crosshair (drawn reticle)
+        this.crosshair = this.add.graphics().setDepth(1000);
+        this.input.setDefaultCursor('none');
+        this.events.on(Phaser.Scenes.Events.RESUME, () => {
+            this.isPaused = false;
+            this.music?.resume();
+            this.input.setDefaultCursor('none');
+            this.opts = loadOptions();
+            this.metronome = this.opts.metronome;
+            this.gameplayMode = resolveGameplayMode(this.opts.gameplayMode);
+            this.registry.set('gameplayMode', this.gameplayMode);
+            this.registry.set('options', this.opts);
+            this.gamepadDeadzone = this.opts.gamepadDeadzone;
+            this.gamepadSensitivity = this.opts.gamepadSensitivity;
+            this.reducedMotion = !!this.opts.reducedMotion;
+            this.registry.set('reducedMotion', this.reducedMotion);
+            this.crosshairMode = this.opts.crosshairMode;
+            this.verticalSafetyBand = !!this.opts.verticalSafetyBand;
+            this.unlockMouseAim = !!this.opts.unlockMouseAim;
+            this.releaseFireMode = false;
+            this.padAimVector.set(0, -1);
+            this.announcer.setVoice('bee');
+            this.announcer.setEnabled(true);
+            this.effects.setReducedMotion(this.reducedMotion);
+            this.hud.setReducedMotion(this.reducedMotion);
+            this.hud.setCrosshairMode(this.crosshairMode);
+            this.hud.setDifficultyLabel(this.difficultyLabel);
+            this.hud.setStage(this.currentStage);
+            this.waveDirector?.setFallbackEnabled(this.opts.allowFallbackWaves);
+            if (this.activeBoss && this.activeBoss.active) {
+                const maxHp = this.activeBoss.getData('maxHp') ?? 1;
+                const hp = this.activeBoss.getData('hp') ?? maxHp;
+                this.hud.setBossHealth(Math.max(hp, 0) / Math.max(maxHp, 1), this.activeBoss.getData('etype'));
+            }
+            else {
+                this.hud.setBossHealth(null);
+            }
+            this.updateMovementBounds();
+        });
+    }
+    update(time, delta) {
+        // Analyzer update
+        if (this.analyzer) {
+            this.analyzer.update();
+            const estPeriod = this.analyzer.getEstimatedPeriodMs();
+            if (estPeriod && isFinite(estPeriod) && estPeriod > 0) {
+                const estBpm = 60000 / estPeriod;
+                const targetScroll = this.computeScrollBase(estBpm);
+                this.scrollBase = Phaser.Math.Linear(this.scrollBase, targetScroll, 0.05);
+                this.beatPeriodMs = Phaser.Math.Linear(this.beatPeriodMs, estPeriod, 0.1);
+                this.beatWindow.setBpm(estBpm);
+                this.hud?.setBpm(estBpm);
+            }
+        }
+        this.registry.set('scrollBase', this.scrollBase);
+        if (this.backgroundScroller) {
+            this.backgroundScroller.setBaseScroll(this.scrollBase);
+            this.backgroundScroller.update(delta);
+        }
+        if (this.starfield) {
+            this.starfield.setBaseScroll(this.scrollBase);
+            this.starfield.update(delta);
+        }
+        this.spawner?.setScrollBase(this.scrollBase);
+        this.waveDirector?.update();
+        if (this.time.now - this.lastBeatAt < 100) { // Visa cirkeln i 100ms efter varje beat
+            this.beatIndicator.setAlpha(1);
+        }
+        else {
+            this.beatIndicator.setAlpha(0.3); // Gör den genomskinlig när inget beat
+        }
+        this.neon.update(delta);
+        if (time - this.lastHitAt > this.comboTimeoutMs && this.comboCount > 0) {
+            this.comboCount = 0;
+            this.hud.setCombo(0);
+            this.lastHitEnemyId = null;
+        }
+        // Shooting
+        const cooldown = this.powerups.hasRapid ? this.fireCooldownMs * 0.8 : this.fireCooldownMs;
+        if (this.isShooting && time - this.lastShotAt >= cooldown) {
+            this.fireBullet();
+            this.lastShotAt = time;
+        }
+        const body = this.player.body;
+        const wasdKeys = this.registry.get('wasd');
+        let moveX = 0;
+        let moveY = 0;
+        if (this.cursors.left?.isDown || wasdKeys?.A?.isDown)
+            moveX -= 1;
+        if (this.cursors.right?.isDown || wasdKeys?.D?.isDown)
+            moveX += 1;
+        if (this.cursors.up?.isDown || wasdKeys?.W?.isDown)
+            moveY -= 1;
+        if (this.cursors.down?.isDown || wasdKeys?.S?.isDown)
+            moveY += 1;
+        if (this.activeGamepad && this.activeGamepad.connected) {
+            const pad = this.activeGamepad;
+            const axisX = pad.axes.length > 0 ? pad.axes[0].getValue() : 0;
+            const axisY = pad.axes.length > 1 ? pad.axes[1].getValue() : 0;
+            const processedX = this.applyGamepadDeadzone(axisX) * this.gamepadSensitivity;
+            const processedY = this.applyGamepadDeadzone(axisY) * this.gamepadSensitivity;
+            moveX += processedX;
+            moveY += processedY;
+            const aimAxisX = pad.axes.length > 2 ? pad.axes[2].getValue() : axisX;
+            const aimAxisY = pad.axes.length > 3 ? pad.axes[3].getValue() : axisY;
+            const aimX = this.applyGamepadDeadzone(aimAxisX);
+            const aimY = this.applyGamepadDeadzone(aimAxisY);
+            if (Math.abs(aimX) > 0 || Math.abs(aimY) > 0) {
+                this.padAimVector.set(aimX, aimY);
+                if (this.padAimVector.lengthSq() > 0)
+                    this.padAimVector.normalize();
+            }
+            else if (Math.abs(processedX) > 0 || Math.abs(processedY) > 0) {
+                this.padAimVector.set(processedX, processedY);
+                if (this.padAimVector.lengthSq() > 0)
+                    this.padAimVector.normalize();
+            }
+            const shootPressed = pad.buttons[0]?.pressed || pad.buttons[1]?.pressed;
+            if (shootPressed && !this.gamepadFireActive) {
+                this.handleFireInputDown();
+                this.gamepadFireActive = true;
+            }
+            else if (!shootPressed && this.gamepadFireActive) {
+                this.gamepadFireActive = false;
+                this.handleFireInputUp();
+            }
+            const bombPressed = pad.buttons[5]?.pressed || pad.buttons[7]?.pressed;
+            if (bombPressed && this.bombCharge >= 100)
+                this.triggerBomb();
+        }
+        else if (this.gamepadFireActive) {
+            this.gamepadFireActive = false;
+            this.handleFireInputUp();
+        }
+        if (this.touchMovePointerId !== undefined)
+            moveX = 0;
+        this.horizontalInputActive = Math.abs(moveX) > 0.1;
+        const magnitude = Math.hypot(moveX, moveY);
+        if (magnitude > 1) {
+            moveX /= magnitude;
+            moveY /= magnitude;
+        }
+        const stageHeight = this.scale.height;
+        const maxSpeed = this.gameplayMode === 'vertical'
+            ? stageHeight / 1
+            : this.scale.width / 1;
+        const targetVelocity = new Phaser.Math.Vector2(moveX, moveY);
+        if (targetVelocity.lengthSq() > 1)
+            targetVelocity.normalize();
+        targetVelocity.scale(maxSpeed);
+        const lerp = 0.2;
+        let newVelX = Phaser.Math.Linear(body.velocity.x, targetVelocity.x, lerp);
+        let newVelY = Phaser.Math.Linear(body.velocity.y, targetVelocity.y, lerp);
+        if (targetVelocity.lengthSq() < 0.01) {
+            newVelX *= 0.82;
+            newVelY *= 0.82;
+        }
+        body.setVelocity(newVelX, newVelY);
+        if (this.gameplayMode === 'vertical' && this.verticalSafetyBand) {
+            const halfHeight = body.height * 0.5;
+            const minY = this.movementMinY - halfHeight;
+            const maxY = this.movementMaxY - halfHeight;
+            body.y = Phaser.Math.Clamp(body.y, minY, maxY);
+            this.player.y = body.y + halfHeight;
+        }
+        if (this.gameplayMode === 'vertical') {
+            this.updateLaneSnap(delta, body.velocity.y);
+        }
+        /*
+        const speed = 250
+        const body = this.player.body as Phaser.Physics.Arcade.Body
+        body.setVelocity(0, 0)
+        
+        // siktesvektor
+        const pointer = this.input.activePointer
+        const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+        const forward = new Phaser.Math.Vector2(world.x - this.player.x, world.y - this.player.y).normalize()
+        const left = new Phaser.Math.Vector2(-forward.y, forward.x) // 90° åt vänster
+        
+        // input (piltangenter + ev WASD)
+        const wasdKeys = this.registry.get('wasd') as any
+        let fwd = 0, strafe = 0
+        if (this.cursors.up?.isDown    || wasdKeys?.W?.isDown) fwd += 1
+        if (this.cursors.down?.isDown  || wasdKeys?.S?.isDown) fwd -= 1
+        if (this.cursors.left?.isDown  || wasdKeys?.A?.isDown) strafe -= 1
+        if (this.cursors.right?.isDown || wasdKeys?.D?.isDown) strafe += 1
+        
+        // rörelseriktning = fram/bak + strafe
+        const move = forward.clone().scale(fwd).add(left.clone().scale(strafe))
+        if (move.lengthSq() > 1) move.normalize() // diagonaler = clamp
+        
+        body.setVelocity(move.x * speed, move.y * speed)
+        
+        // meddela skinet hur mycket vi “gasar” (0..1)
+        const thrustLevel = move.length() // 0..1
+        const pskin = this.player.getData('skin') as any
+        pskin?.setThrust?.(thrustLevel)
+        */
+        // HUD update (score placeholder)
+        const shots = this.scoring.shots || 1;
+        const accPct = ((this.scoring.perfect + this.scoring.good) / shots) * 100;
+        this.hud.update(this.scoring.score, this.scoring.multiplier, accPct);
+        const group = this.spawner.getGroup();
+        const now = this.time.now;
+        if (this.gameplayMode === 'vertical') {
+            this.updateVerticalEnemies(group, now);
+        }
+        else {
+            const px = this.player.x;
+            const py = this.player.y;
+            const dashBoost = 2.2;
+            const dashPhase = Math.floor(now / 600);
+            group.children.each((obj) => {
+                const s = obj;
+                const healthBar = s.getData('healthBar');
+                if (!s.active) {
+                    healthBar?.destroy();
+                    return false;
+                }
+                const etype = s.getData('etype') || 'swarm';
+                const ang = Phaser.Math.Angle.Between(s.x, s.y, px, py);
+                let speed = (etype === 'swarm' ? 110 : etype === 'dasher' ? 160 : 80) * 0.5;
+                if (etype === 'dasher' && dashPhase % 2 === 0)
+                    speed *= dashBoost;
+                s.body.setVelocity(Math.cos(ang) * speed, Math.sin(ang) * speed);
+                this.drawHealthBar(s);
+                return true;
+            });
+        }
+        this.updatePowerupSprites(delta);
+        this.enemyLifecycle?.update(this.time.now);
+        const aimDirection = this.getAimDirection();
+        const reticle = this.getReticlePosition();
+        const aimAngle = Math.atan2(aimDirection.y, aimDirection.x) + Math.PI / 2;
+        if (this.gameplayMode === 'vertical') {
+            this.player.setRotation(-Math.PI / 2);
+        }
+        else {
+            this.player.setRotation(aimAngle);
+        }
+        this.crosshair.clear();
+        const crosshairColor = this.gameplayMode === 'vertical' ? 0xff5db1 : 0x00e5ff;
+        this.crosshair.lineStyle(2, crosshairColor, 0.9);
+        this.crosshair.strokeCircle(reticle.x, reticle.y, 10);
+        this.crosshair.beginPath();
+        this.crosshair.moveTo(reticle.x - 14, reticle.y);
+        this.crosshair.lineTo(reticle.x - 4, reticle.y);
+        this.crosshair.moveTo(reticle.x + 4, reticle.y);
+        this.crosshair.lineTo(reticle.x + 14, reticle.y);
+        this.crosshair.moveTo(reticle.x, reticle.y - 14);
+        this.crosshair.lineTo(reticle.x, reticle.y - 4);
+        this.crosshair.moveTo(reticle.x, reticle.y + 4);
+        this.crosshair.lineTo(reticle.x, reticle.y + 14);
+        this.crosshair.strokePath();
+        const bulletMargin = 64;
+        this.bullets.children.each((obj) => {
+            const bullet = obj;
+            if (!bullet.active)
+                return true;
+            if (bullet.x < -bulletMargin ||
+                bullet.x > this.scale.width + bulletMargin ||
+                bullet.y < -bulletMargin ||
+                bullet.y > this.scale.height + bulletMargin) {
+                this.disableBullet(bullet);
+            }
+            return true;
+        });
+    }
+    fireBullet(judgementOverride, deltaOverride) {
+        const direction = this.getAimDirection();
+        if (direction.lengthSq() === 0)
+            return;
+        const muzzleX = this.player.x + direction.x * 10;
+        const muzzleY = this.player.y + direction.y * 10;
+        this.effects.plasmaCharge(muzzleX, muzzleY, Math.atan2(direction.y, direction.x) + Math.PI / 2);
+        this.effects.muzzleFlash(muzzleX, muzzleY);
+        const ttl = this.computeBulletLifetime(direction);
+        const deltaMs = typeof deltaOverride === 'number'
+            ? deltaOverride
+            : this.analyzer?.nearestBeatDeltaMs?.() ?? 999;
+        const derivedJudgement = this.beatWindow.classify(deltaMs);
+        const judgement = judgementOverride ?? derivedJudgement;
+        const accuracy = this.scoring.registerShot(deltaMs);
+        const bulletMetadata = this.buildBulletMetadata(accuracy, judgement);
+        const bullet = this.spawnPlasmaBullet(direction, ttl, bulletMetadata);
+        if (!bullet)
+            return;
+        if (bulletMetadata.isPerfect) {
+            this.effects.perfectShotBurst(muzzleX, muzzleY);
+        }
+        this.sound.play('shot', { volume: this.opts.sfxVolume });
+        if (this.powerups.hasSplit) {
+            const offset = Phaser.Math.DegToRad(12);
+            const leftDir = direction.clone().rotate(-offset);
+            const rightDir = direction.clone().rotate(offset);
+            this.spawnPlasmaBullet(leftDir, ttl, { ...bulletMetadata });
+            this.spawnPlasmaBullet(rightDir, ttl, { ...bulletMetadata });
+        }
+        this.showShotFeedback(accuracy, judgement);
+        const g = this.add.graphics({ x: this.player.x, y: this.player.y });
+        g.lineStyle(2, 0x00e5ff, 0.8);
+        g.strokeCircle(0, 0, 18);
+        this.tweens.add({ targets: g, alpha: 0, scale: 1.6, duration: 180, onComplete: () => g.destroy() });
+    }
+    showShotFeedback(accuracy, judgementOverride) {
+        if (!this.hud)
+            return;
+        const quality = judgementOverride ?? (accuracy === 'Perfect' ? 'perfect' : 'normal');
+        this.hud.showShotFeedback(quality, accuracy);
+    }
+    spawnPlasmaBullet(direction, lifetimeMs, metadata) {
+        const bullet = this.bullets.get(this.player.x, this.player.y);
+        if (!bullet)
+            return null;
+        bullet.setActive(true).setVisible(true);
+        bullet.setTexture('bullet_plasma_0');
+        bullet.setBlendMode(Phaser.BlendModes.SCREEN);
+        bullet.setDepth(5);
+        bullet.play('bullet_plasma_idle');
+        const body = bullet.body;
+        body.enable = true;
+        body.setAllowGravity(false);
+        body.setSize(12, 72, true);
+        body.onWorldBounds = true;
+        body.setVelocity(direction.x * this.bulletSpeed, direction.y * this.bulletSpeed);
+        const rotation = Math.atan2(direction.y, direction.x) + Math.PI / 2;
+        bullet.setRotation(rotation);
+        bullet.setScale(0.55);
+        bullet.setData('spawnTime', this.time.now);
+        bullet.setData('damage', metadata?.damage ?? 1);
+        bullet.setData('judgement', metadata?.judgement ?? 'normal');
+        bullet.setData('accuracy', metadata?.accuracy ?? 'Offbeat');
+        bullet.setData('isPerfect', metadata?.isPerfect ?? false);
+        this.effects.attachPlasmaTrail(bullet);
+        this.scheduleBulletTtl(bullet, lifetimeMs);
+        return bullet;
+    }
+    buildBulletMetadata(accuracy, judgement) {
+        const isPerfect = accuracy === 'Perfect' && judgement === 'perfect';
+        let damage = 1;
+        if (isPerfect)
+            damage += 1;
+        return {
+            damage,
+            judgement,
+            accuracy,
+            isPerfect
+        };
+    }
+    readBulletMetadata(bullet) {
+        const damageRaw = Number(bullet.getData('damage'));
+        const judgementRaw = bullet.getData('judgement');
+        const accuracyRaw = bullet.getData('accuracy');
+        const isPerfect = bullet.getData('isPerfect') === true;
+        const damage = Number.isFinite(damageRaw) && damageRaw > 0 ? damageRaw : 1;
+        return {
+            damage,
+            judgement: judgementRaw ?? (isPerfect ? 'perfect' : 'normal'),
+            accuracy: accuracyRaw ?? (isPerfect ? 'Perfect' : 'Offbeat'),
+            isPerfect
+        };
+    }
+    scheduleBulletTtl(bullet, lifetimeMs) {
+        const prev = bullet.getData('ttlEvent');
+        prev?.remove(false);
+        const ttlEvent = this.time.addEvent({
+            delay: lifetimeMs ?? this.bulletTtlMs,
+            callback: () => this.disableBullet(bullet)
+        });
+        bullet.setData('ttlEvent', ttlEvent);
+    }
+    disableBullet(bullet) {
+        if (!bullet.active)
+            return;
+        const ttlEvent = bullet.getData('ttlEvent');
+        ttlEvent?.remove(false);
+        bullet.setData('ttlEvent', undefined);
+        this.effects.clearPlasmaTrail(bullet);
+        bullet.anims?.stop?.();
+        if (this.textures.exists('bullet_plasma_0')) {
+            bullet.setTexture('bullet_plasma_0');
+        }
+        bullet.setBlendMode(Phaser.BlendModes.SCREEN);
+        bullet.disableBody(true, true);
+    }
+    handleBulletWorldBounds(body) {
+        const gameObject = body.gameObject;
+        if (!gameObject)
+            return;
+        if (!this.bullets.contains(gameObject))
+            return;
+        this.disableBullet(gameObject);
+    }
+    maybeDropPickup(x, y) {
+        const chance = 0.05;
+        if (Math.random() > chance)
+            return;
+        const types = ['shield', 'rapid', 'split', 'slowmo'];
+        const type = types[Math.floor(Math.random() * types.length)];
+        const texture = `powerup_${type}_0`;
+        const anim = `powerup_pickup_${type}`;
+        const s = this.physics.add.sprite(x, y, texture);
+        if (this.anims.exists(anim))
+            s.play(anim);
+        s.setData('ptype', type);
+        s.setData('spawnAt', this.time.now);
+        s.setData('magnetRange', Math.max(220, this.scale.height * 0.28));
+        s.setDepth(4);
+        s.body.setAllowGravity(false);
+        s.body.setVelocity(0, 60);
+        s.body.setDrag(38, 0);
+        this.activePowerups.add(s);
+        const glow = this.add.image(x, y, 'plasma_glow_disc')
+            .setDepth(3)
+            .setBlendMode(Phaser.BlendModes.ADD)
+            .setAlpha(0.85)
+            .setScale(0.7);
+        const glowFollow = () => {
+            glow.x = s.x;
+            glow.y = s.y;
+        };
+        this.events.on(Phaser.Scenes.Events.UPDATE, glowFollow);
+        const cleanupGlow = () => {
+            this.events.off(Phaser.Scenes.Events.UPDATE, glowFollow);
+            glow.destroy();
+        };
+        const glowTween = this.tweens.add({
+            targets: glow,
+            scale: { from: 0.7, to: 1.95 },
+            alpha: { from: 0.85, to: 0.35 },
+            yoyo: true,
+            repeat: -1,
+            duration: 560,
+            ease: 'Sine.easeInOut'
+        });
+        const pulseTween = this.tweens.add({
+            targets: s,
+            alpha: { from: 1, to: 0.6 },
+            yoyo: true,
+            repeat: -1,
+            duration: 640,
+            ease: 'Sine.easeInOut'
+        });
+        const radius = 24;
+        const offsetX = s.width * 0.5 - radius;
+        const offsetY = s.height * 0.5 - radius;
+        s.body.setCircle(radius, offsetX, offsetY);
+        // Fade after 8s
+        const fadeTween = this.tweens.add({
+            targets: s,
+            alpha: 0.18,
+            duration: 8000,
+            onComplete: () => {
+                pulseTween.stop();
+                glowTween.stop();
+                s.destroy();
+            }
+        });
+        // Overlap with player
+        const overlap = this.physics.add.overlap(this.player, s, () => {
+            overlap.destroy();
+            const ptype = s.getData('ptype');
+            const pickupX = s.x;
+            const pickupY = s.y;
+            s.destroy();
+            const dur = this.powerupDurations[ptype] ?? 5;
+            this.powerups.apply(ptype, dur);
+            this.effects.powerupPickupText(pickupX, pickupY - 10, ptype);
+            this.announcer.playPowerup(ptype);
+            this.playPowerupSound(ptype);
+        });
+        s.once(Phaser.GameObjects.Events.DESTROY, () => {
+            this.activePowerups.delete(s);
+            pulseTween.stop();
+            glowTween.stop();
+            fadeTween.stop();
+            cleanupGlow();
+        });
+    }
+    playPowerupSound(type) {
+        const key = `powerup_${type}`;
+        const vol = this.opts.sfxVolume;
+        if (this.sound.get(key)) {
+            this.sound.play(key, { volume: vol });
+        }
+        else {
+            this.sound.play('ui_select', { volume: vol });
+        }
+    }
+    registerTouchTap(time) {
+        this.touchTapTimes = this.touchTapTimes.filter(t => time - t < 500);
+        this.touchTapTimes.push(time);
+        if (this.touchTapTimes.length >= 2) {
+            this.touchTapTimes = [];
+            if (this.bombCharge >= 100)
+                this.triggerBomb();
+        }
+    }
+    updateMovementBounds() {
+        const { height } = this.scale;
+        if (this.gameplayMode === 'vertical' && this.verticalSafetyBand) {
+            this.movementMinY = height * 0.65;
+            this.movementMaxY = height * 0.94;
+        }
+        else {
+            this.movementMinY = 0;
+            this.movementMaxY = height;
+        }
+    }
+    applyLanePatternCount(count, effect) {
+        const hadLanes = Boolean(this.lanes);
+        const countChanged = this.verticalLaneCount !== count || !hadLanes;
+        this.verticalLaneCount = count;
+        if (countChanged) {
+            if (!this.lanes) {
+                this.setupVerticalLaneSystem();
+            }
+            else {
+                const previousLane = this.lanes.indexAt(this.player.x);
+                this.lanes.rebuild(count);
+                const snapIndex = Phaser.Math.Clamp(previousLane, 0, this.lanes.getCount() - 1);
+                this.startLaneSnap(snapIndex);
+                this.touchLaneIndexBaseline = this.targetLaneIndex;
+                this.touchLaneAccum = 0;
+                this.hud?.setLaneCount(this.lanes.getCount());
+            }
+        }
+        if (effect === 'expand') {
+            this.pulseEnemies(1.1);
+        }
+        else if (effect === 'collapse') {
+            this.pulseEnemies(1.25);
+        }
+        else if (effect === 'pulse') {
+            this.pulseEnemies(1.35);
+        }
+    }
+    setupVerticalLaneSystem() {
+        const laneCount = this.resolveLaneCount();
+        this.lanes?.off(LaneManager.EVT_CHANGED, this.onLaneSnapshot, this);
+        this.lanes?.destroy();
+        this.lanes = new LaneManager({
+            scene: this,
+            count: laneCount,
+            width: this.scale.width,
+            left: 0,
+            debug: true
+        });
+        this.lanes.on(LaneManager.EVT_CHANGED, this.onLaneSnapshot, this);
+        const lanes = this.lanes.getAll();
+        const middle = this.lanes.middle() ?? lanes[Math.floor(lanes.length / 2)] ?? lanes[0];
+        const targetIndex = middle?.index ?? 0;
+        const targetX = middle?.centerX ?? this.scale.width / 2;
+        this.targetLaneIndex = targetIndex;
+        this.laneSnapFromX = targetX;
+        this.laneSnapTargetX = targetX;
+        this.laneSnapElapsed = this.laneSnapDurationMs;
+        this.laneSnapActive = false;
+        this.touchLaneIndexBaseline = targetIndex;
+        this.touchLaneAccum = 0;
+        this.releaseFireArmed = false;
+        this.player.setX(targetX);
+        const body = this.player.body;
+        body.reset(targetX, this.player.y);
+        body.setVelocityX(0);
+        this.spawner?.setLaneManager(this.lanes);
+        this.hud?.setLaneCount(laneCount);
+    }
+    resolveLaneCount() {
+        if (this.verticalLaneCount >= 7)
+            return 7;
+        if (this.verticalLaneCount >= 5)
+            return 5;
+        return 3;
+    }
+    getLaneSpacing() {
+        if (!this.lanes)
+            return this.scale.width / 3;
+        const all = this.lanes.getAll();
+        if (all.length <= 1)
+            return this.scale.width;
+        let sum = 0;
+        let samples = 0;
+        for (let i = 1; i < all.length; i++) {
+            sum += Math.abs(all[i].centerX - all[i - 1].centerX);
+            samples++;
+        }
+        return samples > 0 ? sum / samples : this.scale.width / 3;
+    }
+    shiftLane(direction) {
+        if (!this.lanes)
+            return false;
+        const normalizedDir = direction < 0 ? -1 : direction > 0 ? 1 : 0;
+        if (normalizedDir === 0)
+            return false;
+        const count = this.lanes.getCount();
+        const next = Phaser.Math.Clamp(this.targetLaneIndex + normalizedDir, 0, count - 1);
+        if (next === this.targetLaneIndex)
+            return false;
+        this.startLaneSnap(next);
+        return true;
+    }
+    startLaneSnap(index) {
+        if (!this.lanes)
+            return;
+        const count = this.lanes.getCount();
+        const clamped = Phaser.Math.Clamp(index, 0, count - 1);
+        const targetX = Math.round(this.lanes.centerX(clamped));
+        this.targetLaneIndex = clamped;
+        const currentX = this.player.x;
+        if (Math.abs(targetX - currentX) <= this.laneDeadzonePx) {
+            this.player.setX(targetX);
+            const body = this.player.body;
+            const dx = targetX - currentX;
+            body.position.x += dx;
+            body.prev.x += dx;
+            body.updateCenter();
+            this.laneSnapActive = false;
+            this.laneSnapElapsed = this.laneSnapDurationMs;
+            return;
+        }
+        this.laneSnapFromX = currentX;
+        this.laneSnapTargetX = targetX;
+        this.laneSnapElapsed = 0;
+        this.laneSnapActive = true;
+    }
+    updateLaneSnap(delta, preservedVy) {
+        if (!this.lanes)
+            return;
+        if (this.horizontalInputActive) {
+            this.laneSnapActive = false;
+            return;
+        }
+        const body = this.player.body;
+        if (!this.laneSnapActive) {
+            const nearest = this.lanes.nearest(this.player.x);
+            if (!nearest)
+                return;
+            const snappedCenter = Math.round(nearest.centerX);
+            const distance = Math.abs(snappedCenter - this.player.x);
+            if (distance > this.laneDeadzonePx) {
+                this.targetLaneIndex = nearest.index;
+                this.laneSnapFromX = this.player.x;
+                this.laneSnapTargetX = snappedCenter;
+                this.laneSnapElapsed = 0;
+                this.laneSnapActive = true;
+            }
+            else {
+                const prevX = this.player.x;
+                this.player.setX(snappedCenter);
+                const dx = this.player.x - prevX;
+                body.position.x += dx;
+                body.prev.x += dx;
+                body.updateCenter();
+                body.setVelocity(0, preservedVy);
+            }
+            return;
+        }
+        this.laneSnapElapsed = Math.min(this.laneSnapElapsed + delta, this.laneSnapDurationMs);
+        const t = Phaser.Math.Clamp(this.laneSnapElapsed / this.laneSnapDurationMs, 0, 1);
+        const eased = Phaser.Math.Easing.Sine.InOut(t);
+        const newX = Phaser.Math.Linear(this.laneSnapFromX, this.laneSnapTargetX, eased);
+        const prevX = this.player.x;
+        this.player.setX(newX);
+        const dx = this.player.x - prevX;
+        body.position.x += dx;
+        body.prev.x += dx;
+        body.updateCenter();
+        body.setVelocity(0, preservedVy);
+        if (t >= 1) {
+            const aligned = Math.round(this.laneSnapTargetX);
+            this.laneSnapTargetX = aligned;
+            const prev = this.player.x;
+            this.player.setX(aligned);
+            const snapDx = this.player.x - prev;
+            body.position.x += snapDx;
+            body.prev.x += snapDx;
+            body.updateCenter();
+            body.setVelocity(0, preservedVy);
+            this.laneSnapActive = false;
+        }
+    }
+    applyGamepadDeadzone(value) {
+        const abs = Math.abs(value);
+        if (abs < this.gamepadDeadzone)
+            return 0;
+        const sign = value < 0 ? -1 : 1;
+        const range = 1 - this.gamepadDeadzone;
+        const scaled = (abs - this.gamepadDeadzone) / (range || 1);
+        return sign * Math.min(Math.max(scaled, 0), 1);
+    }
+    setupBeatStatusOverlay() {
+        const { width, height } = this.scale;
+        const baseStyle = {
+            fontFamily: 'UiFont, sans-serif',
+            fontSize: '32px',
+            color: '#ffffff',
+            stroke: '#0a0a14',
+            strokeThickness: 6,
+            shadow: { color: '#2d9cff', blur: 18, fill: true },
+            align: 'center'
+        };
+        this.beatStatusSearching = this.add.text(width / 2, height / 2, 'SEARCHING FOR BEAT', baseStyle)
+            .setOrigin(0.5)
+            .setDepth(1e4)
+            .setAlpha(0)
+            .setScale(0.82);
+        this.beatStatusDetected = this.add.text(width / 2, height / 2, 'BEAT DETECTED, GET READY', {
+            ...baseStyle,
+            color: '#6bffb2',
+            shadow: { color: '#00ffaa', blur: 24, fill: true }
+        })
+            .setOrigin(0.5)
+            .setDepth(1e4)
+            .setAlpha(0)
+            .setScale(0.78);
+        this.tweens.add({
+            targets: this.beatStatusSearching,
+            alpha: 1,
+            scale: 1,
+            duration: 620,
+            ease: 'Back.Out'
+        });
+        this.beatStatusResizeHandler = (size) => {
+            const cx = size.width / 2;
+            const cy = size.height / 2;
+            this.beatStatusSearching?.setPosition(cx, cy);
+            this.beatStatusDetected?.setPosition(cx, cy);
+        };
+        this.scale.on(Phaser.Scale.Events.RESIZE, this.beatStatusResizeHandler, this);
+    }
+    onBeatDetection() {
+        this.beatStatusDetectedShown = true;
+        if (this.beatStatusSearching) {
+            this.tweens.add({
+                targets: this.beatStatusSearching,
+                alpha: 0,
+                scale: 1.08,
+                duration: 360,
+                ease: 'Cubic.easeIn',
+                onComplete: () => {
+                    this.beatStatusSearching?.destroy();
+                    this.beatStatusSearching = undefined;
+                }
+            });
+        }
+        const banner = this.beatStatusDetected;
+        if (!banner)
+            return;
+        banner.setAlpha(0);
+        banner.setScale(0.78);
+        this.tweens.add({
+            targets: banner,
+            alpha: 1,
+            scale: 1,
+            duration: 520,
+            ease: 'Back.Out',
+            onComplete: () => {
+                this.time.delayedCall(1500, () => {
+                    if (!banner.active)
+                        return;
+                    this.tweens.add({
+                        targets: banner,
+                        alpha: 0,
+                        scale: 1.12,
+                        duration: 420,
+                        ease: 'Cubic.easeIn',
+                        onComplete: () => {
+                            banner.destroy();
+                            if (this.beatStatusDetected === banner)
+                                this.beatStatusDetected = undefined;
+                        }
+                    });
+                });
+            }
+        });
+    }
+    getAimDirection() {
+        const fallbackUp = new Phaser.Math.Vector2(0, -1);
+        if (this.gameplayMode === 'vertical') {
+            if (this.crosshairMode === 'pad-relative') {
+                if (this.padAimVector.lengthSq() > 0.05) {
+                    const aim = this.padAimVector.clone();
+                    if (aim.y > -0.2)
+                        aim.y = -0.2;
+                    return aim.normalize();
+                }
+            }
+            if (this.unlockMouseAim) {
+                const pointer = this.input.activePointer;
+                const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+                const dir = new Phaser.Math.Vector2(world.x - this.player.x, world.y - this.player.y);
+                if (dir.lengthSq() > 0.0001) {
+                    return dir.normalize();
+                }
+            }
+            return fallbackUp.clone();
+        }
+        if (this.crosshairMode === 'fixed') {
+            return fallbackUp.clone();
+        }
+        if (this.crosshairMode === 'pad-relative' && this.padAimVector.lengthSq() > 0.05) {
+            return this.padAimVector.clone();
+        }
+        const pointer = this.input.activePointer;
+        const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+        const dir = new Phaser.Math.Vector2(world.x - this.player.x, world.y - this.player.y);
+        if (dir.lengthSq() < 0.0001)
+            return fallbackUp.clone();
+        return dir.normalize();
+    }
+    getReticlePosition() {
+        const { width, height } = this.scale;
+        const clampPoint = (vec) => {
+            vec.x = Phaser.Math.Clamp(vec.x, 12, width - 12);
+            vec.y = Phaser.Math.Clamp(vec.y, 12, height - 12);
+            return vec;
+        };
+        if (this.gameplayMode === 'vertical') {
+            if (this.crosshairMode === 'pad-relative') {
+                const dir = this.getAimDirection();
+                const distance = height * 0.28;
+                return clampPoint(new Phaser.Math.Vector2(this.player.x + dir.x * distance, this.player.y + dir.y * distance));
+            }
+            if (this.unlockMouseAim) {
+                const pointer = this.input.activePointer;
+                return clampPoint(this.cameras.main.getWorldPoint(pointer.x, pointer.y));
+            }
+            const offset = height * 0.35;
+            const targetY = this.player.y - offset;
+            const minY = 60;
+            return clampPoint(new Phaser.Math.Vector2(this.player.x, Math.max(minY, targetY)));
+        }
+        if (this.crosshairMode === 'fixed') {
+            return clampPoint(new Phaser.Math.Vector2(this.player.x, this.player.y - 160));
+        }
+        if (this.crosshairMode === 'pad-relative' && this.padAimVector.lengthSq() > 0.05) {
+            const distance = Math.min(220, Math.max(120, height * 0.25));
+            return clampPoint(new Phaser.Math.Vector2(this.player.x + this.padAimVector.x * distance, this.player.y + this.padAimVector.y * distance));
+        }
+        const pointer = this.input.activePointer;
+        return clampPoint(this.cameras.main.getWorldPoint(pointer.x, pointer.y));
+    }
+    computeBulletLifetime(direction) {
+        if (this.gameplayMode !== 'vertical')
+            return this.bulletTtlMs;
+        const dy = direction.y;
+        if (Math.abs(dy) < 0.0001)
+            return this.bulletTtlMs;
+        const margin = 80;
+        const targetY = -margin;
+        const distance = Math.abs((targetY - this.player.y) / dy);
+        const travelTimeMs = (distance / this.bulletSpeed) * 1000;
+        const clamped = Phaser.Math.Clamp(travelTimeMs + 120, this.bulletTtlMs * 0.5, this.bulletTtlMs * 1.8);
+        return clamped;
+    }
+    getStageConfig(stage) {
+        const stages = this.difficultyProfile.stageTuning;
+        if (!stages || stages.length === 0) {
+            return {
+                stage,
+                scrollMultiplier: 1,
+                spawnMultiplier: 1,
+                enemyHpMultiplier: 1,
+                bossHpMultiplier: 1,
+                enemyCap: 18,
+                maxQueuedWaves: 3
+            };
+        }
+        const exact = stages.find((cfg) => cfg.stage === stage);
+        if (exact)
+            return exact;
+        return stage > stages[stages.length - 1].stage ? stages[stages.length - 1] : stages[0];
+    }
+    updateDifficultyForStage() {
+        this.currentStageConfig = this.getStageConfig(this.currentStage);
+        const cfg = this.currentStageConfig;
+        this.enemyHpMultiplier = this.difficultyProfile.baseEnemyHpMultiplier * (cfg.enemyHpMultiplier ?? 1);
+        this.bossHpMultiplier = this.difficultyProfile.baseBossHpMultiplier * (cfg.bossHpMultiplier ?? 1);
+        this.enemyCap = cfg.enemyCap ?? this.enemyCap;
+        this.waveDirector?.applyStageSettings({
+            maxQueuedWaves: cfg.maxQueuedWaves,
+            heavyControls: {
+                cooldownMs: cfg.heavyCooldownMs ?? this.difficultyProfile.heavyControls.cooldownMs,
+                maxSimultaneous: cfg.maxSimultaneousHeavy ?? this.difficultyProfile.heavyControls.maxSimultaneous,
+                windowMs: this.difficultyProfile.heavyControls.windowMs,
+                maxInWindow: this.difficultyProfile.heavyControls.maxInWindow
+            },
+            categoryCooldowns: this.difficultyProfile.categoryCooldowns,
+            waveRepeatCooldownMs: this.difficultyProfile.waveRepeatCooldownMs / Math.max(0.6, cfg.spawnMultiplier ?? 1)
+        });
+        this.spawner?.setDifficulty({
+            hpMultiplier: this.enemyHpMultiplier,
+            bossHpMultiplier: this.bossHpMultiplier,
+            laneCount: this.verticalLaneCount
+        });
+        this.lanePattern?.updateStage(cfg);
+    }
+    updateVerticalEnemies(group, now) {
+        const height = this.scale.height;
+        const margin = 100;
+        group.children.each((obj) => {
+            const enemy = obj;
+            const healthBar = enemy.getData('healthBar');
+            if (!enemy.active) {
+                healthBar?.destroy();
+                return false;
+            }
+            const pattern = enemy.getData('pattern');
+            const body = enemy.body;
+            if (pattern) {
+                switch (pattern.kind) {
+                    case 'lane': {
+                        enemy.x = pattern.anchorX;
+                        body.setVelocity(0, pattern.speedY);
+                        break;
+                    }
+                    case 'sine':
+                    case 'weaver': {
+                        const elapsed = (now - pattern.spawnTime) / 1000;
+                        const baseAmplitude = pattern.kind === 'weaver'
+                            ? enemy.getData('weaverBaseAmplitude') ?? pattern.amplitude
+                            : pattern.amplitude;
+                        let amplitude = baseAmplitude;
+                        let vy = pattern.speedY;
+                        if (pattern.kind === 'weaver') {
+                            const boostUntil = enemy.getData('weaverBoostUntil');
+                            if (boostUntil && boostUntil > this.time.now) {
+                                amplitude *= 1.4;
+                                vy *= 1.3;
+                            }
+                        }
+                        const offset = Math.sin(elapsed * pattern.angularVelocity) * amplitude;
+                        enemy.x = pattern.anchorX + offset;
+                        body.setVelocity(0, vy);
+                        break;
+                    }
+                    case 'drift': {
+                        body.setVelocity(pattern.velocityX, pattern.speedY);
+                        break;
+                    }
+                    case 'circle': {
+                        const dx = enemy.x - pattern.anchorX;
+                        const dy = enemy.y - pattern.anchorY;
+                        const radius = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+                        const tangential = pattern.angularVelocity * radius;
+                        const vx = (-dy / radius) * tangential;
+                        const vy = (dx / radius) * tangential + this.scrollBase * 0.35;
+                        body.setVelocity(vx, vy);
+                        break;
+                    }
+                    case 'spiral': {
+                        const dx = enemy.x - pattern.anchorX;
+                        const dy = enemy.y - pattern.anchorY;
+                        const radius = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+                        const vx = (-dy / radius) * pattern.angularVelocity * radius;
+                        const vy = (dx / radius) * pattern.angularVelocity * radius + this.scrollBase * 0.4;
+                        body.setVelocity(vx, vy);
+                        break;
+                    }
+                    case 'burst': {
+                        body.setVelocity(body.velocity.x, body.velocity.y);
+                        break;
+                    }
+                    case 'formation_dancer': {
+                        const offsets = pattern.offsets;
+                        if (offsets && offsets.length > 0) {
+                            const indexRaw = enemy.getData('formationIndex') ?? 0;
+                            const index = Phaser.Math.Wrap(indexRaw, 0, offsets.length);
+                            enemy.setData('formationIndex', index);
+                            const targetX = pattern.centerX + (offsets[index] ?? 0);
+                            const lerp = 0.2;
+                            enemy.x = Phaser.Math.Linear(enemy.x, targetX, lerp);
+                        }
+                        body.setVelocity(0, pattern.speedY);
+                        break;
+                    }
+                    case 'boss': {
+                        const settleLine = height * 0.25;
+                        const targetSpeed = enemy.y < settleLine ? pattern.speedY : pattern.speedY * 0.08;
+                        body.setVelocity(0, targetSpeed);
+                        break;
+                    }
+                    case 'lane_hopper': {
+                        body.setVelocity(0, pattern.speedY);
+                        break;
+                    }
+                    case 'teleporter': {
+                        if (this.lanes) {
+                            const lane = Phaser.Math.Clamp(pattern.laneIndex, 0, this.lanes.getCount() - 1);
+                            enemy.x = this.lanes.centerX(lane);
+                        }
+                        body.setVelocity(0, pattern.speedY);
+                        if (enemy.getData('teleporterBlinking') === true) {
+                            body.setVelocity(0, pattern.speedY);
+                        }
+                        break;
+                    }
+                    case 'lane_flood': {
+                        if (this.lanes) {
+                            const lane = Phaser.Math.Clamp(pattern.laneIndex, 0, this.lanes.getCount() - 1);
+                            enemy.x = this.lanes.centerX(lane);
+                        }
+                        body.setVelocity(0, pattern.speedY);
+                        const rect = enemy.getData('flooderRect');
+                        if (rect) {
+                            rect.x = enemy.x;
+                            rect.y = enemy.y;
+                        }
+                        break;
+                    }
+                    case 'mirrorer': {
+                        const clampMargin = 24;
+                        const targetX = Phaser.Math.Clamp(this.player.x, clampMargin, this.scale.width - clampMargin);
+                        const lerp = 0.18;
+                        const newX = Phaser.Math.Linear(enemy.x, targetX, lerp);
+                        enemy.x = newX;
+                        const baseSpeed = pattern.speedY;
+                        let vy = baseSpeed;
+                        const boostUntil = enemy.getData('mirrorerBoostUntil');
+                        if (boostUntil && boostUntil > this.time.now) {
+                            vy *= 1.4;
+                        }
+                        const vx = Phaser.Math.Clamp((targetX - newX) * 6.5, -260, 260);
+                        body.setVelocity(vx, vy);
+                        break;
+                    }
+                }
+            }
+            else {
+                body.setVelocity(body.velocity.x, this.scrollBase);
+            }
+            this.drawHealthBar(enemy);
+            if (enemy.y > height + margin) {
+                this.handleEnemyMiss(enemy);
+                return false;
+            }
+            return true;
+        });
+    }
+    triggerLaneHopperHop() {
+        if (!this.lanes || !this.spawner)
+            return;
+        const group = this.spawner.getGroup();
+        group.children.each((obj) => {
+            const enemy = obj;
+            if (!enemy.active)
+                return true;
+            const pattern = enemy.getData('pattern');
+            if (!pattern || pattern.kind !== 'lane_hopper')
+                return true;
+            const hopEvery = pattern.hopEveryBeats && pattern.hopEveryBeats > 0 ? pattern.hopEveryBeats : 1;
+            const beatCount = (enemy.getData('laneHopBeatCount') ?? 0) + 1;
+            enemy.setData('laneHopBeatCount', beatCount);
+            if (beatCount % hopEvery !== 0)
+                return true;
+            const currentLane = enemy.getData('laneHopCurrent') ?? pattern.laneA;
+            const nextLane = currentLane === pattern.laneA ? pattern.laneB : pattern.laneA;
+            const laneManager = this.lanes;
+            if (!laneManager)
+                return true;
+            const clampedLane = Phaser.Math.Clamp(nextLane, 0, laneManager.getCount() - 1);
+            enemy.setData('laneHopCurrent', clampedLane);
+            const targetX = laneManager.centerX(clampedLane);
+            const body = enemy.body;
+            const existingTween = enemy.getData('laneHopTween');
+            existingTween?.remove();
+            const tween = this.tweens.add({
+                targets: enemy,
+                x: targetX,
+                duration: 140,
+                ease: 'Sine.easeInOut',
+                onUpdate: () => body.updateFromGameObject(),
+                onComplete: () => {
+                    body.setVelocity(0, pattern.speedY);
+                    enemy.setData('laneHopTween', null);
+                }
+            });
+            enemy.setData('laneHopTween', tween);
+            return true;
+        });
+    }
+    updateWeaversOnBeat(band) {
+        if (!this.spawner || band !== 'high')
+            return;
+        const boostUntil = this.time.now + 280;
+        const group = this.spawner.getGroup();
+        group.children.each((obj) => {
+            const enemy = obj;
+            if (!enemy.active)
+                return true;
+            if (enemy.getData('etype') !== 'weaver')
+                return true;
+            enemy.setData('weaverBoostUntil', boostUntil);
+            return true;
+        });
+    }
+    updateTeleportersOnBeat(band) {
+        if (!this.spawner || !this.lanes || band !== 'high')
+            return;
+        const group = this.spawner.getGroup();
+        const laneCount = this.lanes.getCount();
+        group.children.each((obj) => {
+            const enemy = obj;
+            if (!enemy.active)
+                return true;
+            if (enemy.getData('etype') !== 'teleporter')
+                return true;
+            const pattern = enemy.getData('pattern');
+            if (!pattern || pattern.kind !== 'teleporter')
+                return true;
+            const currentLane = enemy.getData('teleporterLane') ?? pattern.laneIndex ?? 0;
+            let nextLane = currentLane;
+            let guard = 0;
+            while (nextLane === currentLane && guard < 5) {
+                nextLane = Phaser.Math.Between(0, Math.max(0, laneCount - 1));
+                guard++;
+            }
+            this.effects.teleporterBlink(enemy.x, enemy.y);
+            enemy.setData('teleporterBlinking', true);
+            enemy.setData('teleporterTargetLane', nextLane);
+            enemy.setAlpha(0.08);
+            this.time.delayedCall(120, () => {
+                if (!enemy.active)
+                    return;
+                const targetLane = enemy.getData('teleporterTargetLane') ?? nextLane;
+                pattern.laneIndex = targetLane;
+                enemy.setData('teleporterLane', targetLane);
+                if (this.lanes) {
+                    enemy.x = this.lanes.centerX(targetLane);
+                }
+                enemy.setAlpha(1);
+                enemy.setData('teleporterBlinking', false);
+            });
+            return true;
+        });
+    }
+    updateFormationDancersOnBeat(band) {
+        if (!this.spawner || band !== 'mid')
+            return;
+        const group = this.spawner.getGroup();
+        group.children.each((obj) => {
+            const enemy = obj;
+            if (!enemy.active)
+                return true;
+            if (enemy.getData('etype') !== 'formation')
+                return true;
+            const pattern = enemy.getData('pattern');
+            if (!pattern || pattern.kind !== 'formation_dancer')
+                return true;
+            const offsets = pattern.offsets;
+            if (!offsets || offsets.length === 0)
+                return true;
+            const direction = enemy.getData('formationDirection') ?? 1;
+            const indexRaw = enemy.getData('formationIndex') ?? 0;
+            const nextIndex = Phaser.Math.Wrap(indexRaw + direction, 0, offsets.length);
+            enemy.setData('formationIndex', nextIndex);
+            return true;
+        });
+    }
+    updateMirrorersOnBeat(band) {
+        if (!this.spawner || band !== 'high')
+            return;
+        const boostUntil = this.time.now + 320;
+        const group = this.spawner.getGroup();
+        group.children.each((obj) => {
+            const enemy = obj;
+            if (!enemy.active)
+                return true;
+            if (enemy.getData('etype') !== 'mirrorer')
+                return true;
+            enemy.setData('mirrorerBoostUntil', boostUntil);
+            return true;
+        });
+    }
+    updateExplodersOnBeat(band) {
+        if (!this.spawner)
+            return;
+        if (band !== 'low')
+            return;
+        const group = this.spawner.getGroup();
+        group.children.each((obj) => {
+            const enemy = obj;
+            if (!enemy.active)
+                return true;
+            if (enemy.getData('etype') !== 'exploder')
+                return true;
+            if (enemy.getData('exploderArmed') === false)
+                return true;
+            let remaining = enemy.getData('exploderCountdownBeats') ?? 0;
+            remaining -= 1;
+            if (remaining <= 0) {
+                enemy.setData('exploderArmed', false);
+                this.detonateExploder(enemy);
+                return true;
+            }
+            enemy.setData('exploderCountdownBeats', remaining);
+            if (remaining === 1) {
+                this.effects.exploderWarning(enemy.x, enemy.y);
+            }
+            return true;
+        });
+    }
+    detonateExploder(enemy) {
+        if (!enemy.active)
+            return;
+        const radius = enemy.getData('exploderRadius') ?? 150;
+        this.effects.enemyExplodeFx(enemy.x, enemy.y);
+        this.sound.play('explode_big', { volume: this.opts.sfxVolume });
+        const distance = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y);
+        if (distance <= radius) {
+            const tookDamage = this.damagePlayer(1, {
+                feedback: 'Exploder Burst!',
+                missPenalty: this.missPenalty,
+                showFeedback: true
+            });
+            if (!tookDamage) {
+                // Shield absorbed; still register a miss to discourage stalling
+                this.scoring.registerMiss(this.missPenalty);
+                this.hud.showMissFeedback('Exploder Burst!');
+            }
+        }
+        else {
+            this.scoring.registerMiss(this.missPenalty);
+            this.hud.showMissFeedback('Exploder Burst!');
+        }
+        this.comboCount = 0;
+        this.hud.setCombo(0);
+        this.bumpBomb(-20);
+        this.cleanupEnemy(enemy, false);
+    }
+    updatePowerupSprites(_delta) {
+        if (this.activePowerups.size === 0)
+            return;
+        const playerPos = new Phaser.Math.Vector2(this.player.x, this.player.y);
+        const baseMagnet = Math.max(220, this.scale.height * 0.28);
+        for (const sprite of Array.from(this.activePowerups)) {
+            if (!sprite.active)
+                continue;
+            const body = sprite.body;
+            if (!body)
+                continue;
+            const toPlayer = new Phaser.Math.Vector2(playerPos.x - sprite.x, playerPos.y - sprite.y);
+            const distance = toPlayer.length();
+            const magnetRange = sprite.getData('magnetRange');
+            const range = magnetRange ?? baseMagnet;
+            if (distance < range) {
+                const pull = 1 - distance / range;
+                if (pull > 0) {
+                    toPlayer.normalize();
+                    const strength = 280 * pull;
+                    const newVelX = Phaser.Math.Linear(body.velocity.x, toPlayer.x * strength, 0.2);
+                    const newVelY = Phaser.Math.Linear(body.velocity.y, toPlayer.y * strength, 0.2);
+                    body.setVelocity(newVelX, newVelY);
+                }
+            }
+            else {
+                const driftSpeed = 60;
+                const newVelY = Phaser.Math.Linear(body.velocity.y, driftSpeed, 0.06);
+                body.setVelocity(body.velocity.x * 0.9, newVelY);
+            }
+            if (sprite.y > this.scale.height + 80) {
+                sprite.destroy();
+            }
+        }
+    }
+    resolveWaveDescriptor(id) {
+        if (this.waveDescriptorIndex.has(id)) {
+            return this.waveDescriptorIndex.get(id);
+        }
+        const fallback = {
+            id,
+            formation: 'lane',
+            enemyType: 'swarm'
+        };
+        this.waveDescriptorIndex.set(id, fallback);
+        return fallback;
+    }
+    handleWaveScheduled(payload, fallback) {
+        if (!this.hud)
+            return;
+        const descriptor = this.resolveWaveDescriptor(payload.descriptorId);
+        const spawnAt = typeof payload.spawnAt === 'number' ? payload.spawnAt : this.time.now;
+        if (this.nextWaveInfo && this.nextWaveInfo.spawnAt <= spawnAt)
+            return;
+        const label = `${descriptor.enemyType} · ${descriptor.formation}`;
+        this.nextWaveInfo = { descriptorId: descriptor.id, spawnAt };
+        this.hud.setUpcomingWave({ label, spawnAt, fallback });
+    }
+    handleEnemyMiss(enemy) {
+        const isBoss = enemy.getData('isBoss') === true;
+        this.cleanupEnemy(enemy, false);
+        this.comboCount = 0;
+        this.hud.setCombo(0);
+        this.lastHitEnemyId = null;
+        this.scoring.registerMiss(isBoss ? this.bossMissPenalty : this.missPenalty);
+        this.hud.showMissFeedback(isBoss ? 'Boss Escaped!' : 'Miss!');
+        if (isBoss) {
+            this.hud.setBossHealth(null);
+            this.bossSpawned = false;
+            this.activeBoss = null;
+        }
+    }
+    damagePlayer(amount, opts = {}) {
+        const now = this.time.now;
+        if (now < this.iframesUntil)
+            return false;
+        if (this.powerups.hasShield) {
+            this.effects.hitSpark(this.player.x, this.player.y);
+            return false;
+        }
+        this.playerHp = Math.max(0, this.playerHp - amount);
+        this.comboCount = 0;
+        this.hud.setCombo(0);
+        this.iframesUntil = now + 800;
+        this.hud.setHp(this.playerHp);
+        if (!this.reducedMotion)
+            this.cameras.main.shake(150, 0.01);
+        if (typeof opts.missPenalty === 'number') {
+            this.scoring.registerMiss(opts.missPenalty);
+        }
+        const shouldShowFeedback = opts.showFeedback ?? Boolean(opts.feedback);
+        if (shouldShowFeedback && opts.feedback) {
+            this.hud.showMissFeedback(opts.feedback);
+        }
+        if (this.playerHp <= 0) {
+            this.endRun();
+        }
+        return true;
+    }
+    onBossDown() {
+        this.activeBoss = null;
+        this.bossSpawned = false;
+        this.currentStage += 1;
+        this.hud.setBossHealth(null);
+        this.hud.setStage(this.currentStage);
+        this.updateDifficultyForStage();
+        this.announcer.playEvent('get_ready');
+    }
+    handleFireInputDown() {
+        if (this.releaseFireMode) {
+            this.releaseFireArmed = true;
+            return;
+        }
+        if (this.opts.fireMode === 'click') {
+            const t = this.time.now;
+            if (t - this.lastShotAt >= this.fireCooldownMs) {
+                this.fireBullet();
+                this.lastShotAt = t;
+            }
+            return;
+        }
+        this.isShooting = true;
+        if (this.opts.fireMode === 'hold_quantized') {
+            this.nextQuantizedShotAt = this.lastBeatAt + this.beatPeriodMs;
+        }
+    }
+    handleFireInputUp() {
+        if (this.releaseFireMode) {
+            if (this.releaseFireArmed) {
+                this.releaseFireArmed = false;
+                this.executeReleaseShot();
+            }
+            return;
+        }
+        this.isShooting = false;
+        this.nextQuantizedShotAt = 0;
+    }
+    executeReleaseShot() {
+        const now = this.time.now;
+        if (now - this.lastShotAt < this.fireCooldownMs)
+            return;
+        const deltaMs = this.analyzer?.nearestBeatDeltaMs?.() ?? null;
+        const judgement = this.beatWindow.classify(deltaMs);
+        this.fireBullet(judgement, typeof deltaMs === 'number' ? deltaMs : undefined);
+        this.lastShotAt = now;
+    }
+    onGamepadConnected(pad) {
+        if (!pad)
+            return;
+        this.activeGamepad = pad;
+    }
+    onGamepadDisconnected(pad) {
+        if (this.activeGamepad === pad) {
+            this.activeGamepad = undefined;
+            this.gamepadFireActive = false;
+            this.handleFireInputUp();
+        }
+    }
+    computeScrollBase(bpm) {
+        const referenceBpm = 120;
+        const ratio = bpm > 0 ? bpm / referenceBpm : 1;
+        const clampedRatio = Phaser.Math.Clamp(ratio, 0.5, 1.8);
+        const stageMultiplier = this.currentStageConfig?.scrollMultiplier ?? 1;
+        const baseAtReference = this.difficultyProfile.baseScrollSpeed * stageMultiplier;
+        const scaled = baseAtReference * clampedRatio;
+        const min = 70 * stageMultiplier;
+        const max = 240 * stageMultiplier;
+        return Phaser.Math.Clamp(scaled, min, max);
+    }
+    pulseEnemies(amplitudeMultiplier = 1) {
+        const group = this.spawner.getGroup();
+        group.children.each((obj) => {
+            const enemy = obj;
+            if (!enemy.active)
+                return false;
+            const skin = enemy.getData('skin');
+            if (!skin)
+                return true;
+            const base = enemy.getData('pulseScale') ?? 0.1;
+            skin.pulse(base * amplitudeMultiplier);
+            return true;
+        });
+    }
+    triggerBomb() {
+        // Clear enemies in radius by disabling all
+        const group = this.spawner.getGroup();
+        /* group.children.each((e: Phaser.GameObjects.GameObject) => {
+           const s = e as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+           if (!s.active) return false
+           this.effects.explosion(s.x, s.y)
+           s.disableBody(true, true)
+           return true
+         })
+         */
+        group.children.each((e) => {
+            const s = e;
+            if (!s.active)
+                return true;
+            this.effects.explosion(s.x, s.y);
+            this.cleanupEnemy(s, true); // ← viktigt, städar skin + bar
+            if (s.getData('isBoss') === true)
+                this.onBossDown();
+            return true;
+        });
+        this.sound.play('explode_big', { volume: this.opts.sfxVolume });
+        this.bumpBomb(-100);
+    }
+    bumpBomb(delta) {
+        const previous = this.bombCharge;
+        this.bombCharge = Phaser.Math.Clamp(this.bombCharge + delta, 0, 100);
+        this.hud.setBombCharge(this.bombCharge / 100);
+        if (this.bombCharge >= 100 && previous < 100 && !this.bombReadyAnnounced) {
+            this.announcer.playBombReady();
+            this.bombReadyAnnounced = true;
+        }
+        else if (this.bombCharge < 100) {
+            this.bombReadyAnnounced = false;
+        }
+    }
+    drawHealthBar(enemy) {
+        const healthBar = enemy.getData('healthBar');
+        if (!healthBar)
+            return;
+        healthBar.clear();
+        const hp = enemy.getData('hp');
+        const maxHp = enemy.getData('maxHp') ?? hp;
+        const healthPercentage = maxHp > 0 && hp > 0 ? hp / maxHp : 0;
+        const barWidth = 20;
+        const barHeight = 3;
+        const x = enemy.x - barWidth / 2;
+        const y = enemy.y - (enemy.height * enemy.scaleY) / 2 - 8;
+        healthBar.fillStyle(0x808080);
+        healthBar.fillRect(x, y, barWidth, barHeight);
+        if (healthPercentage > 0) {
+            healthBar.fillStyle(0x0066ff);
+            healthBar.fillRect(x, y, barWidth * healthPercentage, barHeight);
+        }
+    }
+    endRun() {
+        // Stop music
+        this.music?.stop();
+        this.sound.removeByKey('music');
+        this.cache.audio.remove('music');
+        const shots = this.scoring.shots || 0;
+        const hits = this.scoring.perfect + this.scoring.good;
+        const accuracy = shots > 0 ? (hits / shots) * 100 : 0;
+        this.scene.start('ResultScene', { score: this.scoring.score, accuracy });
+    }
+    pauseGame() {
+        if (this.isPaused)
+            return;
+        this.isPaused = true;
+        this.sound.play('ui_back', { volume: this.opts.sfxVolume });
+        this.music?.pause();
+        this.scene.launch('MenuScene', { resume: true });
+        this.scene.bringToTop('MenuScene');
+        this.input.setDefaultCursor('default');
+        this.scene.pause('GameScene');
+    }
+    getMusic() {
+        return this.music;
+    }
+}

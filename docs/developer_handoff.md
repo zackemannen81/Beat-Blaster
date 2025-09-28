@@ -27,7 +27,7 @@
 
 ## Content & Data Status
 - `src/config/tracks.json` currently maps three tracks: easy (Neon Crusader), normal (Neon Heartbeat), hard (Neon Reverie). Hashes in config must be kept in sync with audio replacements; be mindful of new WAV sources.
-- Difficulty profiles (`src/config/difficultyProfiles.ts`) define lane counts (4/6/7), spawn multipliers, HP scaling, heavy cadence controls, and stage ramps.
+- Difficulty profiles (`src/config/difficultyProfiles.ts`) define lane counts (4/6/7), spawn multipliers, HP scaling, heavy cadence controls, and stage ramps. Refer to `docs/difficulty-system.md` for authoring and tuning guidance.
 - Wave playlists (see `src/systems/WaveLibrary.ts` and `docs/brainstorming.md`) contain lane-hopper, formation, flooder, and teleporter sets across all difficulties. Hard playlist still needs more late-stage boss compositions. Note that the lane pattern now injects deterministic waves on `beat:low`; playlist weights show up primarily in fallback windows.
 - Balance data lives in registry `balance.enemies` at runtime; fallback HP logic ensures defaults for missing config.
 - Assets: Favicon missing (404 seen in dev); add under `public` and reference in Vite if desired.

@@ -1,6 +1,7 @@
 import easyPlaylist from '../config/waves/easy.json'
 import normalPlaylist from '../config/waves/normal.json'
 import hardPlaylist from '../config/waves/hard.json'
+import wipPlaylist from '../config/waves/wip.json'
 import { WavePlaylist } from '../types/waves'
 import { DifficultyProfileId } from '../config/difficultyProfiles'
 
@@ -21,7 +22,8 @@ function normalizePlaylist(fallbackId: DifficultyProfileId, raw: unknown): WaveP
 const library: Record<DifficultyProfileId, WavePlaylist> = {
   easy: normalizePlaylist('easy', easyPlaylist),
   normal: normalizePlaylist('normal', normalPlaylist),
-  hard: normalizePlaylist('hard', hardPlaylist)
+  hard: normalizePlaylist('hard', hardPlaylist),
+  wip: normalizePlaylist('wip', wipPlaylist)
 }
 
 export function getWavePlaylist(profileId: DifficultyProfileId): WavePlaylist {

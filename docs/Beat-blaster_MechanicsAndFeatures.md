@@ -137,6 +137,8 @@
 
 ## 🎚 Svårighetsgrad & HP-skalning
 
+- För detaljerad genomgång av profiler, stage ramps och hur du skapar nya svårighetsgrader, läs `docs/difficulty-system.md`.
+
 - **Fiende-HP:** alltid multipler av beats (1, 2, 4).  
 - **Exempel:**  
   - Små fiender = 1 HP → dör på ett skott.  

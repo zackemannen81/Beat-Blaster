@@ -1,6 +1,6 @@
 import { WaveCategory } from '../types/waves'
 
-export type DifficultyProfileId = 'easy' | 'normal' | 'hard'
+export type DifficultyProfileId = 'easy' | 'normal' | 'hard' | 'wip'
 
 export type StageTuning = {
   stage: number
@@ -140,6 +140,40 @@ const profiles: Record<DifficultyProfileId, DifficultyProfile> = {
       { stage: 2, scrollMultiplier: 1.1, spawnMultiplier: 1.15, enemyHpMultiplier: 1.3, bossHpMultiplier: 1.48, enemyCap: 22, maxQueuedWaves: 4, maxSimultaneousHeavy: 2 },
       { stage: 3, scrollMultiplier: 1.18, spawnMultiplier: 1.25, enemyHpMultiplier: 1.4, bossHpMultiplier: 1.6, enemyCap: 24, maxQueuedWaves: 5, maxSimultaneousHeavy: 3, heavyCooldownMs: 3200 },
       { stage: 4, scrollMultiplier: 1.25, spawnMultiplier: 1.32, enemyHpMultiplier: 1.55, bossHpMultiplier: 1.75, enemyCap: 26, maxQueuedWaves: 5, maxSimultaneousHeavy: 3, heavyCooldownMs: 3000 }
+    ]
+  },
+  wip: {
+    id: 'wip',
+    label: 'wip',
+    description: 'Gentle pacing with generous telegraphs and capped heavy waves for onboarding.',
+    baseScrollSpeed: 60,
+    baseSpawnRate: 0.1,
+    baseEnemyHpMultiplier: 0.2,
+    baseBossHpMultiplier: 0.5,
+    waveDelayMs: 5000,
+    waveRepeatCooldownMs: 16000,
+    fallbackCooldownMs: 62000,
+    wavePlaylistId: 'wip',
+    laneCount: 4,
+    missPenalty: 0,
+    bossMissPenalty: 80,
+    categoryCooldowns: {
+      light: 0,
+      standard: 900,
+      heavy: 3600,
+      boss: 5200
+    },
+    heavyControls: {
+      cooldownMs: 5200,
+      windowMs: 14000,
+      maxInWindow: 1,
+      maxSimultaneous: 1
+    },
+    stageTuning: [
+      { stage: 1, scrollMultiplier: 0.85, spawnMultiplier: 0.7, enemyHpMultiplier: 0.9, bossHpMultiplier: 0.95, enemyCap: 8, maxQueuedWaves: 2 },
+      { stage: 2, scrollMultiplier: 0.92, spawnMultiplier: 0.8, enemyHpMultiplier: 0.98, bossHpMultiplier: 1, enemyCap: 12, maxQueuedWaves: 2 },
+      { stage: 3, scrollMultiplier: 0.98, spawnMultiplier: 0.9, enemyHpMultiplier: 1.05, bossHpMultiplier: 1.08, enemyCap: 14, maxQueuedWaves: 3 },
+      { stage: 4, scrollMultiplier: 1.02, spawnMultiplier: 0.95, enemyHpMultiplier: 1.12, bossHpMultiplier: 1.15, enemyCap: 16, maxQueuedWaves: 3 }
     ]
   }
 }

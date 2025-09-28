@@ -111,13 +111,15 @@ type MirrorerSpawn = SpawnBase & {
  const DIFFICULTY_COUNT: Record<DifficultyProfileId, number> = {
   easy: 0.75,
   normal: 1,
-  hard: 1.35
+  hard: 1.35,
+  wip: 1
  }
 
  const DIFFICULTY_SPEED: Record<DifficultyProfileId, number> = {
   easy: 0.9,
   normal: 1,
-  hard: 1.18
+  hard: 1.18,
+  wip: 1
  }
 
  export default class LanePatternController {

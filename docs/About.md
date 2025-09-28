@@ -10,7 +10,7 @@ Beat Blaster is a rhythm-driven vertical shooter built with Phaser 3 and TypeScr
 - **Player Combat Loop**: BeatWindow grading (Perfect/Great/Good) feeds Scoring and combo multipliers. Semi-auto fire with quantised fallback, bomb charge meter, powerups (shield, rapid, split, slowmo), and damage/iframes.
 - **UI & HUD**: Live BPM, lane count, combo, bomb meter, accuracy, and shot feedback. Options scene with reduced motion, crosshair mode, aim unlock, vertical safety band, volume sliders, and persistent storage. Result scene writes to local leaderboard.
 - **Presentation & FX**: NeonGrid, starfield, background scroller, refreshed CubeSkin colour palettes per archetype, particle bursts, teleporter blinks, perfect-shot rings, announcer VO integration, and reduced-motion pathways.
-- **Data & Config**: Difficulty profiles (easy/normal/hard) define lane counts, spawn envelopes, HP multipliers, heavy cadence. Tracks config maps audio assets, hash, per-track offsets. Registry-driven balance overrides guard missing data.
+- **Data & Config**: Difficulty profiles (easy/normal/hard) define lane counts, spawn envelopes, HP multipliers, heavy cadence. Tracks config maps audio assets, hash, per-track offsets. Registry-driven balance overrides guard missing data. See `docs/difficulty-system.md` for the full tuning workflow.
 
 ## Key Implemented Modules
 - `src/systems/AudioAnalyzer.ts`: FFT-based beat detection, smoothing, and event emission.

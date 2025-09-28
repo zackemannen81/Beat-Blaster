@@ -153,7 +153,12 @@
 
 ---
 
+## 🔊 Announcer Voices
 
+- Tre röstbanker är aktiva: `default`, `bee` och `cyborg` (robotisk kvinnlig AI med futuristisk klang).
+- Cue-mapparna hålls i `src/systems/Announcer.ts`; respektive röstpaket ligger under `src/assets/audio/sfx/voices/<voice>/` med både `.wav` (mono 44.1 kHz) och `.mp3`-speglar för webbfallbacks.
+- Cyborg-rösten genereras via Edge TTS (se `tools/voices/cyborg/` plus dokumentationen i `docs/announcer_voice_clips.md` och `docs/voice_profiles/cyborg.md`). Kör `python3 tools/voices/cyborg/generate_clips.py --force` efter att ha aktiverat venv för att uppdatera klippen.
+- BootScene glob-laddar alla `announcer_*`-klipp, så nya röster eller alternate takes kräver bara att filer med rätt namnkonvention läggs in.
 
 
 💡 Alternativa idéer

@@ -3,7 +3,7 @@
 ## Snapshot
 - Vertical scroller is now the primary experience; omni arena mode remains accessible through Options or `?mode=omni`.
 - Enemy roster (brute, dasher, exploder, weaver, mirrorer, teleporter, flooder, formation, boss shells) is live with lane-aware telegraphs and HP scaling tied to difficulty profiles. A scripted 16-beat lane pattern now guarantees every archetype appears each cycle regardless of difficulty playlist RNG.
-- Audio pipeline ships with the Web Audio analyzer, Conductor event bus, BPM fallback scheduling, announcer hooks, and per-track input offsets.
+- Audio pipeline ships with the Web Audio analyzer, Conductor event bus, BPM fallback scheduling, announcer hooks, and per-track input offsets. Announcer voices now ship in three flavours (default, Bee, and the new Cyborg AI profile) with runtime voice selection.
 - WaveDirector orchestrates scripted playlists per difficulty, coordinating Spawner patterns, LaneManager snapshots, and EnemyLifecycle bookkeeping.
 - Presentation pass includes NeonGrid backdrop, Starfield layers, cube enemy skins, telegraphs, and reduced-motion toggles. Recent crash on tweening destroyed circles was fixed (Effects tweens defer destroy). Enemy CubeSkin palettes were refreshed to better differentiate archetypes.
 
@@ -14,6 +14,7 @@
 - Tests: `npm run test` (Vitest) - suite exists but is currently sparse; no automated coverage for beat timing or lane math yet.
 - Engine: Phaser 3.90.0 (matching dev server console output). Types are aligned with TypeScript 5.6.x in `tsconfig.json`.
 - Assets live under `src/assets`; audio tracks now provided as WAV/MP3 (`track_00.wav`, `track_01.wav`, `track_03.mp3`). OGG mirrors still missing.
+- Voice synthesis pipeline lives under `tools/voices/`: create a venv (`python3 -m venv tools/voices/.venv`), install `pip install -r tools/voices/requirements.txt`, then run `python3 tools/voices/cyborg/generate_clips.py` (add `--force` to regenerate) to refresh the Cyborg announcer assets.
 
 ## Implemented Systems
 - **Audio & Rhythm** - `AudioAnalyzer` computes band energy, emits `beat:low/mid/high`, `bar`, and feeds `Conductor`; analyzer gracefully drops to BPM fallback when unavailable.
@@ -30,7 +31,7 @@
 - Difficulty profiles (`src/config/difficultyProfiles.ts`) define lane counts (4/6/7), spawn multipliers, HP scaling, heavy cadence controls, and stage ramps. Refer to `docs/difficulty-system.md` for authoring and tuning guidance.
 - Wave playlists (see `src/systems/WaveLibrary.ts` and `docs/brainstorming.md`) contain lane-hopper, formation, flooder, and teleporter sets across all difficulties. Hard playlist still needs more late-stage boss compositions. Note that the lane pattern now injects deterministic waves on `beat:low`; playlist weights show up primarily in fallback windows.
 - Balance data lives in registry `balance.enemies` at runtime; fallback HP logic ensures defaults for missing config.
-- Assets: Favicon missing (404 seen in dev); add under `public` and reference in Vite if desired.
+- Assets: Favicon missing (404 seen in dev); add under `public` and reference in Vite if desired. Announcer VO lives in `src/assets/audio/sfx/voices/` (default/Bee/Cyborg WAV+MP3 mirrors) – new voices can be dropped in and BootScene will load them automatically.
 
 ## QA & Operations
 - Manual smoke (vertical mode, audio analyzer, scripted lane cycle) passes; recent playtest exposed the `Arc.radius` tween crash, now resolved.
@@ -56,7 +57,7 @@
 - Consider exposing a toggle to disable the scripted lane cycle for designer-driven testing, plus document the interaction between playlists and the controller.
 
 ## Handoff Checklist
-- [ ] `npm run dev` -> verify audio analyzer handshake, reduced-motion toggle, and track selection (ensure new WAV files load without CORS issues).
+- [ ] `npm run dev` -> verify audio analyzer handshake, reduced-motion toggle, track selection, and that announcer voices (default/Bee/Cyborg) load without CORS issues.
 - [ ] Confirm Difficulty profile linking (`tracks.json` <-> `difficultyProfiles.ts`) and wave playlists (`WaveLibrary`) for each track.
 - [ ] Run `npm run build` -> watch for asset path errors or bundle growth.
 - [ ] Validate local leaderboard persistence and reset between sessions.

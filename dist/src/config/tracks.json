@@ -33,13 +33,13 @@
     "hash": "91913fcb63140356966ac881688e6ae6170bc333"
   },
   {
-    "id": "track_03",
-    "name": "Generic track (difficulty WIP)",
+    "id": "track_09",
+    "name": "Neon Blades (difficulty WIP)",
     "artist": "Alex Harmony",
     "inputOffsetMs": 0,
     "lengthSec": 128,
     "fileOgg": "",
-    "fileMp3": "src/assets/audio/tracks/track_03.mp3",
+    "fileMp3": "src/assets/audio/tracks/track_09.mp3",
     "difficultyProfileId": "wip",
     "hash": "91913fcb63140356966ac881688e6ae6170bc333"
   }

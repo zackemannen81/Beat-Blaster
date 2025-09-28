@@ -174,7 +174,7 @@ this.emBackground = this.scene.add.particles(0, 0, texKey, {
 
     // Sätt djupet på hela partikelsystemet så det ritas bakom skeppet
     particleManager.setDepth(this.gfx.depth - 1)
-    particleManager.startFollow(this.host.body as Phaser.Physics.Arcade.Body) 
+    particleManager.startFollow(this.host.body as Phaser.Physics.Arcade.Body,16,25) 
     //this.emBackground.startFollow(this.host.body as Phaser.Physics.Arcade.Body)
 
   }
@@ -213,7 +213,8 @@ this.emBackground = this.scene.add.particles(0, 0, texKey, {
     if (this.emWingL) this.emWingL.setPosition(wingLPos.x, wingLPos.y+15)
     if (this.emWingR) this.emWingR.setPosition(wingRPos.x, wingRPos.y+15)
     if (this.particleManager) this.particleManager.setPosition(tailPos.x, tailPos.y)
-    // Rotera partiklarnas vinkel med skeppet
+    //  if (this.particleManager) this.particleManager.y= tailPos.y+50
+      // Rotera partiklarnas vinkel med skeppet
     const angle = Phaser.Math.RadToDeg(currentRotation) + 90
     this.emMain!.updateConfig({angle: {  min: angle - 5, max: angle + 5 }})
     this.emWingL!.updateConfig({angle: {  min: angle - 5, max: angle + 5 }})

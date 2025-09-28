@@ -1,8 +1,8 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type PluginOption } from 'vite'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 export default defineConfig(({ command }) => {
-  const plugins = []
+  const plugins: PluginOption[] = []
 
   if (command === 'build') {
     plugins.push(

@@ -219,6 +219,73 @@ export default class WaveDirector {
     }
   }
 
+  scheduleDescriptor(
+    descriptor: WaveDescriptor,
+    options: {
+      delayMs?: number
+      telegraphDelayMs?: number | null
+      anchor?: Phaser.Types.Math.Vector2Like
+      force?: boolean
+      respectAvailability?: boolean
+      markFallback?: boolean
+    } = {}
+  ): boolean {
+    if (!descriptor) return false
+    const now = this.scene.time.now
+    if (!options.force && this.queue.length >= this.maxQueuedWaves) return false
+
+    if (options.respectAvailability !== false) {
+      const stage = Math.max(1, this.stageProvider())
+      const passes = this.isWaveAvailable(descriptor, now, stage, options.markFallback === true)
+      if (!passes) return false
+    }
+
+    const delay = Math.max(0, options.delayMs ?? descriptor.delayMs ?? this.defaultDelay)
+    const leadRaw = options.telegraphDelayMs === null
+      ? null
+      : options.telegraphDelayMs !== undefined
+        ? Math.max(0, options.telegraphDelayMs)
+        : Math.max(0, descriptor.telegraphDelayMs ?? 0)
+    const spawnAt = now + delay
+    const telegraphAt = leadRaw === null
+      ? null
+      : leadRaw > 0
+        ? Math.max(now, spawnAt - leadRaw)
+        : (descriptor.telegraph ? now : null)
+    const anchor = options.anchor ?? this.anchorProvider()
+    const instanceId = `${descriptor.id}#${++this.waveInstanceCounter}`
+
+    const scheduled: ScheduledWave = {
+      descriptor,
+      spawnAt,
+      telegraphAt,
+      telegraphTriggered: telegraphAt === null || telegraphAt <= now,
+      anchor,
+      instanceId,
+      isFallback: options.markFallback === true
+    }
+
+    if (scheduled.telegraphTriggered && descriptor.telegraph && telegraphAt !== null && telegraphAt <= now) {
+      // Telegrapher will be picked up during update loop; ensure we don't double trigger
+      scheduled.telegraphTriggered = false
+    }
+
+    this.lastScheduledWaveId = descriptor.id
+    this.registerPending(descriptor)
+    this.queue.push(scheduled)
+    this.sortQueue()
+
+    const eventName = options.markFallback === true ? 'wave:fallback' : 'wave:scheduled'
+    this.emitEvent(eventName, {
+      descriptorId: descriptor.id,
+      spawnAt: scheduled.spawnAt,
+      telegraphAt: scheduled.telegraphAt,
+      fallback: options.markFallback === true
+    })
+
+    return true
+  }
+
   private pickWaveDescriptor(now: number, band: BeatBand, isFallback: boolean): WaveDescriptor | null {
     const stage = Math.max(1, this.stageProvider())
     const candidates = this.collectCandidates(now, stage, isFallback)

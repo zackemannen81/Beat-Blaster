@@ -27,6 +27,7 @@ export default class CubeSkin {
   private pulseTween?: Phaser.Tweens.Tween
   private ringPulse?: Phaser.Time.TimerEvent
   private ringGlow?: Phaser.GameObjects.Arc
+  private ringUpdate?: () => void
   private baselineScale = 1
   private glowBaseScale = 1
   private variant: CubeVariant
@@ -258,11 +259,12 @@ export default class CubeSkin {
     this.ringGlow = this.scene.add.circle(this.gfx.x, this.gfx.y, this.size * 0.5, this.primaryColor, 0.3)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setDepth(this.gfx.depth - 1)
-    this.scene.events.on(Phaser.Scenes.Events.UPDATE, () => {
+    this.ringUpdate = () => {
       if (!this.ringGlow) return
       this.ringGlow.x = this.gfx.x
       this.ringGlow.y = this.gfx.y
-    })
+    }
+    this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.ringUpdate, this)
     this.ringPulse = this.scene.time.addEvent({
       delay: 240,
       loop: true,
@@ -360,12 +362,20 @@ export default class CubeSkin {
 
   destroy() {
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.follow, this)
+    if (this.ringUpdate) {
+      this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.ringUpdate, this)
+      this.ringUpdate = undefined
+    }
     this.rotateTween?.stop()
+    this.scene.tweens.killTweensOf([this.gfx, this.glowSprite, this.ringGlow])
     this.zapTimer?.remove(false)
     this.aura?.destroy()
     this.pulseTween?.stop()
     this.ringPulse?.remove(false)
-    this.ringGlow?.destroy()
+    if (this.ringGlow) {
+      this.ringGlow.destroy()
+      this.ringGlow = undefined
+    }
     this.glowSprite?.destroy()
     this.gfx.destroy()
   }

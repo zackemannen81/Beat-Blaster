@@ -13,6 +13,7 @@ import PlayerSkin from '../systems/PlayerSkin'
 import NeonGrid from '../systems/NeonGrid'
 import CubeSkin from '../systems/CubeSkin'
 import LaneManager from '../systems/LaneManager'
+import LanePatternController, { LaneEffect } from '../systems/LanePatternController'
 import BeatWindow, { BeatJudgement } from '../systems/BeatWindow'
 import { getDifficultyProfile, DifficultyProfile, DifficultyProfileId, StageTuning } from '../config/difficultyProfiles'
 import WaveDirector from '../systems/WaveDirector'
@@ -114,6 +115,8 @@ export default class GameScene extends Phaser.Scene {
   private activeBoss: Enemy | null = null
   private waveDirector!: WaveDirector
   private lanes?: LaneManager
+  private lanePattern?: LanePatternController
+  private onLanePatternPulse = () => this.pulseEnemies(1.3)
   private targetLaneIndex = 0
   private laneSnapFromX = 0
   private laneSnapTargetX = 0
@@ -395,12 +398,18 @@ export default class GameScene extends Phaser.Scene {
         this.beatCount += 1
         if (this.gameplayMode === 'vertical') this.triggerLaneHopperHop()
       }
+      const usingPattern = this.gameplayMode === 'vertical' && !!this.lanePattern
+      if (usingPattern) {
+        this.lanePattern?.handleBeat(band)
+      }
       this.updateExplodersOnBeat(band)
       this.updateTeleportersOnBeat(band)
       this.updateWeaversOnBeat(band)
       this.updateFormationDancersOnBeat(band)
       this.updateMirrorersOnBeat(band)
-      this.waveDirector.enqueueBeat(band)
+      if (!usingPattern) {
+        this.waveDirector.enqueueBeat(band)
+      }
       if (pulse) this.pulseEnemies()
     }
 
@@ -507,15 +516,30 @@ export default class GameScene extends Phaser.Scene {
         }
       }
     })
+    if (this.gameplayMode === 'vertical') {
+      this.lanePattern = new LanePatternController({
+        scene: this,
+        difficulty: this.difficultyProfile,
+        stage: this.currentStageConfig,
+        waveDirector: this.waveDirector,
+        getLaneManager: () => this.lanes,
+        requestLaneCount: (count, effect) => this.applyLanePatternCount(count, effect)
+      })
+      this.applyLanePatternCount(this.resolveLaneCount())
+    } else {
+      this.lanePattern = undefined
+    }
     this.events.on('wave:scheduled', this.onWaveScheduledHandler, this)
     this.events.on('wave:fallback', this.onWaveFallbackHandler, this)
     this.events.on('wave:spawned', this.handleWaveSpawned, this)
     this.events.on('wave:telegraph', this.handleWaveTelegraph, this)
+    this.events.on('lanes:pulse', this.onLanePatternPulse, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off('wave:scheduled', this.onWaveScheduledHandler, this)
       this.events.off('wave:fallback', this.onWaveFallbackHandler, this)
       this.events.off('wave:spawned', this.handleWaveSpawned, this)
       this.events.off('wave:telegraph', this.handleWaveTelegraph, this)
+      this.events.off('lanes:pulse', this.onLanePatternPulse, this)
       this.announcer.destroy()
     })
     this.updateDifficultyForStage()
@@ -1208,6 +1232,32 @@ pskin?.setThrust?.(thrustLevel)
     }
   }
 
+  private applyLanePatternCount(count: 3 | 5 | 7, effect?: LaneEffect) {
+    const hadLanes = Boolean(this.lanes)
+    const countChanged = this.verticalLaneCount !== count || !hadLanes
+    this.verticalLaneCount = count
+    if (countChanged) {
+      if (!this.lanes) {
+        this.setupVerticalLaneSystem()
+      } else {
+        const previousLane = this.lanes.indexAt(this.player.x)
+        this.lanes.rebuild(count)
+        const snapIndex = Phaser.Math.Clamp(previousLane, 0, this.lanes.getCount() - 1)
+        this.startLaneSnap(snapIndex)
+        this.touchLaneIndexBaseline = this.targetLaneIndex
+        this.touchLaneAccum = 0
+        this.hud?.setLaneCount(this.lanes.getCount())
+      }
+    }
+    if (effect === 'expand') {
+      this.pulseEnemies(1.1)
+    } else if (effect === 'collapse') {
+      this.pulseEnemies(1.25)
+    } else if (effect === 'pulse') {
+      this.pulseEnemies(1.35)
+    }
+  }
+
   private setupVerticalLaneSystem() {
     const laneCount = this.resolveLaneCount()
     this.lanes?.off(LaneManager.EVT_CHANGED, this.onLaneSnapshot, this)
@@ -1493,6 +1543,8 @@ pskin?.setThrust?.(thrustLevel)
       bossHpMultiplier: this.bossHpMultiplier,
       laneCount: this.verticalLaneCount
     })
+
+    this.lanePattern?.updateStage(cfg)
   }
 
 

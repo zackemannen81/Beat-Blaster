@@ -827,7 +827,7 @@ export default class Spawner {
     return this.createEnemy({
       type,
       x: width / 2,
-      y: -160,
+      y: -100,
       velocityY: speedY,
       pattern: { kind: 'boss', speedY },
       scale: 1.8,

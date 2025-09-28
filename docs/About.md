@@ -9,7 +9,7 @@ Beat Blaster is a rhythm-driven vertical shooter built with Phaser 3 and TypeScr
 - **Wave & Spawn Pipeline**: WaveDirector orchestrates playlists per difficulty, while a new `LanePatternController` drives deterministic beat-by-beat spawns, lane expansions (3→5→7→3), and telegraph pulses. Spawner instantiates patterns with telegraphs, HP scaling, pooled sprites, and the lane-aware boss entry fix. Telegraph system renders zone/line/circle warnings with reduced-motion handling.
 - **Player Combat Loop**: BeatWindow grading (Perfect/Great/Good) feeds Scoring and combo multipliers. Semi-auto fire with quantised fallback, bomb charge meter, powerups (shield, rapid, split, slowmo), and damage/iframes.
 - **UI & HUD**: Live BPM, lane count, combo, bomb meter, accuracy, and shot feedback. Options scene with reduced motion, crosshair mode, aim unlock, vertical safety band, volume sliders, and persistent storage. Result scene writes to local leaderboard.
-- **Presentation & FX**: NeonGrid, starfield, background scroller, refreshed CubeSkin colour palettes per archetype, particle bursts, teleporter blinks, perfect-shot rings, announcer VO integration (default, Bee, Cyborg voice banks), and reduced-motion pathways.
+- **Presentation & FX**: NeonGrid with beat-synced lane border runway lights, starfield, background scroller, refreshed CubeSkin colour palettes per archetype, particle bursts, teleporter blinks, perfect-shot rings, announcer VO integration (default, Bee, Cyborg voice banks), and reduced-motion pathways.
 - **Data & Config**: Difficulty profiles (easy/normal/hard) define lane counts, spawn envelopes, HP multipliers, heavy cadence. Tracks config maps audio assets, hash, per-track offsets. Registry-driven balance overrides guard missing data. See `docs/difficulty-system.md` for the full tuning workflow.
 
 ## Key Implemented Modules
@@ -25,6 +25,7 @@ Beat Blaster is a rhythm-driven vertical shooter built with Phaser 3 and TypeScr
 - `src/systems/Effects.ts`: Particle and tween effects for kills, perfect shots, teleports, plasma hits, and bomb events.
 - `src/ui/HUD.ts`: HUD layout, text/graphics updates, meter drawing, and reduced-motion adjustments.
 - `src/scenes/GameScene.ts`: Integrates systems (analyzer, conductor, spawner, powerups, HUD), handles input for mouse, keyboard, gamepad, and touch, manages player state, bullets, collisions, and wave triggers.
+- `src/systems/NeonGrid.ts`: Neon grid backdrop with beat-pulsed lane border lights and lane-aware alignment.
 
 ## Planned Features
 - **Latency Calibration UI**: Interactive slider/test sound inside Options to fine-tune per-track offsets with visual/audio feedback.

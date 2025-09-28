@@ -139,6 +139,11 @@
 
 - För detaljerad genomgång av profiler, stage ramps och hur du skapar nya svårighetsgrader, läs `docs/difficulty-system.md`.
 
+## ✨ Neon Bakgrund & Banbelysning
+- **NeonGrid** renderar bakgrundsrutnät och lane-gränser som futuristiska "runway lights". Varje lane-kant har ljusnoder som följer beatsekvenser (low/mid/high) och ger illusion av flöde längs banans sidor.
+- Rutnätet andas med musiken – låga beats hoppar till nästa nod, mid-beats ger en längre svans, high-beats lägger ett mjukt overlay-glow.
+- Systemet resnappar automatiskt när lane-antalet ändras eller skärmen resizas så att rutnätet alltid lirar med lane-geometrin.
+
 - **Fiende-HP:** alltid multipler av beats (1, 2, 4).  
 - **Exempel:**  
   - Små fiender = 1 HP → dör på ett skott.  

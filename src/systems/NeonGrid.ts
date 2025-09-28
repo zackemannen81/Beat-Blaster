@@ -29,6 +29,7 @@ export default class NeonGrid {
 
   private laneSnapshot?: LaneSnapshot
   private laneBorders: LaneBorderLights[] = []
+  private borderPositions: number[] = []
 
   private rng = new Phaser.Math.RandomDataGenerator([Date.now().toString()])
 
@@ -38,6 +39,8 @@ export default class NeonGrid {
 
   private gridPulse = 0
   private highPulse = 0
+
+  private cellHeight = 96
 
   private readonly nodeSpacingPx = 68
   private readonly baseNodeAlpha = 0.16
@@ -104,6 +107,7 @@ export default class NeonGrid {
   setLaneSnapshot(snapshot?: LaneSnapshot | null) {
     this.laneSnapshot = snapshot ?? undefined
     this.rebuildLaneBorderLights()
+    this.recomputeGridMetrics()
     this.needsRedraw = true
   }
 
@@ -154,12 +158,14 @@ export default class NeonGrid {
   private rebuildLaneBorderLights() {
     if (!this.laneSnapshot) {
       this.laneBorders = []
+      this.borderPositions = []
       return
     }
 
     const { lanes, count, left, width } = this.laneSnapshot
     if (!lanes || lanes.length === 0 || count <= 0) {
       this.laneBorders = []
+      this.borderPositions = []
       return
     }
 
@@ -189,6 +195,8 @@ export default class NeonGrid {
       Phaser.Math.Clamp(pos, left, left + width)
     )
 
+    this.borderPositions = clampedBorders
+
     this.laneBorders = clampedBorders.map(x => {
       const nodes: LightNode[] = []
       const denom = Math.max(nodeCount - 1, 1)
@@ -208,6 +216,28 @@ export default class NeonGrid {
     this.needsRedraw = true
   }
 
+  private recomputeGridMetrics() {
+    const width = Math.max(1, this.scene.scale.width)
+    if (this.borderPositions.length >= 2) {
+      let total = 0
+      let segments = 0
+      for (let i = 1; i < this.borderPositions.length; i++) {
+        const diff = this.borderPositions[i] - this.borderPositions[i - 1]
+        if (diff > 0) {
+          total += diff
+          segments++
+        }
+      }
+      const avg = segments > 0 ? total / segments : width / Math.max(this.laneSnapshot?.count ?? 6, 1)
+      this.cellHeight = Math.max(24, avg)
+    } else if (this.laneSnapshot?.count && this.laneSnapshot.count > 0) {
+      const laneWidth = width / this.laneSnapshot.count
+      this.cellHeight = Math.max(24, laneWidth)
+    } else {
+      this.cellHeight = Math.max(24, width / 8)
+    }
+  }
+
   private makeRenderTexture(width: number, height: number) {
     this.rt?.destroy()
     this.rt = this.scene.add.renderTexture(0, 0, width, height)
@@ -220,6 +250,7 @@ export default class NeonGrid {
   private handleResize(width: number, height: number) {
     this.makeRenderTexture(width, height)
     this.rebuildLaneBorderLights()
+    this.recomputeGridMetrics()
     this.needsRedraw = true
     this.drawFrame()
   }
@@ -235,74 +266,80 @@ export default class NeonGrid {
     graphics.fillRect(0, 0, width, height)
 
     const pulse = Phaser.Math.Clamp(this.gridPulse, 0, 1)
-    const cols = 14
-    const rows = 8
-    const amp = 12 + 50 * pulse
+    const highPulse = Phaser.Math.Clamp(this.highPulse, 0, 1)
 
-    for (let i = 0; i <= cols; i++) {
-      const x = (i / cols) * width
-      graphics.lineStyle(1, 0x00e5ff, 0.18 + 0.25 * pulse)
+    const verticals = this.borderPositions.length >= 2
+      ? this.borderPositions
+      : this.generateFallbackVerticals(width)
+
+    const baseVerticalAlpha = 0.18 + 0.28 * pulse
+    graphics.lineStyle(2, 0x1ad8ff, baseVerticalAlpha)
+    for (const x of verticals) {
       graphics.beginPath()
       graphics.moveTo(x, 0)
       graphics.lineTo(x, height)
       graphics.strokePath()
     }
 
-    for (let j = 0; j <= rows; j++) {
-      const y = (j / rows) * height + Math.sin(this.t * 1.5 + j * 0.5) * amp
-      graphics.lineStyle(1, 0xff5db1, 0.12 + 0.22 * pulse)
+    if (highPulse > 0.01) {
+      graphics.lineStyle(6, 0x92fffb, highPulse * 0.45)
+      for (const x of verticals) {
+        graphics.beginPath()
+        graphics.moveTo(x, 0)
+        graphics.lineTo(x, height)
+        graphics.strokePath()
+      }
+    }
+
+    const cellHeight = this.resolveCellHeight(width)
+    const horizontalAlpha = 0.14 + 0.24 * pulse
+    graphics.lineStyle(2, 0xff5db1, horizontalAlpha)
+    const rowCount = Math.ceil(height / cellHeight)
+    for (let i = 0; i <= rowCount; i++) {
+      const y = Math.round(i * cellHeight)
+      if (y > height + 1) break
       graphics.beginPath()
       graphics.moveTo(0, y)
       graphics.lineTo(width, y)
       graphics.strokePath()
     }
 
-    if (this.laneBorders.length) {
-      const baseLineAlpha = 0.12 + 0.22 * pulse
-      graphics.lineStyle(2, 0x1ad8ff, baseLineAlpha)
-      for (const border of this.laneBorders) {
+    if (highPulse > 0.01) {
+      graphics.lineStyle(4, 0xfff3fb, highPulse * 0.25)
+      for (let i = 0; i <= rowCount; i++) {
+        const y = Math.round(i * cellHeight)
+        if (y > height + 1) break
         graphics.beginPath()
-        graphics.moveTo(border.x, 0)
-        graphics.lineTo(border.x, height)
+        graphics.moveTo(0, y)
+        graphics.lineTo(width, y)
         graphics.strokePath()
       }
+    }
 
-      const overlayAlpha = this.highPulse * 0.45
-      if (overlayAlpha > 0.01) {
-        graphics.lineStyle(6, 0x92fffb, overlayAlpha)
-        for (const border of this.laneBorders) {
-          graphics.beginPath()
-          graphics.moveTo(border.x, 0)
-          graphics.lineTo(border.x, height)
-          graphics.strokePath()
-        }
-      }
+    const baseColor = Phaser.Display.Color.ValueToColor(0x1be9ff)
+    const highlightColor = Phaser.Display.Color.ValueToColor(0xcdfdff)
+    const baseRadius = Phaser.Math.Clamp(width * 0.008, 4, 9)
 
-      const baseColor = Phaser.Display.Color.ValueToColor(0x1be9ff)
-      const highlightColor = Phaser.Display.Color.ValueToColor(0xcdfdff)
-      const baseRadius = Phaser.Math.Clamp(width * 0.008, 4, 9)
+    for (const border of this.laneBorders) {
+      for (const node of border.nodes) {
+        const intensity = Phaser.Math.Clamp(node.intensity, 0, 1)
+        const y = node.y * height
+        const colorInterp = Phaser.Display.Color.Interpolate.ColorWithColor(
+          baseColor,
+          highlightColor,
+          100,
+          Math.round(intensity * 100)
+        )
+        const fillColor = Phaser.Display.Color.GetColor(colorInterp.r, colorInterp.g, colorInterp.b)
+        const alpha = Phaser.Math.Clamp(this.baseNodeAlpha + intensity * this.highlightNodeAlpha, 0, 1)
+        const radius = baseRadius * (0.7 + intensity * 0.9)
 
-      for (const border of this.laneBorders) {
-        for (const node of border.nodes) {
-          const intensity = Phaser.Math.Clamp(node.intensity, 0, 1)
-          const y = node.y * height
-          const colorInterp = Phaser.Display.Color.Interpolate.ColorWithColor(
-            baseColor,
-            highlightColor,
-            100,
-            Math.round(intensity * 100)
-          )
-          const fillColor = Phaser.Display.Color.GetColor(colorInterp.r, colorInterp.g, colorInterp.b)
-          const alpha = Phaser.Math.Clamp(this.baseNodeAlpha + intensity * this.highlightNodeAlpha, 0, 1)
-          const radius = baseRadius * (0.7 + intensity * 0.9)
+        graphics.fillStyle(fillColor, alpha)
+        graphics.fillCircle(border.x, y, radius)
 
-          graphics.fillStyle(fillColor, alpha)
-          graphics.fillCircle(border.x, y, radius)
-
-          if (intensity > 0.15) {
-            graphics.fillStyle(fillColor, alpha * 0.35)
-            graphics.fillCircle(border.x, y, radius * 1.8)
-          }
+        if (intensity > 0.15) {
+          graphics.fillStyle(fillColor, alpha * 0.35)
+          graphics.fillCircle(border.x, y, radius * 1.8)
         }
       }
     }
@@ -310,5 +347,22 @@ export default class NeonGrid {
     this.rt.clear()
     this.rt.draw(graphics, 0, 0)
     graphics.destroy()
+  }
+
+  private resolveCellHeight(width: number): number {
+    if (this.cellHeight > 0) return this.cellHeight
+    const fallback = this.laneSnapshot?.count && this.laneSnapshot.count > 0
+      ? width / this.laneSnapshot.count
+      : width / 8
+    return Math.max(24, fallback)
+  }
+
+  private generateFallbackVerticals(width: number): number[] {
+    const cols = 14
+    const positions: number[] = []
+    for (let i = 0; i <= cols; i++) {
+      positions.push((i / cols) * width)
+    }
+    return positions
   }
 }

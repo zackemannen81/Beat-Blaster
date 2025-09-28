@@ -88,6 +88,10 @@ export default class GameScene extends Phaser.Scene {
   private touchFirePointers = new Set<number>()
   private touchTapTimes: number[] = []
   private beatIndicator!: Phaser.GameObjects.Graphics;
+  private beatStatusSearching?: Phaser.GameObjects.Text
+  private beatStatusDetected?: Phaser.GameObjects.Text
+  private beatStatusDetectedShown = false
+  private beatStatusResizeHandler?: (size: Phaser.Structs.Size) => void
   private lastHitEnemyId: string | null = null
   private neon!: NeonGrid
   private powerupDurations: Record<PowerupType, number> = {
@@ -219,6 +223,8 @@ export default class GameScene extends Phaser.Scene {
     this.beatIndicator = this.add.graphics();
     this.beatIndicator.fillStyle(0xff0000, 1);
     this.beatIndicator.fillCircle(50, 50, 20); // Placera den där det passar i ditt UI
+
+    this.setupBeatStatusOverlay()
 
     if (this.gameplayMode === 'vertical') {
       this.setupVerticalLaneSystem()
@@ -407,6 +413,9 @@ export default class GameScene extends Phaser.Scene {
       this.updateWeaversOnBeat(band)
       this.updateFormationDancersOnBeat(band)
       this.updateMirrorersOnBeat(band)
+      if (!this.beatStatusDetectedShown) {
+        this.onBeatDetection()
+      }
       if (!usingPattern) {
         this.waveDirector.enqueueBeat(band)
       }
@@ -540,6 +549,15 @@ export default class GameScene extends Phaser.Scene {
       this.events.off('wave:spawned', this.handleWaveSpawned, this)
       this.events.off('wave:telegraph', this.handleWaveTelegraph, this)
       this.events.off('lanes:pulse', this.onLanePatternPulse, this)
+      if (this.beatStatusResizeHandler) {
+        this.scale.off(Phaser.Scale.Events.RESIZE, this.beatStatusResizeHandler, this)
+        this.beatStatusResizeHandler = undefined
+      }
+      this.beatStatusSearching?.destroy()
+      this.beatStatusDetected?.destroy()
+      this.beatStatusSearching = undefined
+      this.beatStatusDetected = undefined
+      this.beatStatusDetectedShown = false
       this.announcer.destroy()
     })
     this.updateDifficultyForStage()
@@ -1412,6 +1430,98 @@ pskin?.setThrust?.(thrustLevel)
     const range = 1 - this.gamepadDeadzone
     const scaled = (abs - this.gamepadDeadzone) / (range || 1)
     return sign * Math.min(Math.max(scaled, 0), 1)
+  }
+
+  private setupBeatStatusOverlay() {
+    const { width, height } = this.scale
+    const baseStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+      fontFamily: 'UiFont, sans-serif',
+      fontSize: '32px',
+      color: '#ffffff',
+      stroke: '#0a0a14',
+      strokeThickness: 6,
+      shadow: { color: '#2d9cff', blur: 18, fill: true },
+      align: 'center'
+    }
+
+    this.beatStatusSearching = this.add.text(width / 2, height / 2, 'SEARCHING FOR BEAT', baseStyle)
+      .setOrigin(0.5)
+      .setDepth(1e4)
+      .setAlpha(0)
+      .setScale(0.82)
+
+    this.beatStatusDetected = this.add.text(width / 2, height / 2, 'BEAT DETECTED, GET READY', {
+      ...baseStyle,
+      color: '#6bffb2',
+      shadow: { color: '#00ffaa', blur: 24, fill: true }
+    })
+      .setOrigin(0.5)
+      .setDepth(1e4)
+      .setAlpha(0)
+      .setScale(0.78)
+
+    this.tweens.add({
+      targets: this.beatStatusSearching,
+      alpha: 1,
+      scale: 1,
+      duration: 620,
+      ease: 'Back.Out'
+    })
+
+    this.beatStatusResizeHandler = (size: Phaser.Structs.Size) => {
+      const cx = size.width / 2
+      const cy = size.height / 2
+      this.beatStatusSearching?.setPosition(cx, cy)
+      this.beatStatusDetected?.setPosition(cx, cy)
+    }
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.beatStatusResizeHandler, this)
+  }
+
+  private onBeatDetection() {
+    this.beatStatusDetectedShown = true
+
+    if (this.beatStatusSearching) {
+      this.tweens.add({
+        targets: this.beatStatusSearching,
+        alpha: 0,
+        scale: 1.08,
+        duration: 360,
+        ease: 'Cubic.easeIn',
+        onComplete: () => {
+          this.beatStatusSearching?.destroy()
+          this.beatStatusSearching = undefined
+        }
+      })
+    }
+
+    const banner = this.beatStatusDetected
+    if (!banner) return
+
+    banner.setAlpha(0)
+    banner.setScale(0.78)
+    this.tweens.add({
+      targets: banner,
+      alpha: 1,
+      scale: 1,
+      duration: 520,
+      ease: 'Back.Out',
+      onComplete: () => {
+        this.time.delayedCall(1500, () => {
+          if (!banner.active) return
+          this.tweens.add({
+            targets: banner,
+            alpha: 0,
+            scale: 1.12,
+            duration: 420,
+            ease: 'Cubic.easeIn',
+            onComplete: () => {
+              banner.destroy()
+              if (this.beatStatusDetected === banner) this.beatStatusDetected = undefined
+            }
+          })
+        })
+      }
+    })
   }
 
   private getAimDirection(): Phaser.Math.Vector2 {

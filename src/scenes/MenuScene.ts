@@ -51,7 +51,7 @@ export default class MenuScene extends Phaser.Scene {
     logo.setScale(0.5)
 
     this.hint = this.add.text(width / 2, height * 0.85, 'SPACE: Play   ↑/↓: Select   O: Options', {
-      fontFamily: 'UiFont, sans-serif',
+      fontFamily: 'UiFont2, sans-serif',
       fontSize: '16px',
       color: '#a0e9ff'
     }).setOrigin(0.5)
@@ -85,7 +85,7 @@ export default class MenuScene extends Phaser.Scene {
       this.index = trackIndex
     }
     this.list = this.add.text(width / 2, height * 0.6, '', {
-      fontFamily: 'UiFont, sans-serif',
+      fontFamily: 'UiFont2, sans-serif',
       fontSize: '14px',
       color: '#ffffff',
       align: 'center'

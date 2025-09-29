@@ -292,8 +292,8 @@ export default class NeonGrid {
     }
 
     const cellHeight = this.resolveCellHeight(width)
-    const horizontalAlpha = 0.14 + 0.24 * pulse
-    graphics.lineStyle(2, 0xff5db1, horizontalAlpha)
+    const horizontalAlpha = 0.1 + 0.18 * pulse
+    graphics.lineStyle(1.5, 0xff5db1, horizontalAlpha)
     const rowCount = Math.ceil(height / cellHeight)
     for (let i = 0; i <= rowCount; i++) {
       const y = Math.round(i * cellHeight)
@@ -304,10 +304,32 @@ export default class NeonGrid {
       graphics.strokePath()
     }
 
+    const secondaryAlpha = horizontalAlpha * 0.45
+    if (secondaryAlpha > 0.01) {
+      graphics.lineStyle(1, 0x1a8aff, secondaryAlpha)
+      for (let i = 0; i <= rowCount; i++) {
+        const y = Math.round(i * cellHeight + cellHeight * 0.5)
+        if (y > height + 1) break
+        graphics.beginPath()
+        graphics.moveTo(0, y)
+        graphics.lineTo(width, y)
+        graphics.strokePath()
+      }
+    }
+
     if (highPulse > 0.01) {
-      graphics.lineStyle(4, 0xfff3fb, highPulse * 0.25)
+      graphics.lineStyle(3, 0xfff3fb, highPulse * 0.22)
       for (let i = 0; i <= rowCount; i++) {
         const y = Math.round(i * cellHeight)
+        if (y > height + 1) break
+        graphics.beginPath()
+        graphics.moveTo(0, y)
+        graphics.lineTo(width, y)
+        graphics.strokePath()
+      }
+      graphics.lineStyle(2, 0xcdfdff, highPulse * 0.16)
+      for (let i = 0; i <= rowCount; i++) {
+        const y = Math.round(i * cellHeight + cellHeight * 0.5)
         if (y > height + 1) break
         graphics.beginPath()
         graphics.moveTo(0, y)

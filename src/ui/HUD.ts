@@ -49,6 +49,9 @@ export default class HUD {
   private shotFeedback!: Phaser.GameObjects.Text
   private bpmText!: Phaser.GameObjects.Text
   private laneText!: Phaser.GameObjects.Text
+  private sideOrnaments!: Phaser.GameObjects.Graphics
+  private beatVisualizer!: Phaser.GameObjects.Graphics
+  private beatLevels = { low: 0, mid: 0, high: 0 }
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene
@@ -56,9 +59,14 @@ export default class HUD {
 
   create() {
     const { width, height } = this.scene.scale
+    this.beatVisualizer = this.scene.add.graphics().setDepth(55).setScrollFactor(0)
+    this.beatVisualizer.setBlendMode(Phaser.BlendModes.ADD)
+    this.sideOrnaments = this.scene.add.graphics().setDepth(18).setScrollFactor(0)
+    this.sideOrnaments.setBlendMode(Phaser.BlendModes.ADD)
+
     this.scoreText = this.scene.add.text(16, 10, 'Score: 0', { fontFamily: 'UiFont, sans-serif', fontSize: '16px', color: '#fff' })
     this.multText = this.scene.add.text(width / 2, 10, 'x1.0', { fontFamily: 'UiFont, sans-serif', fontSize: '18px', color: '#a0e9ff' }).setOrigin(0.5, 0)
-    this.accText = this.scene.add.text(width - 160, 10, 'Acc: 0%', { fontFamily: 'UiFont, sans-serif', fontSize: '14px', color: '#fff' })
+    this.accText = this.scene.add.text(width , 10, 'Acc: 0%', { fontFamily: 'UiFont, sans-serif', fontSize: '14px', color: '#fff' })
     this.bombBarBg = this.scene.add.rectangle(width - 160, 20, 120, 10, 0x333333).setOrigin(0, 0)
     this.bombBarFill = this.scene.add.rectangle(width - 160, 20, 0, 10, 0x00e5ff).setOrigin(0, 0)
     this.comboText = this.scene.add.text(width / 2, 40, '', { fontFamily: 'UiFont, sans-serif', fontSize: '24px', color: '#ffb300' }).setOrigin(0.5, 0)
@@ -114,12 +122,21 @@ export default class HUD {
     })
   }
 
+  flashBeat(band: 'low' | 'mid' | 'high') {
+    if (!(band in this.beatLevels)) return
+    this.beatLevels[band as keyof typeof this.beatLevels] = 1
+    this.updateBeatVisualizer()
+  }
+
   update(score: number, multiplier: number, accPct?: number) {
+    const { width, height } = this.scene.scale
     this.scoreText.setText(`Score: ${score}`)
     this.multText.setText(`x${multiplier.toFixed(1)}`)
     if (typeof accPct === 'number') this.accText.setText(`Acc: ${accPct.toFixed(0)}%`)
     this.updatePowerupPanel()
     this.updateUpcoming(this.scene.time.now)
+    this.drawSideOrnaments(width, height)
+//    this.updateBeatVisualizer(true)
   }
 
   setupHearts(maxHp: number) {
@@ -402,6 +419,7 @@ export default class HUD {
       slot.container.setPosition(width - 16, 60 + index * 44)
       index++
     }
+
   }
 
   private handleResize() {
@@ -422,5 +440,76 @@ export default class HUD {
     this.laneText?.setPosition(width - 160, 52)
     this.shotFeedback?.setPosition(width / 2, height * 0.78)
     this.layoutPowerupSlots()
+  }
+  private drawSideOrnaments(width: number, height: number) {
+    if (!this.sideOrnaments) return
+    const g = this.sideOrnaments
+    g.clear()
+    const margin = 12
+    const stripWidth = 16
+    const color = 0x37baff
+    g.lineStyle(1, color, 0.28)
+    g.strokeRect(margin, margin, stripWidth, height - margin * 2)
+    g.strokeRect(width - margin - stripWidth, margin, stripWidth, height - margin * 2)
+
+    g.fillStyle(color, 0.08)
+    g.fillRect(margin + 2, margin + 10, stripWidth - 4, height - margin * 2 - 20)
+    g.fillRect(width - margin - stripWidth + 2, margin + 10, stripWidth - 4, height - margin * 2 - 20)
+
+    const tickCount = 12
+    for (let i = 0; i <= tickCount; i++) {
+      const y = margin + (height - margin * 2) * (i / tickCount)
+      const tick = i % 2 === 0 ? 18 : 10
+      g.lineStyle(1, color, 0.24)
+      g.lineBetween(margin - tick, y, margin, y)
+      g.lineBetween(width - margin, y, width - margin + tick, y)
+    }
+  }
+
+  private updateBeatVisualizer(force = false) {
+    if (!this.beatVisualizer) return
+    const g = this.beatVisualizer
+    const dt = this.scene.game.loop.delta || 16
+    const decay = force ? 0 : Phaser.Math.Clamp(dt / 280, 0.03, 0.12)
+    if (!force) {
+      this.beatLevels.low = Phaser.Math.Clamp(this.beatLevels.low - decay, 0, 1)
+      this.beatLevels.mid = Phaser.Math.Clamp(this.beatLevels.mid - decay, 0, 1)
+      this.beatLevels.high = Phaser.Math.Clamp(this.beatLevels.high - decay, 0, 1)
+    }
+
+    const { width, height } = this.scene.scale
+    const centerX = width / 2
+    const baseY = height - 5
+    const barWidth = 26
+    const gap = 18
+    const baseHeights: Record<'low' | 'mid' | 'high', number> = {
+      low: 42,
+      mid: 32,
+      high: 26
+    }
+    const colors: Record<'low' | 'mid' | 'high', number> = {
+      low: 0xff5db1,
+      mid: 0x38f3ff,
+      high: 0xcdfdff
+    }
+
+    g.clear()
+    g.lineStyle(1, 0x17364c, 0.55)
+    g.beginPath()
+    g.moveTo(centerX - (barWidth + gap) * 1.6, baseY)
+    g.lineTo(centerX + (barWidth + gap) * 1.6, baseY)
+    g.strokePath()
+
+    const order: Array<'low' | 'mid' | 'high'> = ['low', 'mid', 'high']
+    order.forEach((band, idx) => {
+      const intensity = Phaser.Math.Clamp(this.beatLevels[band], 0, 1)
+      const baseHeight = baseHeights[band]
+      const activeHeight = baseHeight * (0.3 + intensity * 0.8)
+      const x = centerX + (idx - 1) * (barWidth + gap)
+      g.fillStyle(0x06111c, 0.55)
+      g.fillRoundedRect(x - barWidth / 2, baseY - baseHeight, barWidth, baseHeight, 4)
+      g.fillStyle(colors[band], 0.45 + intensity * 0.45)
+      g.fillRoundedRect(x - barWidth / 2, baseY - activeHeight, barWidth, activeHeight, 4)
+    })
   }
 }

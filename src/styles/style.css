@@ -1,6 +1,7 @@
 /* Base styles and font-face declarations */
 @font-face { font-family: 'HudFont'; src: url('../assets/fonts/HudFontAlt.ttf') format('truetype'); font-display: swap; }
 @font-face { font-family: 'UiFont';  src: url('../assets/fonts/UiFontAlt.ttf')  format('truetype'); font-display: swap; }
+@font-face { font-family: 'UiFont2'; src: url('../assets/fonts/EurostileExtendedBlack.ttf') format('truetype'); font-display: swap; }
 @font-face { font-family: 'AnnouncerFont';  src: url('../assets/fonts/ComboFont.ttf')  format('truetype'); font-display: swap; }
 
 html, body {
@@ -8,7 +9,7 @@ html, body {
   padding: 0;
   background-color: #0a0a0f;
   color: #e6e6f0;
-  font-family: 'UiFont', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-family: 'UiFont', system-ui, 'UiFont2','AnnouncerFont',-apple-system, Segoe UI, Roboto, sans-serif;
   height: 100%;
 }
 

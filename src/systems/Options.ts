@@ -22,19 +22,19 @@ const KEY = 'bb_options_v1'
 
 export const DEFAULT_OPTIONS: Options = {
   musicVolume: 0.8,
-  sfxVolume: 0.8,
+  sfxVolume: 0.9,
   metronome: false,
   highContrast: false,
   reducedMotion: false,
   shaderEnabled: true,
   inputOffsetMs: {},
-  fireMode: 'click',
-  gameplayMode: 'omni',
+  fireMode: 'hold_quantized',
+  gameplayMode: 'vertical',
   gamepadDeadzone: 0.25,
   gamepadSensitivity: 1,
-  crosshairMode: 'pointer',
+  crosshairMode: 'fixed',
   verticalSafetyBand: false,
-  allowFallbackWaves: true,
+  allowFallbackWaves: false,
   unlockMouseAim: false
 }
 

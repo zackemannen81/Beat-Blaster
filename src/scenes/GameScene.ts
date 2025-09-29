@@ -422,6 +422,7 @@ export default class GameScene extends Phaser.Scene {
       this.updateFormationDancersOnBeat(band)
       this.updateMirrorersOnBeat(band)
       this.neon?.onBeat(band)
+      this.hud?.flashBeat(band)
       if (!this.beatStatusDetectedShown) {
         this.onBeatDetection()
       }

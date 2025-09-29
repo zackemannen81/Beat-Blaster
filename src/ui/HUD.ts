@@ -65,7 +65,20 @@ export default class HUD {
     this.stageText = this.scene.add.text(16, 60, 'Stage 1', { fontFamily: 'UiFont, sans-serif', fontSize: '18px', color: '#9ad2ff' })
     this.crosshairText = this.scene.add.text(16, 84, 'Crosshair: Pointer', { fontFamily: 'UiFont, sans-serif', fontSize: '16px', color: '#9ad2ff' })
     this.upcomingWaveText = this.scene.add.text(16, 108, '', { fontFamily: 'UiFont, sans-serif', fontSize: '16px', color: '#ffd866' })
-    this.telegraphText = this.scene.add.text(16, 130, '', { fontFamily: 'UiFont, sans-serif', fontSize: '15px', color: '#ff5db1' })
+    this.telegraphText = this.scene.add.text(width / 2, height * 0.22, '', {
+      fontFamily: 'UiFont, sans-serif',
+      fontSize: '38px',
+      fontStyle: 'bold',
+      color: '#ffe7ff',
+      stroke: '#0a0c26',
+      strokeThickness: 6,
+      align: 'center'
+    })
+      .setOrigin(0.5)
+      .setDepth(80)
+      .setVisible(false)
+    this.telegraphText.setShadow(0, 0, '#ff4fd8', 24, true, true)
+    this.telegraphText.setWordWrapWidth(width * 0.72)
     this.upcomingWaveText.setVisible(false)
     this.telegraphText.setVisible(false)
 
@@ -266,12 +279,34 @@ export default class HUD {
   }
 
   setTelegraphMessage(text: string) {
+    this.scene.tweens.killTweensOf(this.telegraphText)
     this.telegraphText.setText(text)
     this.telegraphText.setVisible(true)
+    this.telegraphText.setAlpha(0)
+    this.telegraphText.setScale(0.86)
+    this.scene.tweens.add({
+      targets: this.telegraphText,
+      alpha: 1,
+      scale: 1,
+      duration: 220,
+      ease: 'Back.easeOut'
+    })
   }
 
   clearTelegraphMessage() {
-    this.telegraphText.setVisible(false)
+    if (!this.telegraphText.visible) return
+    this.scene.tweens.killTweensOf(this.telegraphText)
+    this.scene.tweens.add({
+      targets: this.telegraphText,
+      alpha: 0,
+      scale: 0.92,
+      duration: 240,
+      ease: 'Sine.easeInOut',
+      onComplete: () => {
+        this.telegraphText.setVisible(false)
+        this.telegraphText.setScale(1)
+      }
+    })
   }
 
   bindPowerups(powerups: Powerups) {
@@ -379,7 +414,8 @@ export default class HUD {
     this.stageText.setPosition(16, 60)
     this.crosshairText.setPosition(16, 84)
     this.upcomingWaveText.setPosition(16, 108)
-    this.telegraphText.setPosition(16, 130)
+    this.telegraphText.setPosition(width / 2, height * 0.22)
+    this.telegraphText.setWordWrapWidth(width * 0.72)
     this.bossContainer.setPosition(width / 2, 80)
     this.missText.setPosition(width / 2, height * 0.45)
     this.bpmText?.setPosition(width - 160, 34)

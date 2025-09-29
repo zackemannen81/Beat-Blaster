@@ -136,6 +136,7 @@ export default class GameScene extends Phaser.Scene {
   private onLaneSnapshot = (snapshot: ReturnType<LaneManager['getSnapshot']>) => {
     this.hud?.setLaneCount(snapshot.count)
     this.neon?.setLaneSnapshot(snapshot)
+    this.registry.set('laneSnapshot', snapshot)
   }
   private horizontalInputActive = false
   private unlockMouseAim = false
@@ -403,6 +404,8 @@ export default class GameScene extends Phaser.Scene {
     
     // Set up beat listeners
     const handleBeat = (band: 'low' | 'mid' | 'high', pulse = false) => {
+      this.events.emit('beat', band)
+      this.events.emit(`beat:${band}`)
       this.conductor.onBeat()
       this.lastBeatAt = this.time.now
       if (band === 'low') {
@@ -1287,6 +1290,7 @@ pskin?.setThrust?.(thrustLevel)
     this.lanes?.off(LaneManager.EVT_CHANGED, this.onLaneSnapshot, this)
     this.lanes?.destroy()
     this.neon?.setLaneSnapshot(null)
+    this.registry.remove('laneSnapshot')
     this.currentSnapPoint = null
     this.lanes = new LaneManager({
       scene: this,

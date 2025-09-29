@@ -81,12 +81,12 @@ class LaneRunwayEffect {
   private scene: Phaser.Scene
   private container: Phaser.GameObjects.Container
   private lanes: LaneRunway[] = []
-  private readonly baseAlpha = 0.14
-  private readonly highlightAlpha = 0.92
-  private readonly baseScale = 0.38
-  private readonly highlightScale = 0.9
+  private readonly baseAlpha = 0.24
+  private readonly highlightAlpha = 1
+  private readonly baseScale = 0.48
+  private readonly highlightScale = 1.05
   private readonly glowScaleMultiplier = 1.9
-  private readonly tailIntensity = 0.35
+  private readonly tailIntensity = 0.45
   private readonly rng = new Phaser.Math.RandomDataGenerator([Date.now().toString()])
 
   private beatHandler: () => void = () => {}
@@ -128,6 +128,9 @@ class LaneRunwayEffect {
 
     this.scene.events.on('beat:low', this.beatHandler)
     this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.updateHandler)
+
+    // Kick off with an immediate highlight so the runway pops even before the next beat.
+    this.advance()
 
     if (duration > 0) {
       const fadeDelay = Math.max(0, duration - 200)

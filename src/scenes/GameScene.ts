@@ -1293,7 +1293,7 @@ pskin?.setThrust?.(thrustLevel)
       count: laneCount,
       width: this.scale.width,
       left: 0,
-      debug: true
+      debug: false
     })
     this.lanes.on(LaneManager.EVT_CHANGED, this.onLaneSnapshot, this)
     this.onLaneSnapshot(this.lanes.getSnapshot())
@@ -1694,6 +1694,7 @@ pskin?.setThrust?.(thrustLevel)
     })
 
     this.lanePattern?.updateStage(cfg)
+    this.starfield?.setStageSpeedModifier(cfg.scrollMultiplier ?? 1)
   }
 
 

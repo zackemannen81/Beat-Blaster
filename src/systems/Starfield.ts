@@ -6,6 +6,7 @@ export default class Starfield {
   private scene: Phaser.Scene
   private stars: Star[] = []
   private baseScroll = 120
+  private stageSpeedModifier = 1
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene
@@ -35,8 +36,8 @@ export default class Starfield {
     }
 
     // Three parallax layers
-    makeLayer(80, 0.3, 0.8, 0.5)
-    makeLayer(60, 0.55, 0.6, 0.4)
+    makeLayer(80, 0.3, 0.8, 0.9)
+    makeLayer(60, 0.55, 0.6, 0.6)
     makeLayer(40, 0.85, 0.4, 0.3)
     const bgimage = this.scene.add.image(width / 2, height / 2, 'background')
     bgimage.setOrigin(0.5)
@@ -49,7 +50,7 @@ export default class Starfield {
   update(dt: number) {
     const { width, height } = this.scene.scale
     for (const s of this.stars) {
-      const speed = this.baseScroll * s.multiplier
+      const speed = this.baseScroll * this.stageSpeedModifier * s.multiplier
       s.img.y += (speed * dt) / 1000
       if (s.img.y > height + 2) {
         s.img.y = -2
@@ -65,5 +66,13 @@ export default class Starfield {
 
   setBaseScroll(speed: number) {
     this.baseScroll = speed
+  }
+
+  setStageSpeedModifier(multiplier: number) {
+    if (!Number.isFinite(multiplier) || multiplier <= 0) {
+      this.stageSpeedModifier = 1
+      return
+    }
+    this.stageSpeedModifier = multiplier
   }
 }

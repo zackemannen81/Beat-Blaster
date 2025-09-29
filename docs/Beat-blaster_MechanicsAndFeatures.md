@@ -143,6 +143,7 @@
 - **NeonGrid** renderar bakgrundsrutnät och lane-gränser som futuristiska "runway lights". Garantier: rutnätets vertikala linjer matchar lane-borders och cellbredd = lane-bredd, så rutorna följer banans format oavsett 3/5/7 lanes. Varje lane-kant har ljusnoder som följer beatsekvenser (low/mid/high) och ger illusion av flöde längs banans sidor.
 - Rutnätet andas med musiken – låga beats hoppar till nästa nod, mid-beats ger en längre svans, high-beats lägger ett mjukt overlay-glow.
 - Systemet resnappar automatiskt när lane-antalet ändras eller skärmen resizas så att rutnätet alltid lirar med lane-geometrin.
+- **Starfield** parallaxlager använder samma stage-scroll multiplier, så hastigheten ökar i takt med progression och bpm.
 
 - **Fiende-HP:** alltid multipler av beats (1, 2, 4).  
 - **Exempel:**  

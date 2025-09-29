@@ -40,11 +40,11 @@ export default class NeonGrid {
   private gridPulse = 0
   private highPulse = 0
 
-  private cellHeight = 96
+  private cellHeight = 48
 
-  private readonly nodeSpacingPx = 68
-  private readonly baseNodeAlpha = 0.16
-  private readonly highlightNodeAlpha = 0.6
+  private readonly nodeSpacingPx = 48
+  private readonly baseNodeAlpha = 0.08
+  private readonly highlightNodeAlpha = 0.64
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene
@@ -273,7 +273,7 @@ export default class NeonGrid {
       : this.generateFallbackVerticals(width)
 
     const baseVerticalAlpha = 0.18 + 0.28 * pulse
-    graphics.lineStyle(2, 0x1ad8ff, baseVerticalAlpha)
+    graphics.lineStyle(1, 0x1ad8ff, baseVerticalAlpha)
     for (const x of verticals) {
       graphics.beginPath()
       graphics.moveTo(x, 0)
